@@ -29,7 +29,7 @@ public sealed class Codegen
             if (unit.Consts.Count > 0) Line("");
             foreach (var cls in unit.Classes) EmitClassLua(cls);
             foreach (var fn in unit.Functions) EmitFnLua(fn);
-            if (hasInit) Line("OnInit()");
+            if (hasInit) EmitLuaHook();
         }
         else
         {
@@ -49,6 +49,22 @@ public sealed class Codegen
             Line("endlibrary");
         }
         return string.Join("\n", _lines) + "\n";
+    }
+
+    // Инжект InitGlobals: без него сгенерированный war3map.lua не вызывается движком.
+    // См. https://xgm.guru/p/wc3/lua-inject
+    private void EmitLuaHook()
+    {
+        Line("do");
+        Line("    local old = InitGlobals");
+        Line("    function InitGlobals()");
+        Line("        if old then old() end");
+        Line("        OnInit()");
+        Line("    end");
+        Line("end");
+        Line("");
+        Line("-- фолбэк: если движок не вызвал InitGlobals, запускаем сами");
+        Line("if not InitGlobals then OnInit() end");
     }
 
     private void EmitClassVj(ClassDecl cls)
