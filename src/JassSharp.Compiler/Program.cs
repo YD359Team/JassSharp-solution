@@ -155,11 +155,10 @@ static class MapBuild
                 ? Path.GetDirectoryName(exeDir)!
                 : exeDir;
 
-            var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
-            var testDir = Path.Combine(docs, "Warcraft III", "Maps", "Test");
+            // TEMP, не OneDrive — нет блокировок. Уникальное имя, чтобы не удалять старое
+            var testDir = Path.Combine(Path.GetTempPath(), "JassSharp");
             Directory.CreateDirectory(testDir);
-            var testMap = Path.Combine(testDir, "JassSharpMap");
-            if (Directory.Exists(testMap)) Directory.Delete(testMap, true);
+            var testMap = Path.Combine(testDir, "map_" + DateTime.Now.ToString("HHmmss"));
             CopyDir(map, testMap);
             Console.WriteLine("copy: " + testMap);
 
