@@ -65,6 +65,16 @@
           "default": "",
           "description": "Путь к Warcraft III.exe для команды Run Map."
         },
+        "jasssharp.editorPath": {
+          "type": "string",
+          "default": "",
+          "description": "Путь к World Editor.exe. Пусто — ищется рядом с игрой."
+        },
+        "jasssharp.mpqToolPath": {
+          "type": "string",
+          "default": "",
+          "description": "Путь к mpqtool.exe (или другому упаковщику) для команды Pack Map."
+        },
         "jasssharp.projectFile": {
           "type": "string",
           "default": "jasssharp.json",
@@ -77,7 +87,9 @@
       { "command": "jasssharp.buildVjass", "title": "JASS#: Build vJASS" },
       { "command": "jasssharp.buildLua", "title": "JASS#: Build Lua" },
       { "command": "jasssharp.buildMap", "title": "JASS#: Build Map", "icon": "$(package)" },
-      { "command": "jasssharp.runMap", "title": "JASS#: Run Map", "icon": "$(play)" }
+      { "command": "jasssharp.runMap", "title": "JASS#: Run Map", "icon": "$(play)" },
+      { "command": "jasssharp.openEditor", "title": "JASS#: Open in World Editor", "icon": "$(edit)" },
+      { "command": "jasssharp.packMap", "title": "JASS#: Pack Map", "icon": "$(archive)" }
     ],
     "menus": {
       "editor/context": [
@@ -88,6 +100,11 @@
         },
         {
           "command": "jasssharp.runMap",
+          "when": "editorLangId == jasssharp",
+          "group": "navigation"
+        },
+        {
+          "command": "jasssharp.openEditor",
           "when": "editorLangId == jasssharp",
           "group": "navigation"
         }
@@ -102,6 +119,11 @@
           "command": "jasssharp.buildMap",
           "when": "editorLangId == jasssharp",
           "group": "navigation@2"
+        },
+        {
+          "command": "jasssharp.openEditor",
+          "when": "editorLangId == jasssharp",
+          "group": "navigation@3"
         }
       ]
     }
