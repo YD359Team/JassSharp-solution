@@ -7,6 +7,20 @@ export function activate(context: vscode.ExtensionContext) {
   const diags = vscode.languages.createDiagnosticCollection("jasssharp");
   context.subscriptions.push(diags);
 
+  const runBtn = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+  runBtn.command = "jasssharp.runMap";
+  runBtn.text = "$(play) Run Map";
+  runBtn.tooltip = "JASS#: собрать и запустить карту";
+  context.subscriptions.push(runBtn);
+
+  const updateBtn = () => {
+    const ed = vscode.window.activeTextEditor;
+    if (ed?.document.languageId === "jasssharp") runBtn.show();
+    else runBtn.hide();
+  };
+  updateBtn();
+  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(updateBtn));
+
   context.subscriptions.push(
     vscode.commands.registerCommand("jasssharp.build", () => build("")),
     vscode.commands.registerCommand("jasssharp.buildVjass", () => build("vjass")),
