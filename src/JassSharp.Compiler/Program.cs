@@ -95,6 +95,7 @@ static class MapBuild
         var target = root.TryGetProperty("target", out var t) ? t.GetString() ?? "lua" : "lua";
         var entry = root.TryGetProperty("entry", out var e) ? e.GetString() : null;
         var game = root.TryGetProperty("game", out var g) ? g.GetString() : null;
+        var extra = root.TryGetProperty("args", out var a) ? a.GetString() : null;
         game = string.IsNullOrWhiteSpace(game) ? Environment.GetEnvironmentVariable("JASSSHARP_GAME") : game;
         map = Path.IsPathRooted(map) ? map : Path.Combine(project, map);
 
@@ -143,13 +144,27 @@ static class MapBuild
                 Console.Error.WriteLine("для запуска укажите game в jasssharp.json (путь к Warcraft III.exe)");
                 return 1;
             }
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+
+            // Reforged: exe в x86_64, рабочая папка — корень _retail_
+            var exeDir = Path.GetDirectoryName(game)!;
+            var workDir = exeDir.EndsWith("x86_64", StringComparison.OrdinalIgnoreCase)
+                ? Path.GetDirectoryName(exeDir)!
+                : exeDir;
+
+            // -launch обязателен для Reforged, иначе откроется только лаунчер
+            var args = $"-launch -windowmode windowed -loadfile \"{map}\"";
+            if (!string.IsNullOrWhiteSpace(extra)) args += " " + extra;
+
+            var psi = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = game,
-                Arguments = $"-loadfile \"{map}\"",
-                UseShellExecute = true,
-            });
-            Console.WriteLine("запуск: " + game);
+                Arguments = args,
+                WorkingDirectory = workDir,
+                UseShellExecute = false,
+            };
+            System.Diagnostics.Process.Start(psi);
+            Console.WriteLine($"запуск: {game} {args}");
+            Console.WriteLine($"рабочая папка: {workDir}");
         }
         return 0;
     }
