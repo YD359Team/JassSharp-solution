@@ -142,11 +142,58 @@ static class MapBuild
         File.WriteAllText(dest, script);
         Console.WriteLine("script: " + dest);
 
+        if (!File.Exists(Path.Combine(map, "war3map.w3i")))
+            Console.WriteLine("warn: no war3map.w3i in map folder — World Editor will say Level Info missing");
+
+        // упаковка в .w3x. На 3.0.1 папку -loadfile не берёт
+        var tool = Environment.GetEnvironmentVariable("JASSSHARP_MPQ")
+                   ?? FindOnPath("mpqtool.exe")
+                   ?? FindOnPath("mpqtool");
+        string? packed = null;
+        if (!string.IsNullOrWhiteSpace(tool) && File.Exists(tool))
+        {
+            var outDir = Path.Combine(project, "bin");
+            Directory.CreateDirectory(outDir);
+            packed = Path.Combine(outDir, "JassSharpMap.w3x");
+            if (File.Exists(packed)) File.Delete(packed);
+            Console.WriteLine("pack: " + tool + " new \"" + map + "\" \"" + packed + "\"");
+            var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = tool,
+                Arguments = $"new \"{map}\" \"{packed}\"",
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+            });
+            if (p != null)
+            {
+                var err = p.StandardError.ReadToEnd();
+                var outp = p.StandardOutput.ReadToEnd();
+                p.WaitForExit();
+                if (!string.IsNullOrWhiteSpace(outp)) Console.WriteLine(outp.Trim());
+                if (p.ExitCode != 0 || !File.Exists(packed))
+                {
+                    Console.Error.WriteLine("pack failed: " + err.Trim());
+                    packed = null;
+                }
+                else Console.WriteLine("packed: " + packed);
+            }
+        }
+        else
+        {
+            Console.WriteLine("warn: mpqtool not found. set JASSSHARP_MPQ or put mpqtool.exe on PATH. folder map will not load on 3.0.1");
+        }
+
         if (launch)
         {
             if (string.IsNullOrWhiteSpace(game) || !File.Exists(game))
             {
                 Console.Error.WriteLine("set game in jasssharp.json (path to Warcraft III.exe)");
+                return 1;
+            }
+            if (packed == null)
+            {
+                Console.Error.WriteLine("cannot run: no .w3x. install mpqtool and set jasssharp.mpqToolPath");
                 return 1;
             }
 
@@ -155,38 +202,36 @@ static class MapBuild
                 ? Path.GetDirectoryName(exeDir)!
                 : exeDir;
 
-            // TEMP, не OneDrive — нет блокировок. Уникальное имя, чтобы не удалять старое
-            var testDir = Path.Combine(Path.GetTempPath(), "JassSharp");
-            Directory.CreateDirectory(testDir);
-            var testMap = Path.Combine(testDir, "map_" + DateTime.Now.ToString("HHmmss"));
-            CopyDir(map, testMap);
-            Console.WriteLine("copy: " + testMap);
-
-            var launchArgs = $"-launch -editor -windowmode windowed -loadfile \"{testMap}\"";
+            var launchArgs = $"-launch -editor -windowmode windowed -loadfile \"{packed}\"";
             if (!string.IsNullOrWhiteSpace(extra)) launchArgs += " " + extra;
 
             Console.WriteLine("LAUNCH: \"" + game + "\" " + launchArgs);
             Console.WriteLine("WORKDIR: " + workDir);
 
-            var psi = new System.Diagnostics.ProcessStartInfo
+            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
                 FileName = game,
                 Arguments = launchArgs,
                 WorkingDirectory = workDir,
                 UseShellExecute = true,
-            };
-            System.Diagnostics.Process.Start(psi);
+            });
             Console.WriteLine("started");
         }
         return 0;
     }
 
-    static void CopyDir(string src, string dst)
+    static string? FindOnPath(string name)
     {
-        Directory.CreateDirectory(dst);
-        foreach (var f in Directory.GetFiles(src))
-            File.Copy(f, Path.Combine(dst, Path.GetFileName(f)), true);
-        foreach (var d in Directory.GetDirectories(src))
-            CopyDir(d, Path.Combine(dst, Path.GetFileName(d)));
+        var path = Environment.GetEnvironmentVariable("PATH") ?? "";
+        foreach (var dir in path.Split(Path.PathSeparator))
+        {
+            try
+            {
+                var full = Path.Combine(dir.Trim(), name);
+                if (File.Exists(full)) return full;
+            }
+            catch { }
+        }
+        return null;
     }
 }
