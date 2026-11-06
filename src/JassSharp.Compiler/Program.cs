@@ -1,6 +1,10 @@
+using System.Text;
 using System.Text.Json;
 using JassSharp.Emit;
 using JassSharp.Syntax;
+
+Console.OutputEncoding = Encoding.UTF8;
+Console.InputEncoding = Encoding.UTF8;
 
 if (args.Length < 2 || args[0] is not ("build" or "check" or "map"))
 {
@@ -16,7 +20,7 @@ var cmd = args[0];
 if (cmd == "check")
 {
     var path = args[1];
-    if (!File.Exists(path)) { Console.Error.WriteLine($"файл не найден: {path}"); return 1; }
+    if (!File.Exists(path)) { Console.Error.WriteLine($"file not found: {path}"); return 1; }
     var diags = new List<JassSharp.Diagnostic>();
     try
     {
@@ -48,7 +52,7 @@ if (cmd == "map")
 }
 
 var file = args[1];
-if (!File.Exists(file)) { Console.Error.WriteLine($"файл не найден: {file}"); return 1; }
+if (!File.Exists(file)) { Console.Error.WriteLine($"file not found: {file}"); return 1; }
 var target = "both";
 for (var i = 2; i < args.Length - 1; i++)
     if (args[i] == "--target") target = args[i + 1];
@@ -75,7 +79,7 @@ try
 }
 catch (Exception ex)
 {
-    Console.Error.WriteLine($"ошибка: {ex.Message}");
+    Console.Error.WriteLine($"error: {ex.Message}");
     return 1;
 }
 return 0;
@@ -87,7 +91,7 @@ static class MapBuild
         var cfgPath = Path.Combine(project, "jasssharp.json");
         if (!File.Exists(cfgPath))
         {
-            Console.Error.WriteLine("нет jasssharp.json");
+            Console.Error.WriteLine("no jasssharp.json");
             return 1;
         }
         using var doc = JsonDocument.Parse(File.ReadAllText(cfgPath));
@@ -109,7 +113,7 @@ static class MapBuild
             if (Directory.Exists(src))
                 files.AddRange(Directory.GetFiles(src, "*.w3js", SearchOption.AllDirectories));
         }
-        if (files.Count == 0) { Console.Error.WriteLine("нет .w3js"); return 1; }
+        if (files.Count == 0) { Console.Error.WriteLine("no .w3js"); return 1; }
 
         var chunks = new List<string>();
         foreach (var f in files)
@@ -129,20 +133,20 @@ static class MapBuild
 
         if (File.Exists(map) && (map.EndsWith(".w3x", StringComparison.OrdinalIgnoreCase) || map.EndsWith(".w3m", StringComparison.OrdinalIgnoreCase)))
         {
-            Console.Error.WriteLine("архив .w3x: укажите папку карты (распакованную) в jasssharp.json → map");
+            Console.Error.WriteLine("archive .w3x: set map to unpacked folder in jasssharp.json");
             return 1;
         }
         Directory.CreateDirectory(map);
         var name = target == "vjass" ? "war3map.j" : "war3map.lua";
         var dest = Path.Combine(map, name);
         File.WriteAllText(dest, script);
-        Console.WriteLine(dest);
+        Console.WriteLine("script: " + dest);
 
         if (launch)
         {
             if (string.IsNullOrWhiteSpace(game) || !File.Exists(game))
             {
-                Console.Error.WriteLine("для запуска укажите game в jasssharp.json (путь к Warcraft III.exe)");
+                Console.Error.WriteLine("set game in jasssharp.json (path to Warcraft III.exe)");
                 return 1;
             }
 
@@ -151,30 +155,29 @@ static class MapBuild
                 ? Path.GetDirectoryName(exeDir)!
                 : exeDir;
 
-            // как в warcraft-vscode: копируем в Documents/Warcraft III/Maps/Test
             var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             var testDir = Path.Combine(docs, "Warcraft III", "Maps", "Test");
             Directory.CreateDirectory(testDir);
             var testMap = Path.Combine(testDir, "JassSharpMap");
             if (Directory.Exists(testMap)) Directory.Delete(testMap, true);
             CopyDir(map, testMap);
-            Console.WriteLine($"копия: {testMap}");
+            Console.WriteLine("copy: " + testMap);
 
-            // как в Wurst: -launch -editor для сохранения сессии Battle.net
-            var args = $"-launch -editor -windowmode windowed -loadfile \"{testMap}\"";
-            if (!string.IsNullOrWhiteSpace(extra)) args += " " + extra;
+            var launchArgs = $"-launch -editor -windowmode windowed -loadfile \"{testMap}\"";
+            if (!string.IsNullOrWhiteSpace(extra)) launchArgs += " " + extra;
+
+            Console.WriteLine("LAUNCH: \"" + game + "\" " + launchArgs);
+            Console.WriteLine("WORKDIR: " + workDir);
 
             var psi = new System.Diagnostics.ProcessStartInfo
             {
                 FileName = game,
-                Arguments = args,
+                Arguments = launchArgs,
                 WorkingDirectory = workDir,
                 UseShellExecute = true,
             };
             System.Diagnostics.Process.Start(psi);
-            Console.WriteLine($"запуск: {game} {args}");
-            Console.WriteLine($"рабочая папка: {workDir}");
-            Console.WriteLine("если открылся только лаунчер — зайдите в Battle.net и попробуйте ещё раз");
+            Console.WriteLine("started");
         }
         return 0;
     }
