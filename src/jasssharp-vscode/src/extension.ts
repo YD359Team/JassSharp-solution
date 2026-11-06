@@ -270,13 +270,21 @@ async function mapBuild(run: boolean) {
   const args = ["map", "--project", root];
   if (run) args.push("--run");
 
-  const game = vscode.workspace.getConfiguration("jasssharp").get<string>("gamePath")?.trim();
+  const cfg = vscode.workspace.getConfiguration("jasssharp");
+  const game = cfg.get<string>("gamePath")?.trim();
+  const mpq = cfg.get<string>("mpqToolPath")?.trim();
   const env = { ...process.env };
   if (game) {
     env.JASSSHARP_GAME = game;
     info(`gamePath: ${game} exists=${fs.existsSync(game)}`);
   } else {
     info("gamePath: (not set, from jasssharp.json)");
+  }
+  if (mpq) {
+    env.JASSSHARP_MPQ = mpq;
+    info(`mpqTool: ${mpq} exists=${fs.existsSync(mpq)}`);
+  } else {
+    info("mpqTool: (not set)");
   }
   info(`cmd: ${compilerCmd()} ${args.join(" ")}`);
   info(`cwd: ${root}`);
