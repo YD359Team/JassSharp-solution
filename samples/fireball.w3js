@@ -1,0 +1,44 @@
+namespace MyMap.Spells
+{
+    const int FireballId = 'A000';
+
+    class Fireball
+    {
+        unit Caster;
+        float Damage;
+
+        public Fireball(unit caster)
+        {
+            this.Caster = caster;
+            this.Damage = 100.0 + caster.Level * 25.0;
+        }
+
+        public void Cast(float targetX, float targetY)
+        {
+            effect sfx = new effect("Abilities\\Spells\\Other\\Fireball.mdx", targetX, targetY);
+            sfx.Destroy();
+        }
+    }
+
+    void OnSpellEffect()
+    {
+        unit caster = GetTriggerUnit();
+        if (GetSpellAbilityId() == FireballId)
+        {
+            Fireball spell = new Fireball(caster);
+            spell.Cast(GetSpellTargetX(), GetSpellTargetY());
+        }
+    }
+
+    void OnInit()
+    {
+        trigger t = new trigger();
+        t.RegisterAnyUnitEvent(EVENT_PLAYER_UNIT_SPELL_EFFECT);
+        t.AddAction(OnSpellEffect);
+
+        unit hero = new unit(Player(0), 'Hpal', 0.0, 0.0, 270.0);
+        hero.Name = "Arthas";
+        hero.Life = 500.0;
+        hero.SetPosition(100.0, 200.0).Kill();
+    }
+}
