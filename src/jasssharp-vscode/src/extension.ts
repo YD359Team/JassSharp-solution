@@ -2,6 +2,7 @@ import * as vscode from "vscode";
 import { spawn } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
+import { registerCompletions } from "./completion";
 
 let log: vscode.OutputChannel;
 
@@ -11,6 +12,8 @@ export function activate(context: vscode.ExtensionContext) {
 
   const diags = vscode.languages.createDiagnosticCollection("jasssharp");
   context.subscriptions.push(diags);
+
+  registerCompletions(context);
 
   const runBtn = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   runBtn.command = "jasssharp.runMap";
