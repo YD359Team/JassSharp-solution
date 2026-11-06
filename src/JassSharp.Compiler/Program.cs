@@ -21,11 +21,11 @@ if (cmd == "check")
     try
     {
         var unit = new Parser(new Lexer(File.ReadAllText(path)).Lex()).ParseNamespace();
-        diags.AddRange(JassSharp.Checker.Check(unit));
+        diags.AddRange(JassSharp.Checker.Check(unit, path));
     }
     catch (ParseException ex)
     {
-        diags.Add(new JassSharp.Diagnostic(ex.Line, ex.Col, "error", ex.Message));
+        diags.Add(new JassSharp.Diagnostic(ex.Line, ex.Col, "error", ex.Message, path));
     }
     catch (Exception ex)
     {
@@ -112,8 +112,16 @@ static class MapBuild
         var chunks = new List<string>();
         foreach (var f in files)
         {
-            var unit = new Parser(new Lexer(File.ReadAllText(f)).Lex()).ParseNamespace();
-            chunks.Add(target == "vjass" ? new VjassEmitter().Emit(unit) : new LuaEmitter().Emit(unit));
+            try
+            {
+                var unit = new Parser(new Lexer(File.ReadAllText(f)).Lex()).ParseNamespace();
+                chunks.Add(target == "vjass" ? new VjassEmitter().Emit(unit) : new LuaEmitter().Emit(unit));
+            }
+            catch (ParseException ex)
+            {
+                Console.Error.WriteLine($"{f}:{ex.Line}:{ex.Col}: {ex.Message}");
+                return 1;
+            }
         }
         var script = string.Join("\n", chunks);
 
