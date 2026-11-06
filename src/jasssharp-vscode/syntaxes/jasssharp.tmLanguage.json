@@ -1,0 +1,55 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "JASS#",
+  "scopeName": "source.jasssharp",
+  "patterns": [
+    { "include": "#comment" },
+    { "include": "#rawcode" },
+    { "include": "#string" },
+    { "include": "#keyword" },
+    { "include": "#type" },
+    { "include": "#constant" },
+    { "include": "#number" },
+    { "include": "#operator" }
+  ],
+  "repository": {
+    "comment": {
+      "patterns": [
+        { "name": "comment.line.double-slash.jasssharp", "match": "//.*$" },
+        { "name": "comment.block.jasssharp", "begin": "/\\*", "end": "\\*/" }
+      ]
+    },
+    "rawcode": {
+      "name": "constant.numeric.rawcode.jasssharp",
+      "match": "'[A-Za-z0-9_]{1,4}'"
+    },
+    "string": {
+      "name": "string.quoted.double.jasssharp",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        { "name": "constant.character.escape.jasssharp", "match": "\\\\." }
+      ]
+    },
+    "keyword": {
+      "name": "keyword.control.jasssharp",
+      "match": "\\b(namespace|class|const|public|private|if|else|return|new|while|for|this)\\b"
+    },
+    "type": {
+      "name": "storage.type.jasssharp",
+      "match": "\\b(void|int|float|bool|string|code|unit|player|trigger|timer|group|effect|item|location|rect|force|widget|handle|ability|destructable|sound|quest|leaderboard|multiboard|dialog|button|texttag|lightning|image|ubersplat|fogmodifier|hashtable|framehandle|agent)\\b"
+    },
+    "constant": {
+      "name": "constant.language.jasssharp",
+      "match": "\\b(true|false|null)\\b"
+    },
+    "number": {
+      "name": "constant.numeric.jasssharp",
+      "match": "\\b\\d+(\\.\\d+)?\\b"
+    },
+    "operator": {
+      "name": "keyword.operator.jasssharp",
+      "match": "==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|=>|[+\\-*/=<>!]"
+    }
+  }
+}

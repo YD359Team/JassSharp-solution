@@ -1,0 +1,24 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/JassSharp.Compiler/JassSharp.Compiler.csproj" />
+  </Folder>
+  <Folder Name="/src/jasssharp-vscode/">
+    <File Path="src/jasssharp-vscode/language-configuration.json" />
+    <File Path="src/jasssharp-vscode/package.json" />
+    <File Path="src/jasssharp-vscode/README.md" />
+    <File Path="src/jasssharp-vscode/tsconfig.json" />
+  </Folder>
+  <Folder Name="/src/jasssharp-vscode/out/">
+    <File Path="src/jasssharp-vscode/out/extension.js" />
+    <File Path="src/jasssharp-vscode/out/extension.js.map" />
+  </Folder>
+  <Folder Name="/src/jasssharp-vscode/snippets/">
+    <File Path="src/jasssharp-vscode/snippets/jasssharp.json" />
+  </Folder>
+  <Folder Name="/src/jasssharp-vscode/src/">
+    <File Path="src/jasssharp-vscode/src/extension.ts" />
+  </Folder>
+  <Folder Name="/src/jasssharp-vscode/syntaxes/">
+    <File Path="src/jasssharp-vscode/syntaxes/jasssharp.tmLanguage.json" />
+  </Folder>
+</Solution>

@@ -1,0 +1,41 @@
+{
+  "Namespace": {
+    "prefix": "namespace",
+    "body": [
+      "namespace ${1:MyMap}",
+      "{",
+      "\t$0",
+      "}"
+    ],
+    "description": "namespace"
+  },
+  "Class": {
+    "prefix": "class",
+    "body": [
+      "class ${1:Name}",
+      "{",
+      "\t$0",
+      "}"
+    ],
+    "description": "class"
+  },
+  "OnInit": {
+    "prefix": "oninit",
+    "body": [
+      "void OnInit()",
+      "{",
+      "\t$0",
+      "}"
+    ],
+    "description": "OnInit entry point"
+  },
+  "Trigger": {
+    "prefix": "trigger",
+    "body": [
+      "trigger ${1:t} = new trigger();",
+      "${1:t}.RegisterAnyUnitEvent(${2:EVENT_PLAYER_UNIT_SPELL_EFFECT});",
+      "${1:t}.AddAction(${3:OnAction});"
+    ],
+    "description": "explicit trigger"
+  }
+}

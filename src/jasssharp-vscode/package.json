@@ -1,0 +1,99 @@
+{
+  "name": "jasssharp",
+  "displayName": "JASS#",
+  "description": "Подсветка и сборка JASS# (.w3js) в vJASS и Lua",
+  "version": "0.1.0",
+  "publisher": "jasssharp",
+  "engines": { "vscode": "^1.85.0" },
+  "categories": ["Programming Languages"],
+  "main": "./out/extension.js",
+  "activationEvents": ["onLanguage:jasssharp"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "jasssharp",
+        "aliases": ["JASS#", "jasssharp"],
+        "extensions": [".w3js"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "jasssharp",
+        "scopeName": "source.jasssharp",
+        "path": "./syntaxes/jasssharp.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "jasssharp",
+        "path": "./snippets/jasssharp.json"
+      }
+    ],
+    "configuration": {
+      "title": "JASS#",
+      "properties": {
+        "jasssharp.compilerPath": {
+          "type": "string",
+          "default": "",
+          "description": "Путь к jasssharp (exe или dll). Пусто — ищется в PATH."
+        },
+        "jasssharp.defaultTarget": {
+          "type": "string",
+          "enum": ["both", "vjass", "lua"],
+          "default": "both",
+          "description": "Цель по умолчанию для команды Build."
+        },
+        "jasssharp.gamePath": {
+          "type": "string",
+          "default": "",
+          "description": "Путь к Warcraft III.exe для команды Run Map."
+        },
+        "jasssharp.projectFile": {
+          "type": "string",
+          "default": "jasssharp.json",
+          "description": "Имя файла проекта карты."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "jasssharp.build",
+        "title": "JASS#: Build"
+      },
+      {
+        "command": "jasssharp.buildVjass",
+        "title": "JASS#: Build vJASS"
+      },
+      {
+        "command": "jasssharp.buildLua",
+        "title": "JASS#: Build Lua"
+      },
+      {
+        "command": "jasssharp.buildMap",
+        "title": "JASS#: Build Map"
+      },
+      {
+        "command": "jasssharp.runMap",
+        "title": "JASS#: Run Map"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "jasssharp.build",
+          "when": "editorLangId == jasssharp",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -p . -w"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.85.0",
+    "typescript": "^5.4.0"
+  }
+}
