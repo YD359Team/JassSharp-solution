@@ -4,16 +4,27 @@
   "description": "Подсветка и сборка JASS# (.w3js) в vJASS и Lua",
   "version": "0.1.0",
   "publisher": "jasssharp",
-  "engines": { "vscode": "^1.85.0" },
-  "categories": ["Programming Languages"],
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
   "main": "./out/extension.js",
-  "activationEvents": ["onLanguage:jasssharp"],
+  "activationEvents": [
+    "onLanguage:jasssharp"
+  ],
   "contributes": {
     "languages": [
       {
         "id": "jasssharp",
-        "aliases": ["JASS#", "jasssharp"],
-        "extensions": [".w3js"],
+        "aliases": [
+          "JASS#",
+          "jasssharp"
+        ],
+        "extensions": [
+          ".w3js"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -40,7 +51,11 @@
         },
         "jasssharp.defaultTarget": {
           "type": "string",
-          "enum": ["both", "vjass", "lua"],
+          "enum": [
+            "both",
+            "vjass",
+            "lua"
+          ],
           "default": "both",
           "description": "Цель по умолчанию для команды Build."
         },
@@ -93,6 +108,7 @@
     "watch": "tsc -p . -w"
   },
   "devDependencies": {
+    "@types/node": "^26.6.6",
     "@types/vscode": "^1.85.0",
     "typescript": "^5.4.0"
   }
