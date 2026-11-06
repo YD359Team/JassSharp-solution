@@ -155,12 +155,12 @@ public sealed class Parser(List<Token> tokens)
         }
         if (LooksLikeDecl())
         {
-            var type = Eat(TokKind.Id).Text;
+            var typeTok = Eat(TokKind.Id);
             var id = Eat(TokKind.Id).Text;
             Expr? init = null;
             if (Accept("=")) init = ParseExpr();
             Accept(";");
-            return new VarStmt(type, id, init);
+            return new VarStmt(typeTok.Text, id, init, typeTok.Line, typeTok.Col);
         }
         var expr = ParseExpr();
         if (Accept("="))
@@ -247,9 +247,15 @@ public sealed class Parser(List<Token> tokens)
         var e = ParsePrimary();
         while (true)
         {
-            if (Accept(".")) e = new MemberExpr(e, Eat(TokKind.Id).Text);
+            if (Accept(".")) 
+            {
+                var id = Eat(TokKind.Id);
+                e = new MemberExpr(e, id.Text, id.Line, id.Col);
+            }
             else if (Accept("("))
             {
+                var line = e.Line;
+                var col = e.Col;
                 var args = new List<Expr>();
                 if (!Check(")"))
                 {
@@ -257,7 +263,7 @@ public sealed class Parser(List<Token> tokens)
                     while (Accept(","));
                 }
                 Expect(")");
-                e = new CallExpr(e, args);
+                e = new CallExpr(e, args, line, col);
             }
             else break;
         }
@@ -268,7 +274,7 @@ public sealed class Parser(List<Token> tokens)
     {
         if (CheckId("new"))
         {
-            Eat(TokKind.Id);
+            var newTok = Eat(TokKind.Id);
             var type = Eat(TokKind.Id).Text;
             Expect("(");
             var args = new List<Expr>();
@@ -278,20 +284,20 @@ public sealed class Parser(List<Token> tokens)
                 while (Accept(","));
             }
             Expect(")");
-            return new NewExpr(type, args);
+            return new NewExpr(type, args, newTok.Line, newTok.Col);
         }
-        if (CheckId("this")) { Eat(TokKind.Id); return new ThisExpr(); }
-        if (CheckId("true")) { Eat(TokKind.Id); return new BoolExpr(true); }
-        if (CheckId("false")) { Eat(TokKind.Id); return new BoolExpr(false); }
-        if (CheckId("null")) { Eat(TokKind.Id); return new NullExpr(); }
-        var t = tokens[_i++];
-        return t.Kind switch
+        if (CheckId("this")) { var t = Eat(TokKind.Id); return new ThisExpr(t.Line, t.Col); }
+        if (CheckId("true")) { var t = Eat(TokKind.Id); return new BoolExpr(true, t.Line, t.Col); }
+        if (CheckId("false")) { var t = Eat(TokKind.Id); return new BoolExpr(false, t.Line, t.Col); }
+        if (CheckId("null")) { var t = Eat(TokKind.Id); return new NullExpr(t.Line, t.Col); }
+        var tok = tokens[_i++];
+        return tok.Kind switch
         {
-            TokKind.Id => new NameExpr(t.Text),
-            TokKind.Num => new NumExpr(t.Text),
-            TokKind.Str => new StrExpr(t.Text),
-            TokKind.Raw => new RawExpr(t.Text),
-            _ => throw new ParseException($"неожиданный токен {t.Text}", t.Line, t.Col),
+            TokKind.Id => new NameExpr(tok.Text, tok.Line, tok.Col),
+            TokKind.Num => new NumExpr(tok.Text, tok.Line, tok.Col),
+            TokKind.Str => new StrExpr(tok.Text, tok.Line, tok.Col),
+            TokKind.Raw => new RawExpr(tok.Text, tok.Line, tok.Col),
+            _ => throw new ParseException($"неожиданный токен {tok.Text}", tok.Line, tok.Col),
         };
     }
 
