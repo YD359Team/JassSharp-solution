@@ -1,0 +1,6 @@
+{
+  "map": "map",
+  "target": "lua",
+  "entry": "samples/fireball.w3js",
+  "game": ""
+}
