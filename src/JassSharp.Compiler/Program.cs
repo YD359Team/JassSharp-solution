@@ -47,7 +47,7 @@ if (cmd == "map")
     return MapBuild.Run(project, run);
 }
 
-// build
+// build — вывод в bin/ рядом с исходником
 var file = args[1];
 if (!File.Exists(file)) { Console.Error.WriteLine($"файл не найден: {file}"); return 1; }
 var target = "both";
@@ -57,17 +57,19 @@ for (var i = 2; i < args.Length - 1; i++)
 try
 {
     var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
-    var dir = Path.GetDirectoryName(Path.GetFullPath(file)) ?? ".";
+    var srcDir = Path.GetDirectoryName(Path.GetFullPath(file)) ?? ".";
+    var bin = Path.Combine(srcDir, "bin");
+    Directory.CreateDirectory(bin);
     var stem = Path.GetFileNameWithoutExtension(file);
     if (target is "vjass" or "both")
     {
-        var outPath = Path.Combine(dir, stem + ".j");
+        var outPath = Path.Combine(bin, stem + ".j");
         File.WriteAllText(outPath, new VjassEmitter().Emit(unit));
         Console.WriteLine(outPath);
     }
     if (target is "lua" or "both")
     {
-        var outPath = Path.Combine(dir, stem + ".lua");
+        var outPath = Path.Combine(bin, stem + ".lua");
         File.WriteAllText(outPath, new LuaEmitter().Emit(unit));
         Console.WriteLine(outPath);
     }
@@ -145,13 +147,11 @@ static class MapBuild
                 return 1;
             }
 
-            // Reforged: exe в x86_64, рабочая папка — корень _retail_
             var exeDir = Path.GetDirectoryName(game)!;
             var workDir = exeDir.EndsWith("x86_64", StringComparison.OrdinalIgnoreCase)
                 ? Path.GetDirectoryName(exeDir)!
                 : exeDir;
 
-            // -launch обязателен для Reforged, иначе откроется только лаунчер
             var args = $"-launch -windowmode windowed -loadfile \"{map}\"";
             if (!string.IsNullOrWhiteSpace(extra)) args += " " + extra;
 
