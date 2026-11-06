@@ -145,7 +145,6 @@ static class MapBuild
         if (!File.Exists(Path.Combine(map, "war3map.w3i")))
             Console.WriteLine("warn: no war3map.w3i in map folder — World Editor will say Level Info missing");
 
-        // упаковка в .w3x. На 3.0.1 папку -loadfile не берёт
         var tool = Environment.GetEnvironmentVariable("JASSSHARP_MPQ")
                    ?? FindOnPath("mpqtool.exe")
                    ?? FindOnPath("mpqtool");
@@ -181,7 +180,7 @@ static class MapBuild
         }
         else
         {
-            Console.WriteLine("warn: mpqtool not found. set JASSSHARP_MPQ or put mpqtool.exe on PATH. folder map will not load on 3.0.1");
+            Console.WriteLine("warn: mpqtool not found. set JASSSHARP_MPQ or put mpqtool.exe on PATH");
         }
 
         if (launch)
@@ -197,12 +196,28 @@ static class MapBuild
                 return 1;
             }
 
+            // копируем в Documents\\Warcraft III\\Maps\\Test — единственное место, где 3.0.1 видит карту
+            var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            var testDir = Path.Combine(docs, "Warcraft III", "Maps", "Test");
+            var downloadDir = Path.Combine(docs, "Warcraft III", "Maps", "Download");
+            Directory.CreateDirectory(testDir);
+            Directory.CreateDirectory(downloadDir);
+
+            var testMap = Path.Combine(testDir, "JassSharpMap.w3x");
+            var downloadMap = Path.Combine(downloadDir, "JassSharpMap.w3x");
+            try { File.Copy(packed, testMap, true); Console.WriteLine("copy test: " + testMap); }
+            catch (Exception ex) { Console.WriteLine("warn copy test: " + ex.Message); }
+            try { File.Copy(packed, downloadMap, true); Console.WriteLine("copy download: " + downloadMap); }
+            catch (Exception ex) { Console.WriteLine("warn copy download: " + ex.Message); }
+
+            var launchFile = File.Exists(testMap) ? testMap : packed;
+
             var exeDir = Path.GetDirectoryName(game)!;
             var workDir = exeDir.EndsWith("x86_64", StringComparison.OrdinalIgnoreCase)
                 ? Path.GetDirectoryName(exeDir)!
                 : exeDir;
 
-            var launchArgs = $"-launch -editor -windowmode windowed -loadfile \"{packed}\"";
+            var launchArgs = $"-launch -editor -windowmode windowed -loadfile \"{launchFile}\"";
             if (!string.IsNullOrWhiteSpace(extra)) launchArgs += " " + extra;
 
             Console.WriteLine("LAUNCH: \"" + game + "\" " + launchArgs);
