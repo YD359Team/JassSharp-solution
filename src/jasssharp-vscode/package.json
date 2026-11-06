@@ -4,6 +4,7 @@
   "description": "Подсветка и сборка JASS# (.w3js) в vJASS и Lua",
   "version": "0.1.0",
   "publisher": "jasssharp",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -18,14 +19,13 @@
     "languages": [
       {
         "id": "jasssharp",
-        "aliases": [
-          "JASS#",
-          "jasssharp"
-        ],
-        "extensions": [
-          ".w3js"
-        ],
-        "configuration": "./language-configuration.json"
+        "aliases": ["JASS#", "jasssharp"],
+        "extensions": [".w3js"],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./icon.png",
+          "dark": "./icon.png"
+        }
       }
     ],
     "grammars": [
@@ -51,11 +51,7 @@
         },
         "jasssharp.defaultTarget": {
           "type": "string",
-          "enum": [
-            "both",
-            "vjass",
-            "lua"
-          ],
+          "enum": ["both", "vjass", "lua"],
           "default": "both",
           "description": "Цель по умолчанию для команды Build."
         },
@@ -72,26 +68,11 @@
       }
     },
     "commands": [
-      {
-        "command": "jasssharp.build",
-        "title": "JASS#: Build"
-      },
-      {
-        "command": "jasssharp.buildVjass",
-        "title": "JASS#: Build vJASS"
-      },
-      {
-        "command": "jasssharp.buildLua",
-        "title": "JASS#: Build Lua"
-      },
-      {
-        "command": "jasssharp.buildMap",
-        "title": "JASS#: Build Map"
-      },
-      {
-        "command": "jasssharp.runMap",
-        "title": "JASS#: Run Map"
-      }
+      { "command": "jasssharp.build", "title": "JASS#: Build" },
+      { "command": "jasssharp.buildVjass", "title": "JASS#: Build vJASS" },
+      { "command": "jasssharp.buildLua", "title": "JASS#: Build Lua" },
+      { "command": "jasssharp.buildMap", "title": "JASS#: Build Map" },
+      { "command": "jasssharp.runMap", "title": "JASS#: Run Map" }
     ],
     "menus": {
       "editor/context": [
@@ -105,11 +86,13 @@
   },
   "scripts": {
     "compile": "tsc -p .",
-    "watch": "tsc -p . -w"
+    "watch": "tsc -p . -w",
+    "package": "npm run compile && vsce package"
   },
   "devDependencies": {
-    "@types/node": "^26.6.6",
+    "@types/node": "^20.0.0",
     "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^3.0.0",
     "typescript": "^5.4.0"
   }
 }
