@@ -73,11 +73,11 @@
       }
     },
     "commands": [
-      { "command": "jasssharp.build", "title": "JASS#: Build" },
+      { "command": "jasssharp.build", "title": "JASS#: Build", "icon": "$(tools)" },
       { "command": "jasssharp.buildVjass", "title": "JASS#: Build vJASS" },
       { "command": "jasssharp.buildLua", "title": "JASS#: Build Lua" },
-      { "command": "jasssharp.buildMap", "title": "JASS#: Build Map" },
-      { "command": "jasssharp.runMap", "title": "JASS#: Run Map" }
+      { "command": "jasssharp.buildMap", "title": "JASS#: Build Map", "icon": "$(package)" },
+      { "command": "jasssharp.runMap", "title": "JASS#: Run Map", "icon": "$(play)" }
     ],
     "menus": {
       "editor/context": [
@@ -85,6 +85,23 @@
           "command": "jasssharp.build",
           "when": "editorLangId == jasssharp",
           "group": "navigation"
+        },
+        {
+          "command": "jasssharp.runMap",
+          "when": "editorLangId == jasssharp",
+          "group": "navigation"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "jasssharp.runMap",
+          "when": "editorLangId == jasssharp",
+          "group": "navigation@1"
+        },
+        {
+          "command": "jasssharp.buildMap",
+          "when": "editorLangId == jasssharp",
+          "group": "navigation@2"
         }
       ]
     }
