@@ -4,7 +4,12 @@
   "description": "Подсветка и сборка JASS# (.w3js) в vJASS и Lua",
   "version": "0.1.0",
   "publisher": "jasssharp",
-  "icon": "icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/YD359Team/JassSharp-solution"
+  },
+  "license": "MIT",
+  "icon": "image.png",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -23,8 +28,8 @@
         "extensions": [".w3js"],
         "configuration": "./language-configuration.json",
         "icon": {
-          "light": "./icon.png",
-          "dark": "./icon.png"
+          "light": "./image.png",
+          "dark": "./image.png"
         }
       }
     ],
