@@ -47,7 +47,6 @@ if (cmd == "map")
     return MapBuild.Run(project, run);
 }
 
-// build — вывод в bin/ рядом с исходником
 var file = args[1];
 if (!File.Exists(file)) { Console.Error.WriteLine($"файл не найден: {file}"); return 1; }
 var target = "both";
@@ -152,7 +151,17 @@ static class MapBuild
                 ? Path.GetDirectoryName(exeDir)!
                 : exeDir;
 
-            var args = $"-launch -windowmode windowed -loadfile \"{map}\"";
+            // как в warcraft-vscode: копируем в Documents/Warcraft III/Maps/Test
+            var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+            var testDir = Path.Combine(docs, "Warcraft III", "Maps", "Test");
+            Directory.CreateDirectory(testDir);
+            var testMap = Path.Combine(testDir, "JassSharpMap");
+            if (Directory.Exists(testMap)) Directory.Delete(testMap, true);
+            CopyDir(map, testMap);
+            Console.WriteLine($"копия: {testMap}");
+
+            // как в Wurst: -launch -editor для сохранения сессии Battle.net
+            var args = $"-launch -editor -windowmode windowed -loadfile \"{testMap}\"";
             if (!string.IsNullOrWhiteSpace(extra)) args += " " + extra;
 
             var psi = new System.Diagnostics.ProcessStartInfo
@@ -160,12 +169,22 @@ static class MapBuild
                 FileName = game,
                 Arguments = args,
                 WorkingDirectory = workDir,
-                UseShellExecute = false,
+                UseShellExecute = true,
             };
             System.Diagnostics.Process.Start(psi);
             Console.WriteLine($"запуск: {game} {args}");
             Console.WriteLine($"рабочая папка: {workDir}");
+            Console.WriteLine("если открылся только лаунчер — зайдите в Battle.net и попробуйте ещё раз");
         }
         return 0;
+    }
+
+    static void CopyDir(string src, string dst)
+    {
+        Directory.CreateDirectory(dst);
+        foreach (var f in Directory.GetFiles(src))
+            File.Copy(f, Path.Combine(dst, Path.GetFileName(f)), true);
+        foreach (var d in Directory.GetDirectories(src))
+            CopyDir(d, Path.Combine(dst, Path.GetFileName(d)));
     }
 }
