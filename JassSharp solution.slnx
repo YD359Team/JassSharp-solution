@@ -1,4 +1,8 @@
 <Solution>
+  <Folder Name="/samples/">
+    <File Path="samples/fireball.w3js" />
+    <File Path="samples/jasssharp.json" />
+  </Folder>
   <Folder Name="/src/">
     <Project Path="src/JassSharp.Compiler/JassSharp.Compiler.csproj" />
   </Folder>
@@ -20,5 +24,8 @@
   </Folder>
   <Folder Name="/src/jasssharp-vscode/syntaxes/">
     <File Path="src/jasssharp-vscode/syntaxes/jasssharp.tmLanguage.json" />
+  </Folder>
+  <Folder Name="/Элементы решения/">
+    <File Path="build.bat" />
   </Folder>
 </Solution>
