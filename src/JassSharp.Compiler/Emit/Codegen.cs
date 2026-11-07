@@ -28,6 +28,9 @@ public sealed class Codegen
                 Line("-- usings: " + string.Join(", ", unit.Usings));
             Line("if not BJDebugMsg then function BJDebugMsg(s) print(s) end end");
             Line("");
+            foreach (var f in unit.Fields)
+                Line(f.IsArray ? $"{f.Name} = {{}}" : $"{f.Name} = nil");
+            if (unit.Fields.Count > 0) Line("");
             foreach (var c in unit.Consts)
                 Line($"local {c.Name} = {EmitExpr(c.Value)}");
             if (unit.Consts.Count > 0) Line("");
@@ -38,12 +41,14 @@ public sealed class Codegen
         else
         {
             Line($"library {unit.Name}{(hasInit ? " initializer OnInit" : "")}");
-            if (unit.Consts.Count > 0)
+            if (unit.Consts.Count > 0 || unit.Fields.Count > 0)
             {
                 Line("globals");
                 _indent = 1;
                 foreach (var c in unit.Consts)
                     Line($"constant {MapType(c.Type)} {c.Name} = {EmitExpr(c.Value)}");
+                foreach (var f in unit.Fields)
+                    Line($"{MapType(f.Type)} array {f.Name}");
                 _indent = 0;
                 Line("endglobals");
                 Line("");
@@ -207,6 +212,28 @@ public sealed class Codegen
                         Line("endloop");
                     }
                     break;
+                case ForStmt f:
+                    if (_lua)
+                    {
+                        if (f.Init is not null) EmitStmts([f.Init]);
+                        Line($"while {EmitExpr(f.Cond ?? new BoolExpr(true))} do");
+                        _indent++;
+                        EmitStmts(f.Body);
+                        if (f.Step is not null) EmitStmts([f.Step]);
+                        _indent--;
+                        Line("end");
+                    }
+                    else
+                    {
+                        Line("loop");
+                        _indent++;
+                        if (f.Cond is not null) Line($"exitwhen not ({EmitExpr(f.Cond)})");
+                        EmitStmts(f.Body);
+                        if (f.Step is not null) EmitStmts([f.Step]);
+                        _indent--;
+                        Line("endloop");
+                    }
+                    break;
             }
         }
     }
@@ -264,7 +291,9 @@ public sealed class Codegen
         NameExpr n => n.Name,
         UnaryExpr u when u.Op == "!" && !_lua => $"not ({EmitExpr(u.Inner)})",
         UnaryExpr u => $"{(u.Op == "!" ? "not " : "-")}{EmitExpr(u.Inner)}",
+        BinaryExpr b when b.Op == "+" && _lua => $"({EmitExpr(b.Left)} .. {EmitExpr(b.Right)})",
         BinaryExpr b => $"({EmitExpr(b.Left)} {Op(b.Op)} {EmitExpr(b.Right)})",
+        IndexExpr ix => $"{EmitExpr(ix.Object)}[{EmitExpr(ix.Index)}]",
         NewExpr n when NativeTable.Constructors.TryGetValue(n.Type, out var ctor) =>
             $"{ctor}({string.Join(", ", n.Args.Select(EmitExpr))})",
         NewExpr n => _lua
