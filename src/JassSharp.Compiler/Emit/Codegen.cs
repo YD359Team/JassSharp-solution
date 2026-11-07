@@ -23,13 +23,15 @@ public sealed class Codegen
         var hasInit = unit.Functions.Any(f => f.Name == "OnInit");
         if (_lua)
         {
-            Line($"-- {unit.Name}  (JASS# → Lua, rawcode уже вычислен)");
+            Line($"-- {unit.Name}  (JASS# → Lua)");
+            if (unit.Usings.Count > 0)
+                Line("-- usings: " + string.Join(", ", unit.Usings));
             foreach (var c in unit.Consts)
                 Line($"local {c.Name} = {EmitExpr(c.Value)}");
             if (unit.Consts.Count > 0) Line("");
             foreach (var cls in unit.Classes) EmitClassLua(cls);
             foreach (var fn in unit.Functions) EmitFnLua(fn);
-            if (hasInit) EmitLuaHook();
+            EmitLuaEntry(hasInit);
         }
         else
         {
@@ -51,20 +53,16 @@ public sealed class Codegen
         return string.Join("\n", _lines) + "\n";
     }
 
-    // Инжект InitGlobals: без него сгенерированный war3map.lua не вызывается движком.
-    // См. https://xgm.guru/p/wc3/lua-inject
-    private void EmitLuaHook()
+    // Движок вызывает config() и main(). Без них заменённый war3map.lua не запускается.
+    private void EmitLuaEntry(bool hasInit)
     {
-        Line("do");
-        Line("    local old = InitGlobals");
-        Line("    function InitGlobals()");
-        Line("        if old then old() end");
-        Line("        OnInit()");
-        Line("    end");
+        Line("function config()");
         Line("end");
         Line("");
-        Line("-- фолбэк: если движок не вызвал InitGlobals, запускаем сами");
-        Line("if not InitGlobals then OnInit() end");
+        Line("function main()");
+        Line("    InitBlizzard()");
+        if (hasInit) Line("    OnInit()");
+        Line("end");
     }
 
     private void EmitClassVj(ClassDecl cls)
