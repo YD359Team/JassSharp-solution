@@ -24,6 +24,7 @@
     <File Path="src/jasssharp-vscode/src/constants.ts" />
     <File Path="src/jasssharp-vscode/src/extension.ts" />
     <File Path="src/jasssharp-vscode/src/hover.ts" />
+    <File Path="src/jasssharp-vscode/src/members.ts" />
     <File Path="src/jasssharp-vscode/src/signature.ts" />
   </Folder>
   <Folder Name="/src/jasssharp-vscode/syntaxes/">
