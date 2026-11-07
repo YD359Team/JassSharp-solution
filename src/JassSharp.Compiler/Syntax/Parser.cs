@@ -11,10 +11,20 @@ public sealed class Parser(List<Token> tokens)
         var name = Eat(TokKind.Id).Text;
         while (Accept(".")) name += "_" + Eat(TokKind.Id).Text;
         Expect("{");
-        var ns = new NsUnit(name, [], [], []);
+        var usings = new List<string>();
+        var ns = new NsUnit(name, usings, [], [], []);
         while (!Accept("}"))
         {
-        if (Peek.Kind == TokKind.Eof) throw new ParseException("незакрытый namespace", Peek.Line, Peek.Col);
+            if (Peek.Kind == TokKind.Eof) throw new ParseException("незакрытый namespace", Peek.Line, Peek.Col);
+            if (CheckId("using"))
+            {
+                Eat(TokKind.Id);
+                var mod = Eat(TokKind.Id).Text;
+                while (Accept(".")) mod += "_" + Eat(TokKind.Id).Text;
+                Accept(";");
+                usings.Add(mod);
+                continue;
+            }
             SkipVis();
             if (CheckId("const"))
             {
@@ -247,7 +257,7 @@ public sealed class Parser(List<Token> tokens)
         var e = ParsePrimary();
         while (true)
         {
-            if (Accept(".")) 
+            if (Accept("."))
             {
                 var id = Eat(TokKind.Id);
                 e = new MemberExpr(e, id.Text, id.Line, id.Col);
