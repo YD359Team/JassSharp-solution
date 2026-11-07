@@ -12,7 +12,8 @@ public sealed class Parser(List<Token> tokens)
         while (Accept(".")) name += "_" + Eat(TokKind.Id).Text;
         Expect("{");
         var usings = new List<string>();
-        var ns = new NsUnit(name, usings, [], [], []);
+        var fields = new List<FieldDecl>();
+        var ns = new NsUnit(name, usings, [], [], [], fields);
         while (!Accept("}"))
         {
             if (Peek.Kind == TokKind.Eof) throw new ParseException("незакрытый namespace", Peek.Line, Peek.Col);
@@ -38,13 +39,21 @@ public sealed class Parser(List<Token> tokens)
             }
             else
             {
-                var ret = Eat(TokKind.Id).Text;
+                var typeTok = Eat(TokKind.Id);
+                var isArray = Accept("[") && Accept("]");
                 var id = Eat(TokKind.Id).Text;
-                Expect("(");
-                var ps = ParseParams();
-                Expect(")");
-                Expect("{");
-                ns.Functions.Add(new FnDecl(ret, id, ps, ParseBlock()));
+                if (Accept("("))
+                {
+                    var ps = ParseParams();
+                    Expect(")");
+                    Expect("{");
+                    ns.Functions.Add(new FnDecl(typeTok.Text, id, ps, ParseBlock()));
+                }
+                else
+                {
+                    Accept(";");
+                    fields.Add(new FieldDecl(typeTok.Text, id, isArray));
+                }
             }
         }
         return ns;
@@ -80,6 +89,7 @@ public sealed class Parser(List<Token> tokens)
                 continue;
             }
             var type = Eat(TokKind.Id).Text;
+            var isArray = Accept("[") && Accept("]");
             var id = Eat(TokKind.Id).Text;
             if (Accept("("))
             {
@@ -91,7 +101,7 @@ public sealed class Parser(List<Token> tokens)
             else
             {
                 Accept(";");
-                fields.Add(new FieldDecl(type, id));
+                fields.Add(new FieldDecl(type, id, isArray));
             }
         }
         return new ClassDecl(name, fields, ctor, methods);
@@ -126,9 +136,12 @@ public sealed class Parser(List<Token> tokens)
 
     private bool LooksLikeDecl()
     {
-        if (Peek.Kind != TokKind.Id || _i + 1 >= tokens.Count || tokens[_i + 1].Kind != TokKind.Id) return false;
-        var next = tokens[_i + 2];
-        if (next.Kind == TokKind.Sym && next.Text == "(") return false;
+        if (Peek.Kind != TokKind.Id || _i + 1 >= tokens.Count) return false;
+        var next = tokens[_i + 1];
+        if (next.Kind == TokKind.Sym && next.Text == "[") return true;
+        if (next.Kind != TokKind.Id) return false;
+        var after = tokens[_i + 2];
+        if (after.Kind == TokKind.Sym && after.Text == "(") return false;
         return TypeNames.Contains(Peek.Text) || char.IsUpper(Peek.Text[0]);
     }
 
@@ -155,6 +168,22 @@ public sealed class Parser(List<Token> tokens)
             Expect("{");
             return new WhileStmt(c, ParseBlock());
         }
+        if (CheckId("for"))
+        {
+            Eat(TokKind.Id);
+            Expect("(");
+            Stmt? init = null;
+            if (!Check(";")) init = ParseStmt();
+            else Eat(TokKind.Sym);
+            Expr? cond = null;
+            if (!Check(";")) cond = ParseExpr();
+            Expect(";");
+            Stmt? step = null;
+            if (!Check(")")) step = ParseStmt();
+            Expect(")");
+            Expect("{");
+            return new ForStmt(init, cond, step, ParseBlock());
+        }
         if (CheckId("return"))
         {
             Eat(TokKind.Id);
@@ -166,6 +195,7 @@ public sealed class Parser(List<Token> tokens)
         if (LooksLikeDecl())
         {
             var typeTok = Eat(TokKind.Id);
+            Accept("["); Accept("]");
             var id = Eat(TokKind.Id).Text;
             Expr? init = null;
             if (Accept("=")) init = ParseExpr();
@@ -261,6 +291,12 @@ public sealed class Parser(List<Token> tokens)
             {
                 var id = Eat(TokKind.Id);
                 e = new MemberExpr(e, id.Text, id.Line, id.Col);
+            }
+            else if (Accept("[") )
+            {
+                var idx = ParseExpr();
+                Expect("]");
+                e = new IndexExpr(e, idx, e.Line, e.Col);
             }
             else if (Accept("("))
             {
