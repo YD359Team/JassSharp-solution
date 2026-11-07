@@ -26,6 +26,8 @@ public sealed class Codegen
             Line($"-- {unit.Name}  (JASS# → Lua)");
             if (unit.Usings.Count > 0)
                 Line("-- usings: " + string.Join(", ", unit.Usings));
+            Line("if not BJDebugMsg then function BJDebugMsg(s) print(s) end end");
+            Line("");
             foreach (var c in unit.Consts)
                 Line($"local {c.Name} = {EmitExpr(c.Value)}");
             if (unit.Consts.Count > 0) Line("");
@@ -53,7 +55,6 @@ public sealed class Codegen
         return string.Join("\n", _lines) + "\n";
     }
 
-    // Движок вызывает config() и main(). Без них заменённый war3map.lua не запускается.
     private void EmitLuaEntry(bool hasInit)
     {
         Line("function config()");
@@ -61,7 +62,14 @@ public sealed class Codegen
         Line("");
         Line("function main()");
         Line("    InitBlizzard()");
-        if (hasInit) Line("    OnInit()");
+        if (hasInit)
+        {
+            Line("    local ok, err = pcall(OnInit)");
+            Line("    if not ok then");
+            Line("        print(\"JASS# OnInit error: \" .. tostring(err))");
+            Line("        BJDebugMsg(\"JASS# OnInit error: \" .. tostring(err))");
+            Line("    end");
+        }
         Line("end");
     }
 
@@ -133,7 +141,7 @@ public sealed class Codegen
     private void EmitFnLua(FnDecl fn)
     {
         _locals = fn.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
-        Line($"local function {fn.Name}({string.Join(", ", fn.Params.Select(p => p.Name))})");
+        Line($"function {fn.Name}({string.Join(", ", fn.Params.Select(p => p.Name))})");
         _indent++;
         EmitStmts(fn.Body);
         _indent--;
