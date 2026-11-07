@@ -185,9 +185,12 @@ static class MapBuild
 
             string finalScript = script;
             bool gotOrig = false;
-            if (editor is not null)
+            if (mpqcli is not null)
+                gotOrig = ExtractWithMpqcli(mpqcli, sourceW3x, scriptName, origFile);
+            else if (editor is not null)
                 gotOrig = ExtractFile(editor, sourceW3x, scriptName, origDir) && File.Exists(origFile);
-            if (gotOrig)
+
+            if (gotOrig && File.Exists(origFile))
             {
                 var orig = File.ReadAllText(origFile);
                 Console.WriteLine($"original from base: {orig.Length} bytes");
@@ -218,35 +221,37 @@ end
             File.WriteAllText(tmpScript, finalScript);
             Console.WriteLine($"final script: {new FileInfo(tmpScript).Length} bytes");
 
-            if (target == "lua" && editor is not null)
+            if (target == "lua")
             {
                 var tmpDir = Path.Combine(Path.GetTempPath(), "JassSharp_w3i");
                 Directory.CreateDirectory(tmpDir);
                 var tmpW3i = Path.Combine(tmpDir, "war3map.w3i");
                 try { if (File.Exists(tmpW3i)) File.Delete(tmpW3i); } catch { }
 
-                if (ExtractFile(editor, packed, "war3map.w3i", tmpDir))
+                bool gotW3i = false;
+                if (mpqcli is not null)
+                    gotW3i = ExtractWithMpqcli(mpqcli, packed, "war3map.w3i", tmpW3i);
+                else if (editor is not null)
+                    gotW3i = ExtractFile(editor, packed, "war3map.w3i", tmpDir) && File.Exists(tmpW3i);
+
+                if (gotW3i && File.Exists(tmpW3i))
                 {
-                    if (File.Exists(tmpW3i))
+                    var st = ReadScriptType(tmpW3i);
+                    Console.WriteLine("w3i before: " + (st == 1 ? "Lua" : st == 0 ? "JASS" : "?"));
+                    if (st != 1)
                     {
-                        var st = ReadScriptType(tmpW3i);
-                        Console.WriteLine("w3i before: " + (st == 1 ? "Lua" : st == 0 ? "JASS" : "?"));
-                        if (st != 1)
+                        if (PatchScriptType(tmpW3i, 1))
                         {
-                            if (PatchScriptType(tmpW3i, 1))
-                            {
-                                Console.WriteLine("patched script type → 1");
-                                if (mpqcli is not null)
-                                    InjectWithMpqcli(mpqcli, packed, tmpW3i, "war3map.w3i");
-                                else
-                                    InjectFile(editor, packed, tmpW3i, "war3map.w3i");
-                            }
-                            else Console.WriteLine("warn: не удалось патчить w3i");
+                            Console.WriteLine("patched script type → 1");
+                            if (mpqcli is not null)
+                                InjectWithMpqcli(mpqcli, packed, tmpW3i, "war3map.w3i");
+                            else if (editor is not null)
+                                InjectFile(editor, packed, tmpW3i, "war3map.w3i");
                         }
+                        else Console.WriteLine("warn: не удалось патчить w3i");
                     }
-                    else Console.WriteLine("warn: extract ok но war3map.w3i не найден в " + tmpDir);
                 }
-                else Console.WriteLine("warn: war3map.w3i не извлечён из base");
+                else Console.WriteLine("warn: war3map.w3i не извлечён");
 
                 try { Directory.Delete(tmpDir, true); } catch { }
             }
@@ -267,7 +272,13 @@ end
                 Directory.CreateDirectory(verifyDir);
                 var verifyFile = Path.Combine(verifyDir, scriptName);
                 try { if (File.Exists(verifyFile)) File.Delete(verifyFile); } catch { }
-                if (editor is not null && ExtractFile(editor, packed, scriptName, verifyDir) && File.Exists(verifyFile))
+                bool verified = false;
+                if (mpqcli is not null)
+                    verified = ExtractWithMpqcli(mpqcli, packed, scriptName, verifyFile);
+                else if (editor is not null)
+                    verified = ExtractFile(editor, packed, scriptName, verifyDir) && File.Exists(verifyFile);
+
+                if (verified && File.Exists(verifyFile))
                 {
                     var got = File.ReadAllText(verifyFile);
                     Console.WriteLine($"verify: extracted {got.Length} bytes");
@@ -373,10 +384,36 @@ end
 
     static bool InjectWithMpqcli(string mpqcli, string archive, string filePath, string nameInArchive)
     {
+        var args = $"add \"{archive}\" \"{filePath}\" --path \"{nameInArchive}\" --overwrite";
+        Console.WriteLine($"mpqcli cmd: {Path.GetFileName(mpqcli)} {args}");
         var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
         {
             FileName = mpqcli,
-            Arguments = $"add \"{archive}\" \"{filePath}\" --path \"{nameInArchive}\" --overwrite",
+            Arguments = args,
+            UseShellExecute = false,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+        });
+        if (p is null) { Console.WriteLine("mpqcli: process null"); return false; }
+        var err = p.StandardError.ReadToEnd();
+        var outp = p.StandardOutput.ReadToEnd();
+        p.WaitForExit();
+        Console.WriteLine($"mpqcli exit: {p.ExitCode}");
+        if (!string.IsNullOrWhiteSpace(outp)) Console.WriteLine("mpqcli out: " + outp.Trim());
+        if (!string.IsNullOrWhiteSpace(err)) Console.WriteLine("mpqcli err: " + err.Trim());
+        return p.ExitCode == 0;
+    }
+
+    static bool ExtractWithMpqcli(string mpqcli, string archive, string nameInArchive, string targetFile)
+    {
+        var dir = Path.GetDirectoryName(targetFile)!;
+        Directory.CreateDirectory(dir);
+        var args = $"extract \"{archive}\" \"{nameInArchive}\" --output \"{dir}\"";
+        Console.WriteLine($"mpqcli extract: {args}");
+        var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = mpqcli,
+            Arguments = args,
             UseShellExecute = false,
             RedirectStandardError = true,
             RedirectStandardOutput = true,
@@ -385,9 +422,9 @@ end
         var err = p.StandardError.ReadToEnd();
         var outp = p.StandardOutput.ReadToEnd();
         p.WaitForExit();
-        if (!string.IsNullOrWhiteSpace(outp)) Console.WriteLine("mpqcli: " + outp.Trim());
-        if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(err)) Console.WriteLine("mpqcli err: " + err.Trim());
-        return p.ExitCode == 0;
+        if (!string.IsNullOrWhiteSpace(outp)) Console.WriteLine("extract out: " + outp.Trim());
+        if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(err)) Console.WriteLine("extract err: " + err.Trim());
+        return p.ExitCode == 0 && File.Exists(targetFile);
     }
 
     static bool ExtractFile(string editor, string archive, string nameInArchive, string targetDir)
