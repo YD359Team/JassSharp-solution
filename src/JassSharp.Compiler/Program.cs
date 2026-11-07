@@ -104,6 +104,7 @@ static class MapBuild
         var baseMap = root.TryGetProperty("base", out var b) ? b.GetString() : null;
         var cfgEditor = root.TryGetProperty("mpqEditor", out var me) ? me.GetString() : null;
         var cfgMpq = root.TryGetProperty("mpqTool", out var mt) ? mt.GetString() : null;
+        var cfgMpqcli = root.TryGetProperty("mpqcli", out var mc) ? mc.GetString() : null;
         game = string.IsNullOrWhiteSpace(game) ? Environment.GetEnvironmentVariable("JASSSHARP_GAME") : game;
         map = Norm(Path.IsPathRooted(map) ? map : Path.Combine(project, map));
         if (!string.IsNullOrWhiteSpace(baseMap))
@@ -163,24 +164,29 @@ static class MapBuild
         var mpqtool = !string.IsNullOrWhiteSpace(cfgMpq) && File.Exists(cfgMpq) ? cfgMpq
                       : Environment.GetEnvironmentVariable("JASSSHARP_MPQ")
                       ?? FindOnPath("mpqtool.exe") ?? FindOnPath("mpqtool");
+        var mpqcli = !string.IsNullOrWhiteSpace(cfgMpqcli) && File.Exists(cfgMpqcli) ? cfgMpqcli
+                     : Environment.GetEnvironmentVariable("JASSSHARP_MPQCLI")
+                     ?? FindOnPath("mpqcli.exe") ?? FindOnPath("mpqcli");
 
         Console.WriteLine("MPQEditor: " + (editor ?? "not found"));
+        Console.WriteLine("mpqcli: " + (mpqcli ?? "not found"));
         if (sourceW3x is not null) Console.WriteLine("base: " + sourceW3x + " (" + new FileInfo(sourceW3x).Length + " bytes)");
 
         bool ok = false;
-        if (sourceW3x is not null && editor is not null && File.Exists(editor))
+        if (sourceW3x is not null && (mpqcli is not null || editor is not null))
         {
             Console.WriteLine("mode: inject");
             File.Copy(sourceW3x, packed, true);
 
-            // извлекаем оригинал из BASE, а не из packed
             var origDir = Path.Combine(Path.GetTempPath(), "JassSharp_orig");
             Directory.CreateDirectory(origDir);
             var origFile = Path.Combine(origDir, scriptName);
             try { if (File.Exists(origFile)) File.Delete(origFile); } catch { }
 
             string finalScript = script;
-            bool gotOrig = ExtractFile(editor, sourceW3x, scriptName, origDir) && File.Exists(origFile);
+            bool gotOrig = false;
+            if (editor is not null)
+                gotOrig = ExtractFile(editor, sourceW3x, scriptName, origDir) && File.Exists(origFile);
             if (gotOrig)
             {
                 var orig = File.ReadAllText(origFile);
@@ -212,7 +218,7 @@ end
             File.WriteAllText(tmpScript, finalScript);
             Console.WriteLine($"final script: {new FileInfo(tmpScript).Length} bytes");
 
-            if (target == "lua")
+            if (target == "lua" && editor is not null)
             {
                 var tmpDir = Path.Combine(Path.GetTempPath(), "JassSharp_w3i");
                 Directory.CreateDirectory(tmpDir);
@@ -230,7 +236,10 @@ end
                             if (PatchScriptType(tmpW3i, 1))
                             {
                                 Console.WriteLine("patched script type → 1");
-                                InjectFile(editor, packed, tmpW3i, "war3map.w3i");
+                                if (mpqcli is not null)
+                                    InjectWithMpqcli(mpqcli, packed, tmpW3i, "war3map.w3i");
+                                else
+                                    InjectFile(editor, packed, tmpW3i, "war3map.w3i");
                             }
                             else Console.WriteLine("warn: не удалось патчить w3i");
                         }
@@ -243,7 +252,13 @@ end
             }
 
             Console.WriteLine("inject script: " + scriptName);
-            if (InjectFile(editor, packed, tmpScript, scriptName))
+            bool injected = false;
+            if (mpqcli is not null)
+                injected = InjectWithMpqcli(mpqcli, packed, tmpScript, scriptName);
+            else if (editor is not null)
+                injected = InjectFile(editor, packed, tmpScript, scriptName);
+
+            if (injected)
             {
                 ok = true;
                 Console.WriteLine($"injected: {packed} ({new FileInfo(packed).Length} bytes)");
@@ -252,7 +267,7 @@ end
                 Directory.CreateDirectory(verifyDir);
                 var verifyFile = Path.Combine(verifyDir, scriptName);
                 try { if (File.Exists(verifyFile)) File.Delete(verifyFile); } catch { }
-                if (ExtractFile(editor, packed, scriptName, verifyDir) && File.Exists(verifyFile))
+                if (editor is not null && ExtractFile(editor, packed, scriptName, verifyDir) && File.Exists(verifyFile))
                 {
                     var got = File.ReadAllText(verifyFile);
                     Console.WriteLine($"verify: extracted {got.Length} bytes");
@@ -304,7 +319,7 @@ end
         }
         else
         {
-            Console.Error.WriteLine("no base .w3x and no MPQEditor/mpqtool");
+            Console.Error.WriteLine("no base .w3x and no MPQEditor/mpqcli/mpqtool");
             return 1;
         }
 
@@ -354,6 +369,25 @@ end
             Console.WriteLine("started");
         }
         return 0;
+    }
+
+    static bool InjectWithMpqcli(string mpqcli, string archive, string filePath, string nameInArchive)
+    {
+        var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = mpqcli,
+            Arguments = $"add \"{archive}\" \"{filePath}\" --path \"{nameInArchive}\" --overwrite",
+            UseShellExecute = false,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+        });
+        if (p is null) return false;
+        var err = p.StandardError.ReadToEnd();
+        var outp = p.StandardOutput.ReadToEnd();
+        p.WaitForExit();
+        if (!string.IsNullOrWhiteSpace(outp)) Console.WriteLine("mpqcli: " + outp.Trim());
+        if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(err)) Console.WriteLine("mpqcli err: " + err.Trim());
+        return p.ExitCode == 0;
     }
 
     static bool ExtractFile(string editor, string archive, string nameInArchive, string targetDir)
