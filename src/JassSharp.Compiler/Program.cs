@@ -135,12 +135,10 @@ static class MapBuild
         var script = string.Join("\n", chunks);
         var scriptName = target == "vjass" ? "war3map.j" : "war3map.lua";
 
-        // пишем скрипт во временный файл
         var tmpScript = Path.Combine(Path.GetTempPath(), "JassSharp_" + scriptName);
         File.WriteAllText(tmpScript, script);
         Console.WriteLine($"script: {tmpScript} ({new FileInfo(tmpScript).Length} bytes)");
 
-        // ищем базовую карту: base в конфиге, или .w3x в папке map, или сам map это .w3x
         string? sourceW3x = null;
         if (!string.IsNullOrWhiteSpace(baseMap) && File.Exists(baseMap))
             sourceW3x = baseMap;
@@ -163,11 +161,14 @@ static class MapBuild
                       ?? FindOnPath("mpqtool.exe")
                       ?? FindOnPath("mpqtool");
 
+        Console.WriteLine("MPQEditor: " + (editor ?? "not found"));
+        Console.WriteLine("mpqtool: " + (mpqtool ?? "not found"));
+        if (sourceW3x is not null) Console.WriteLine("base found: " + sourceW3x);
+
         bool ok = false;
         if (sourceW3x is not null && editor is not null && File.Exists(editor))
         {
-            // копия + инжект через MPQEditor (workflow из статьи)
-            Console.WriteLine("base: " + sourceW3x);
+            Console.WriteLine("mode: inject into base");
             File.Copy(sourceW3x, packed, true);
             Console.WriteLine($"copy: {packed} ({new FileInfo(packed).Length} bytes)");
             var args = $"add \"{packed}\" \"{tmpScript}\" \"{scriptName}\"";
@@ -197,7 +198,9 @@ static class MapBuild
         }
         else if (Directory.Exists(map) && mpqtool is not null && File.Exists(mpqtool))
         {
-            // фолбэк: пакуем папку
+            if (sourceW3x is not null)
+                Console.WriteLine("warn: base set but MPQEditor not found, packing folder instead. install Ladik MPQEditor and set JASSSHARP_MPQEDITOR");
+            Console.WriteLine("mode: pack folder");
             File.WriteAllText(Path.Combine(map, scriptName), script);
             if (File.Exists(packed)) File.Delete(packed);
             Console.WriteLine("pack: " + mpqtool + " new \"" + map + "\" \"" + packed + "\"");
@@ -231,7 +234,6 @@ static class MapBuild
 
         if (!ok) return 1;
 
-        // проверяем Lua-флаг в w3i если есть в папке
         var w3iPath = Directory.Exists(map) ? Path.Combine(map, "war3map.w3i") : null;
         if (w3iPath is not null && File.Exists(w3iPath))
         {
@@ -250,7 +252,6 @@ static class MapBuild
                 return 1;
             }
 
-            // убиваем предыдущий процесс
             foreach (var proc in System.Diagnostics.Process.GetProcessesByName("Warcraft III"))
             {
                 try { proc.Kill(); Console.WriteLine("killed previous Warcraft III"); } catch { }
@@ -268,8 +269,8 @@ static class MapBuild
             var workDir = exeDir.EndsWith("x86_64", StringComparison.OrdinalIgnoreCase)
                 ? Path.GetDirectoryName(exeDir)! : exeDir;
 
-            // без -editor, как в статье
-            var launchArgs = $"-loadfile \"{launchFile}\" -windowmode windowed";
+            // -launch нужен на 3.0.1, -editor не нужен для запуска карты
+            var launchArgs = $"-launch -loadfile \"{launchFile}\" -windowmode windowed";
             if (!string.IsNullOrWhiteSpace(extra)) launchArgs += " " + extra;
 
             Console.WriteLine("LAUNCH: \"" + game + "\" " + launchArgs);
@@ -287,7 +288,6 @@ static class MapBuild
         return 0;
     }
 
-    // читаем script type из war3map.w3i (0=JASS, 1=Lua), format >= 28
     static int? ReadScriptType(string path)
     {
         try
@@ -296,11 +296,9 @@ static class MapBuild
             using var br = new BinaryReader(fs);
             var format = br.ReadInt32();
             if (format < 28) return 0;
-            br.ReadInt32(); // map version
-            br.ReadInt32(); // editor version
-            br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); // game version
-            // пропускаем строки до script type — это хрупко, поэтому просто ищем в конце
-            // для надёжности логируем format и говорим проверить вручную если нужно
+            br.ReadInt32();
+            br.ReadInt32();
+            br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); br.ReadInt32();
             return null;
         }
         catch { return null; }
