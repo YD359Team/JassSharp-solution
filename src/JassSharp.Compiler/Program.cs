@@ -102,6 +102,8 @@ static class MapBuild
         var game = root.TryGetProperty("game", out var g) ? g.GetString() : null;
         var extra = root.TryGetProperty("args", out var a) ? a.GetString() : null;
         var baseMap = root.TryGetProperty("base", out var b) ? b.GetString() : null;
+        var cfgEditor = root.TryGetProperty("mpqEditor", out var me) ? me.GetString() : null;
+        var cfgMpq = root.TryGetProperty("mpqTool", out var mt) ? mt.GetString() : null;
         game = string.IsNullOrWhiteSpace(game) ? Environment.GetEnvironmentVariable("JASSSHARP_GAME") : game;
         map = Path.IsPathRooted(map) ? map : Path.Combine(project, map);
         if (!string.IsNullOrWhiteSpace(baseMap) && !Path.IsPathRooted(baseMap))
@@ -154,14 +156,16 @@ static class MapBuild
         Directory.CreateDirectory(outDir);
         var packed = Path.Combine(outDir, "JassSharpMap.w3x");
 
-        var editor = Environment.GetEnvironmentVariable("JASSSHARP_MPQEDITOR")
-                     ?? FindOnPath("MPQEditor.exe")
-                     ?? FindOnPath("MPQEditor");
-        var mpqtool = Environment.GetEnvironmentVariable("JASSSHARP_MPQ")
-                      ?? FindOnPath("mpqtool.exe")
-                      ?? FindOnPath("mpqtool");
+        var envEditor = Environment.GetEnvironmentVariable("JASSSHARP_MPQEDITOR");
+        var editor = !string.IsNullOrWhiteSpace(cfgEditor) && File.Exists(cfgEditor) ? cfgEditor
+                     : !string.IsNullOrWhiteSpace(envEditor) && File.Exists(envEditor) ? envEditor
+                     : FindOnPath("MPQEditor.exe") ?? FindOnPath("MPQEditor");
+        var mpqtool = !string.IsNullOrWhiteSpace(cfgMpq) && File.Exists(cfgMpq) ? cfgMpq
+                      : Environment.GetEnvironmentVariable("JASSSHARP_MPQ")
+                      ?? FindOnPath("mpqtool.exe") ?? FindOnPath("mpqtool");
 
-        Console.WriteLine("MPQEditor: " + (editor ?? "not found"));
+        Console.WriteLine("MPQEditor env: " + (envEditor ?? "(empty)"));
+        Console.WriteLine("MPQEditor: " + (editor ?? "not found") + (editor is not null ? " exists=" + File.Exists(editor) : ""));
         Console.WriteLine("mpqtool: " + (mpqtool ?? "not found"));
         if (sourceW3x is not null) Console.WriteLine("base found: " + sourceW3x);
 
@@ -199,7 +203,7 @@ static class MapBuild
         else if (Directory.Exists(map) && mpqtool is not null && File.Exists(mpqtool))
         {
             if (sourceW3x is not null)
-                Console.WriteLine("warn: base set but MPQEditor not found, packing folder instead. install Ladik MPQEditor and set JASSSHARP_MPQEDITOR");
+                Console.WriteLine("warn: base set but MPQEditor not found, packing folder instead. add \"mpqEditor\":: \"C:\\path\\MPQEditor.exe\" to jasssharp.json");
             Console.WriteLine("mode: pack folder");
             File.WriteAllText(Path.Combine(map, scriptName), script);
             if (File.Exists(packed)) File.Delete(packed);
@@ -269,7 +273,6 @@ static class MapBuild
             var workDir = exeDir.EndsWith("x86_64", StringComparison.OrdinalIgnoreCase)
                 ? Path.GetDirectoryName(exeDir)! : exeDir;
 
-            // -launch нужен на 3.0.1, -editor не нужен для запуска карты
             var launchArgs = $"-launch -loadfile \"{launchFile}\" -windowmode windowed";
             if (!string.IsNullOrWhiteSpace(extra)) launchArgs += " " + extra;
 
