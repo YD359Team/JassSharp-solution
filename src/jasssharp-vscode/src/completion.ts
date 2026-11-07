@@ -1,8 +1,7 @@
 import * as vscode from "vscode";
 
-// Базовый набор для подсказок. Полный каталог подтянем позже из компилятора.
 const KEYWORDS = [
-  "namespace", "class", "void", "int", "float", "bool", "string", "const",
+  "namespace", "using", "class", "void", "int", "float", "bool", "string", "const",
   "new", "this", "if", "else", "while", "return", "true", "false", "null",
 ];
 
