@@ -172,30 +172,36 @@ static class MapBuild
         {
             Console.WriteLine("mode: inject");
             File.Copy(sourceW3x, packed, true);
-            var args = $"add \"{packed}\" \"{tmpScript}\" \"{scriptName}\"";
-            Console.WriteLine("inject: " + Path.GetFileName(editor) + " add ... \"" + scriptName + "\"");
-            var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+
+            // патчим script type в war3map.w3i если цель Lua
+            if (target == "lua")
             {
-                FileName = editor,
-                Arguments = args,
-                UseShellExecute = false,
-                RedirectStandardError = true,
-                RedirectStandardOutput = true,
-            });
-            if (p is not null)
-            {
-                var err = p.StandardError.ReadToEnd();
-                var outp = p.StandardOutput.ReadToEnd();
-                p.WaitForExit();
-                if (!string.IsNullOrWhiteSpace(outp)) Console.WriteLine(outp.Trim());
-                if (p.ExitCode != 0)
-                    Console.Error.WriteLine("inject failed: " + err.Trim());
-                else
+                var tmpW3i = Path.Combine(Path.GetTempPath(), "JassSharp_war3map.w3i");
+                if (ExtractFile(editor, packed, "war3map.w3i", tmpW3i))
                 {
-                    ok = true;
-                    Console.WriteLine($"injected: {packed} ({new FileInfo(packed).Length} bytes)");
+                    var st = ReadScriptType(tmpW3i);
+                    Console.WriteLine("w3i before: " + (st == 1 ? "Lua" : st == 0 ? "JASS" : "?"));
+                    if (st != 1)
+                    {
+                        if (PatchScriptType(tmpW3i, 1))
+                        {
+                            Console.WriteLine("patched script type → 1");
+                            InjectFile(editor, packed, tmpW3i, "war3map.w3i");
+                        }
+                        else Console.WriteLine("warn: не удалось патчить w3i");
+                    }
+                    try { File.Delete(tmpW3i); } catch { }
                 }
+                else Console.WriteLine("warn: war3map.w3i не извлечён из base");
             }
+
+            Console.WriteLine("inject script: " + scriptName);
+            if (InjectFile(editor, packed, tmpScript, scriptName))
+            {
+                ok = true;
+                Console.WriteLine($"injected: {packed} ({new FileInfo(packed).Length} bytes)");
+            }
+            else Console.Error.WriteLine("inject script failed");
         }
         else if (Directory.Exists(map) && mpqtool is not null && File.Exists(mpqtool))
         {
@@ -203,6 +209,13 @@ static class MapBuild
                 Console.WriteLine("warn: base set but MPQEditor not found, packing folder");
             Console.WriteLine("mode: pack folder");
             File.WriteAllText(Path.Combine(map, scriptName), script);
+            // патчим w3i в папке если есть
+            var folderW3i = Path.Combine(map, "war3map.w3i");
+            if (target == "lua" && File.Exists(folderW3i))
+            {
+                if (PatchScriptType(folderW3i, 1))
+                    Console.WriteLine("patched folder w3i → Lua");
+            }
             if (File.Exists(packed)) File.Delete(packed);
             Console.WriteLine("pack: " + Path.GetFileName(mpqtool) + " new ...");
             var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
@@ -234,16 +247,6 @@ static class MapBuild
         }
 
         if (!ok) return 1;
-
-        var w3iPath = Directory.Exists(map) ? Path.Combine(map, "war3map.w3i") : null;
-        if (w3iPath is not null && File.Exists(w3iPath))
-        {
-            var st = ReadScriptType(w3iPath);
-            if (st is null) Console.WriteLine("w3i: не удалось прочитать script type");
-            else Console.WriteLine("w3i script type: " + (st == 1 ? "Lua" : "JASS"));
-            if (target == "lua" && st != 1)
-                Console.WriteLine("warn: карта не Lua. в World Editor: Scenario → Map Options → Script language = Lua");
-        }
 
         if (launch)
         {
@@ -288,9 +291,91 @@ static class MapBuild
         return 0;
     }
 
+    static bool ExtractFile(string editor, string archive, string nameInArchive, string outPath)
+    {
+        try { if (File.Exists(outPath)) File.Delete(outPath); } catch { }
+        var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = editor,
+            Arguments = $"extract \"{archive}\" \"{nameInArchive}\" \"{outPath}\"",
+            UseShellExecute = false,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+        });
+        if (p is null) return false;
+        p.WaitForExit();
+        return p.ExitCode == 0 && File.Exists(outPath);
+    }
+
+    static bool InjectFile(string editor, string archive, string filePath, string nameInArchive)
+    {
+        var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = editor,
+            Arguments = $"add \"{archive}\" \"{filePath}\" \"{nameInArchive}\"",
+            UseShellExecute = false,
+            RedirectStandardError = true,
+            RedirectStandardOutput = true,
+        });
+        if (p is null) return false;
+        p.WaitForExit();
+        return p.ExitCode == 0;
+    }
+
+    static bool PatchScriptType(string path, int value)
+    {
+        try
+        {
+            var bytes = File.ReadAllBytes(path);
+            using var ms = new MemoryStream(bytes);
+            using var br = new BinaryReader(ms);
+            var format = br.ReadInt32();
+            if (format < 28) return false;
+
+            br.ReadInt32(); // saves
+            br.ReadInt32(); // editor
+            br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); // game version
+
+            for (var i = 0; i < 4; i++) SkipString(br);
+
+            br.ReadBytes(32); // camera
+            br.ReadBytes(16); // margins
+            br.ReadInt32(); br.ReadInt32(); // width/height
+            br.ReadInt32(); // flags
+            br.ReadByte(); // tileset
+            br.ReadInt32(); // loading index
+
+            if (format >= 25)
+            {
+                for (var i = 0; i < 8; i++) SkipString(br);
+                br.ReadInt32(); // fog style
+                br.ReadBytes(12); // fog floats
+                br.ReadBytes(4); // fog color
+                br.ReadInt32(); // weather
+                SkipString(br); // sound
+                br.ReadByte(); // light
+                br.ReadBytes(4); // water
+            }
+
+            var pos = (int)ms.Position;
+            if (pos + 4 > bytes.Length) return false;
+            bytes[pos] = (byte)value;
+            bytes[pos + 1] = 0;
+            bytes[pos + 2] = 0;
+            bytes[pos + 3] = 0;
+            File.WriteAllBytes(path, bytes);
+            return true;
+        }
+        catch { return false; }
+    }
+
+    static void SkipString(BinaryReader br)
+    {
+        while (br.ReadByte() != 0) { }
+    }
+
     static string Norm(string p) => Path.GetFullPath(p.Replace('/', '\\'));
 
-    // парсим war3map.w3i до script type (0=JASS, 1=Lua), format >= 28
     static int? ReadScriptType(string path)
     {
         try
@@ -300,67 +385,38 @@ static class MapBuild
             var format = br.ReadInt32();
             if (format < 28) return 0;
 
-            br.ReadInt32(); // saves
-            br.ReadInt32(); // editor version
-            br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); // game version
-
-            // name, author, description, recommended
-            for (var i = 0; i < 4; i++) ReadString(br);
-
-            // camera bounds float[8]
-            for (var i = 0; i < 8; i++) br.ReadSingle();
-
-            // margins int[4]
-            for (var i = 0; i < 4; i++) br.ReadInt32();
-
-            // playable width, height
             br.ReadInt32();
             br.ReadInt32();
+            br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); br.ReadInt32();
 
-            // flags
+            for (var i = 0; i < 4; i++) SkipString(br);
+
+            br.ReadBytes(32);
+            br.ReadBytes(16);
             br.ReadInt32();
-
-            // tileset char
+            br.ReadInt32();
+            br.ReadInt32();
             br.ReadByte();
-
-            // loading screen index
             br.ReadInt32();
 
             if (format >= 25)
             {
-                ReadString(br); // loading screen path
-                ReadString(br); // loading text
-                ReadString(br); // loading title
-                ReadString(br); // loading subtitle
-                ReadString(br); // prologue path
-                ReadString(br); // prologue text
-                ReadString(br); // prologue title
-                ReadString(br); // prologue subtitle
-
-                br.ReadInt32(); // fog style
-                br.ReadSingle(); br.ReadSingle(); br.ReadSingle(); // fog z start/end/density
-                br.ReadByte(); br.ReadByte(); br.ReadByte(); br.ReadByte(); // fog color
-                br.ReadInt32(); // weather
-                ReadString(br); // sound environment
-                br.ReadByte(); // light
-                br.ReadByte(); br.ReadByte(); br.ReadByte(); br.ReadByte(); // water color
+                for (var i = 0; i < 8; i++) SkipString(br);
+                br.ReadInt32();
+                br.ReadBytes(12);
+                br.ReadBytes(4);
+                br.ReadInt32();
+                SkipString(br);
+                br.ReadByte();
+                br.ReadBytes(4);
             }
 
             if (format >= 28)
-                return br.ReadInt32(); // script type: 0=JASS, 1=Lua
+                return br.ReadInt32();
 
             return 0;
         }
         catch { return null; }
-    }
-
-    static string ReadString(BinaryReader br)
-    {
-        var sb = new StringBuilder();
-        byte b;
-        while ((b = br.ReadByte()) != 0)
-            sb.Append((char)b);
-        return sb.ToString();
     }
 
     static List<string> ResolveUsings(List<string> files, string src, string project)
