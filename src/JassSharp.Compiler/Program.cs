@@ -424,7 +424,16 @@ end
         p.WaitForExit();
         if (!string.IsNullOrWhiteSpace(outp)) Console.WriteLine("extract out: " + outp.Trim());
         if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(err)) Console.WriteLine("extract err: " + err.Trim());
-        return p.ExitCode == 0 && File.Exists(targetFile);
+
+        // ищем файл в папке вывода
+        var found = Directory.GetFiles(dir, "*", SearchOption.AllDirectories)
+            .FirstOrDefault(f => Path.GetFileName(f).Equals(nameInArchive, StringComparison.OrdinalIgnoreCase));
+        if (found is not null && found != targetFile)
+        {
+            Console.WriteLine($"extract found: {found}");
+            File.Copy(found, targetFile, true);
+        }
+        return File.Exists(targetFile);
     }
 
     static bool ExtractFile(string editor, string archive, string nameInArchive, string targetDir)
