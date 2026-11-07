@@ -140,10 +140,6 @@ static class MapBuild
         var tmpScript = Path.Combine(Path.GetTempPath(), "JassSharp_" + scriptName);
         File.WriteAllText(tmpScript, script);
         Console.WriteLine($"script: {tmpScript} ({new FileInfo(tmpScript).Length} bytes)");
-        Console.WriteLine("--- script preview ---");
-        var preview = script.Length > 400 ? script[..400] + "..." : script;
-        Console.WriteLine(preview.Replace("\n", "\n  "));
-        Console.WriteLine("---");
 
         string? sourceW3x = null;
         if (!string.IsNullOrWhiteSpace(baseMap) && File.Exists(baseMap))
@@ -207,6 +203,44 @@ static class MapBuild
                 try { Directory.Delete(tmpDir, true); } catch { }
             }
 
+            // пробуем сохранить оригинальный скрипт и хукнуть
+            var origDir = Path.Combine(Path.GetTempPath(), "JassSharp_orig");
+            Directory.CreateDirectory(origDir);
+            var origFile = Path.Combine(origDir, scriptName);
+            try { if (File.Exists(origFile)) File.Delete(origFile); } catch { }
+
+            string finalScript = script;
+            if (ExtractFile(editor, packed, scriptName, origDir) && File.Exists(origFile))
+            {
+                var orig = File.ReadAllText(origFile);
+                Console.WriteLine($"original {scriptName}: {orig.Length} bytes, hooking");
+                // убираем наш main/config из скрипта, добавляем хук
+                var userOnly = System.Text.RegularExpressions.Regex.Replace(
+                    script,
+                    @"function\s+config\s*\(\s*\)\s*end\s*function\s+main\s*\(\)[\s\S]*?end\s*$",
+                    "",
+                    System.Text.RegularExpressions.RegexOptions.Multiline);
+                finalScript = orig + "\n\n-- JASS#\n" + userOnly + @"
+do
+  local _origMain = main
+  function main()
+    _origMain()
+    if OnInit then
+      local ok, err = pcall(OnInit)
+      if not ok then
+        print('JASS# OnInit error: ' .. tostring(err))
+        if BJDebugMsg then BJDebugMsg('JASS# OnInit error: ' .. tostring(err)) end
+      end
+    end
+  end
+end
+";
+            }
+            else Console.WriteLine("no original script, using generated");
+
+            File.WriteAllText(tmpScript, finalScript);
+            Console.WriteLine($"final script: {new FileInfo(tmpScript).Length} bytes");
+
             Console.WriteLine("inject script: " + scriptName);
             if (InjectFile(editor, packed, tmpScript, scriptName))
             {
@@ -220,14 +254,16 @@ static class MapBuild
                 if (ExtractFile(editor, packed, scriptName, verifyDir) && File.Exists(verifyFile))
                 {
                     var got = File.ReadAllText(verifyFile);
-                    Console.WriteLine($"verify: extracted {got.Length} bytes from packed map");
-                    var head = got.Length > 200 ? got[..200] : got;
+                    Console.WriteLine($"verify: extracted {got.Length} bytes");
+                    var head = got.Length > 250 ? got[..250] : got;
                     Console.WriteLine("verify head: " + head.Replace("\n", " | "));
                 }
-                else Console.WriteLine("verify: не удалось извлечь " + scriptName + " обратно");
+                else Console.WriteLine("verify: не удалось извлечь обратно");
                 try { Directory.Delete(verifyDir, true); } catch { }
             }
             else Console.Error.WriteLine("inject script failed");
+
+            try { Directory.Delete(origDir, true); } catch { }
         }
         else if (Directory.Exists(map) && mpqtool is not null && File.Exists(mpqtool))
         {
