@@ -235,7 +235,6 @@ static class MapBuild
 
         if (!ok) return 1;
 
-        // проверяем Lua-флаг в распакованной папке если есть
         var w3iPath = Directory.Exists(map) ? Path.Combine(map, "war3map.w3i") : null;
         if (w3iPath is not null && File.Exists(w3iPath))
         {
@@ -271,7 +270,6 @@ static class MapBuild
             var workDir = exeDir.EndsWith("x86_64", StringComparison.OrdinalIgnoreCase)
                 ? Path.GetDirectoryName(exeDir)! : exeDir;
 
-            // -editor нужен на 3.0.1 чтобы карта открылась, а не меню
             var launchArgs = $"-launch -editor -windowmode windowed -loadfile \"{launchFile}\"";
             if (!string.IsNullOrWhiteSpace(extra)) launchArgs += " " + extra;
 
@@ -292,6 +290,7 @@ static class MapBuild
 
     static string Norm(string p) => Path.GetFullPath(p.Replace('/', '\\'));
 
+    // парсим war3map.w3i до script type (0=JASS, 1=Lua), format >= 28
     static int? ReadScriptType(string path)
     {
         try
@@ -300,12 +299,68 @@ static class MapBuild
             using var br = new BinaryReader(fs);
             var format = br.ReadInt32();
             if (format < 28) return 0;
+
+            br.ReadInt32(); // saves
+            br.ReadInt32(); // editor version
+            br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); // game version
+
+            // name, author, description, recommended
+            for (var i = 0; i < 4; i++) ReadString(br);
+
+            // camera bounds float[8]
+            for (var i = 0; i < 8; i++) br.ReadSingle();
+
+            // margins int[4]
+            for (var i = 0; i < 4; i++) br.ReadInt32();
+
+            // playable width, height
             br.ReadInt32();
             br.ReadInt32();
-            br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); br.ReadInt32();
-            return null;
+
+            // flags
+            br.ReadInt32();
+
+            // tileset char
+            br.ReadByte();
+
+            // loading screen index
+            br.ReadInt32();
+
+            if (format >= 25)
+            {
+                ReadString(br); // loading screen path
+                ReadString(br); // loading text
+                ReadString(br); // loading title
+                ReadString(br); // loading subtitle
+                ReadString(br); // prologue path
+                ReadString(br); // prologue text
+                ReadString(br); // prologue title
+                ReadString(br); // prologue subtitle
+
+                br.ReadInt32(); // fog style
+                br.ReadSingle(); br.ReadSingle(); br.ReadSingle(); // fog z start/end/density
+                br.ReadByte(); br.ReadByte(); br.ReadByte(); br.ReadByte(); // fog color
+                br.ReadInt32(); // weather
+                ReadString(br); // sound environment
+                br.ReadByte(); // light
+                br.ReadByte(); br.ReadByte(); br.ReadByte(); br.ReadByte(); // water color
+            }
+
+            if (format >= 28)
+                return br.ReadInt32(); // script type: 0=JASS, 1=Lua
+
+            return 0;
         }
         catch { return null; }
+    }
+
+    static string ReadString(BinaryReader br)
+    {
+        var sb = new StringBuilder();
+        byte b;
+        while ((b = br.ReadByte()) != 0)
+            sb.Append((char)b);
+        return sb.ToString();
     }
 
     static List<string> ResolveUsings(List<string> files, string src, string project)
