@@ -25,18 +25,40 @@ public static class Checker
     private static bool Known(string name, HashSet<string> fns, HashSet<string> consts, HashSet<string> classes) =>
         fns.Contains(name) || consts.Contains(name) || classes.Contains(name)
         || NativeCatalog.Natives.Contains(name) || NativeCatalog.Constants.Contains(name)
-        || name.StartsWith("BJ", StringComparison.Ordinal); // blizzard.j wrappers
+        || name.StartsWith("BJ", StringComparison.Ordinal);
+
+    private static string? InferType(Syntax.Expr e, Dictionary<string, string> types)
+    {
+        return e switch
+        {
+            NameExpr n when types.TryGetValue(n.Name, out var t) => t,
+            CallExpr c when c.Callee is NameExpr id && NativeSigs.Map.TryGetValue(id.Name, out var sig) => sig.ReturnType,
+            IntExpr => "int",
+            FloatExpr => "float",
+            BoolExpr => "bool",
+            StringExpr => "string",
+            RawcodeExpr => "int",
+            _ => null
+        };
+    }
 
     private static void Walk(List<Stmt> body, List<ParamDecl> ps, HashSet<string> classes, HashSet<string> fns, HashSet<string> consts, List<Diagnostic> diags, string? file)
     {
         var locals = ps.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
+        var types = ps.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
+
         void Stmt(Stmt s)
         {
             switch (s)
             {
                 case VarStmt v:
                     locals.Add(v.Name);
-                    if (v.Init is not null) Expr(v.Init);
+                    if (v.Init is not null)
+                    {
+                        Expr(v.Init);
+                        var t = InferType(v.Init, types);
+                        if (t is not null) types[v.Name] = t;
+                    }
                     break;
                 case AssignStmt a:
                     Expr(a.Target); Expr(a.Value);
@@ -54,6 +76,7 @@ public static class Checker
                     break;
             }
         }
+
         void Expr(Syntax.Expr e)
         {
             switch (e)
@@ -61,6 +84,22 @@ public static class Checker
                 case CallExpr c when c.Callee is NameExpr id:
                     if (!Known(id.Name, fns, consts, classes))
                         diags.Add(new Diagnostic(id.Line, id.Col, "warning", $"неизвестный вызов {id.Name}", file));
+                    else if (NativeSigs.Map.TryGetValue(id.Name, out var sig))
+                    {
+                        if (c.Args.Count != sig.Params.Length)
+                            diags.Add(new Diagnostic(id.Line, id.Col, "error", $"{id.Name}: ожидалось {sig.Params.Length} аргументов, получено {c.Args.Count}", file));
+                        else
+                        {
+                            for (var i = 0; i < c.Args.Count; i++)
+                            {
+                                var arg = c.Args[i];
+                                var expected = sig.Params[i];
+                                var actual = InferType(arg, types);
+                                if (actual is not null && actual != expected && !IsCompatible(actual, expected))
+                                    diags.Add(new Diagnostic(arg.Line, arg.Col, "error", $"{id.Name}: аргумент {i + 1} ожидался {expected}, получен {actual}", file));
+                            }
+                        }
+                    }
                     foreach (var a in c.Args) Expr(a);
                     break;
                 case NameExpr n:
@@ -82,5 +121,13 @@ public static class Checker
             }
         }
         foreach (var s in body) Stmt(s);
+    }
+
+    private static bool IsCompatible(string actual, string expected)
+    {
+        if (actual == expected) return true;
+        if (expected == "int" && actual == "float") return true;
+        if (expected == "float" && actual == "int") return true;
+        return false;
     }
 }
