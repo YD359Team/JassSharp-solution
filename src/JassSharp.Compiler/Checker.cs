@@ -33,11 +33,10 @@ public static class Checker
         {
             NameExpr n when types.TryGetValue(n.Name, out var t) => t,
             CallExpr c when c.Callee is NameExpr id && NativeSigs.Map.TryGetValue(id.Name, out var sig) => sig.ReturnType,
-            IntExpr => "int",
-            FloatExpr => "float",
+            NumExpr n => n.Text.Contains('.') || n.Text.Contains('e') || n.Text.Contains('E') ? "float" : "int",
             BoolExpr => "bool",
-            StringExpr => "string",
-            RawcodeExpr => "int",
+            StrExpr => "string",
+            RawExpr => "int",
             _ => null
         };
     }
