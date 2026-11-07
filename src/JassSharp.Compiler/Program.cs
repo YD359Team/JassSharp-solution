@@ -140,6 +140,10 @@ static class MapBuild
         var tmpScript = Path.Combine(Path.GetTempPath(), "JassSharp_" + scriptName);
         File.WriteAllText(tmpScript, script);
         Console.WriteLine($"script: {tmpScript} ({new FileInfo(tmpScript).Length} bytes)");
+        Console.WriteLine("--- script preview ---");
+        var preview = script.Length > 400 ? script[..400] + "..." : script;
+        Console.WriteLine(preview.Replace("\n", "\n  "));
+        Console.WriteLine("---");
 
         string? sourceW3x = null;
         if (!string.IsNullOrWhiteSpace(baseMap) && File.Exists(baseMap))
@@ -208,6 +212,20 @@ static class MapBuild
             {
                 ok = true;
                 Console.WriteLine($"injected: {packed} ({new FileInfo(packed).Length} bytes)");
+
+                var verifyDir = Path.Combine(Path.GetTempPath(), "JassSharp_verify");
+                Directory.CreateDirectory(verifyDir);
+                var verifyFile = Path.Combine(verifyDir, scriptName);
+                try { if (File.Exists(verifyFile)) File.Delete(verifyFile); } catch { }
+                if (ExtractFile(editor, packed, scriptName, verifyDir) && File.Exists(verifyFile))
+                {
+                    var got = File.ReadAllText(verifyFile);
+                    Console.WriteLine($"verify: extracted {got.Length} bytes from packed map");
+                    var head = got.Length > 200 ? got[..200] : got;
+                    Console.WriteLine("verify head: " + head.Replace("\n", " | "));
+                }
+                else Console.WriteLine("verify: не удалось извлечь " + scriptName + " обратно");
+                try { Directory.Delete(verifyDir, true); } catch { }
             }
             else Console.Error.WriteLine("inject script failed");
         }
@@ -254,6 +272,9 @@ static class MapBuild
         }
 
         if (!ok) return 1;
+
+        Console.WriteLine("built: " + packed);
+        Console.WriteLine("открывай этот файл в редакторе, не base");
 
         if (launch)
         {
