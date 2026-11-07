@@ -3,6 +3,7 @@ import { spawn } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { registerCompletions } from "./completion";
+import { registerHover } from "./hover";
 
 let log: vscode.OutputChannel;
 
@@ -14,6 +15,7 @@ export function activate(context: vscode.ExtensionContext) {
   context.subscriptions.push(diags);
 
   registerCompletions(context);
+  registerHover(context);
 
   const runBtn = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
   runBtn.command = "jasssharp.runMap";
