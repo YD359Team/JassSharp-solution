@@ -1,7 +1,7 @@
 namespace JassSharp.Syntax;
 
 public abstract record Node;
-public sealed record NsUnit(string Name, List<ConstDecl> Consts, List<ClassDecl> Classes, List<FnDecl> Functions) : Node;
+public sealed record NsUnit(string Name, List<string> Usings, List<ConstDecl> Consts, List<ClassDecl> Classes, List<FnDecl> Functions) : Node;
 public sealed record ConstDecl(string Type, string Name, Expr Value);
 public sealed record FieldDecl(string Type, string Name);
 public sealed record ParamDecl(string Type, string Name);
