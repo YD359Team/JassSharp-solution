@@ -73,6 +73,12 @@ public static class Checker
                     Expr(w.Cond);
                     foreach (var t in w.Body) Stmt(t);
                     break;
+                case ForStmt f:
+                    if (f.Init is not null) Stmt(f.Init);
+                    if (f.Cond is not null) Expr(f.Cond);
+                    if (f.Step is not null) Stmt(f.Step);
+                    foreach (var t in f.Body) Stmt(t);
+                    break;
             }
         }
 
@@ -111,6 +117,7 @@ public static class Checker
                     foreach (var a in n.Args) Expr(a);
                     break;
                 case MemberExpr m: Expr(m.Object); break;
+                case IndexExpr ix: Expr(ix.Object); Expr(ix.Index); break;
                 case BinaryExpr b: Expr(b.Left); Expr(b.Right); break;
                 case UnaryExpr u: Expr(u.Inner); break;
                 case CallExpr c:
