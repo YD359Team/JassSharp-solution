@@ -173,26 +173,34 @@ static class MapBuild
             Console.WriteLine("mode: inject");
             File.Copy(sourceW3x, packed, true);
 
-            // патчим script type в war3map.w3i если цель Lua
             if (target == "lua")
             {
-                var tmpW3i = Path.Combine(Path.GetTempPath(), "JassSharp_war3map.w3i");
-                if (ExtractFile(editor, packed, "war3map.w3i", tmpW3i))
+                var tmpDir = Path.Combine(Path.GetTempPath(), "JassSharp_w3i");
+                Directory.CreateDirectory(tmpDir);
+                var tmpW3i = Path.Combine(tmpDir, "war3map.w3i");
+                try { if (File.Exists(tmpW3i)) File.Delete(tmpW3i); } catch { }
+
+                if (ExtractFile(editor, packed, "war3map.w3i", tmpDir))
                 {
-                    var st = ReadScriptType(tmpW3i);
-                    Console.WriteLine("w3i before: " + (st == 1 ? "Lua" : st == 0 ? "JASS" : "?"));
-                    if (st != 1)
+                    if (File.Exists(tmpW3i))
                     {
-                        if (PatchScriptType(tmpW3i, 1))
+                        var st = ReadScriptType(tmpW3i);
+                        Console.WriteLine("w3i before: " + (st == 1 ? "Lua" : st == 0 ? "JASS" : "?"));
+                        if (st != 1)
                         {
-                            Console.WriteLine("patched script type → 1");
-                            InjectFile(editor, packed, tmpW3i, "war3map.w3i");
+                            if (PatchScriptType(tmpW3i, 1))
+                            {
+                                Console.WriteLine("patched script type → 1");
+                                InjectFile(editor, packed, tmpW3i, "war3map.w3i");
+                            }
+                            else Console.WriteLine("warn: не удалось патчить w3i");
                         }
-                        else Console.WriteLine("warn: не удалось патчить w3i");
                     }
-                    try { File.Delete(tmpW3i); } catch { }
+                    else Console.WriteLine("warn: extract ok но war3map.w3i не найден в " + tmpDir);
                 }
                 else Console.WriteLine("warn: war3map.w3i не извлечён из base");
+
+                try { Directory.Delete(tmpDir, true); } catch { }
             }
 
             Console.WriteLine("inject script: " + scriptName);
@@ -209,7 +217,6 @@ static class MapBuild
                 Console.WriteLine("warn: base set but MPQEditor not found, packing folder");
             Console.WriteLine("mode: pack folder");
             File.WriteAllText(Path.Combine(map, scriptName), script);
-            // патчим w3i в папке если есть
             var folderW3i = Path.Combine(map, "war3map.w3i");
             if (target == "lua" && File.Exists(folderW3i))
             {
@@ -291,20 +298,24 @@ static class MapBuild
         return 0;
     }
 
-    static bool ExtractFile(string editor, string archive, string nameInArchive, string outPath)
+    static bool ExtractFile(string editor, string archive, string nameInArchive, string targetDir)
     {
-        try { if (File.Exists(outPath)) File.Delete(outPath); } catch { }
+        Directory.CreateDirectory(targetDir);
         var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
         {
             FileName = editor,
-            Arguments = $"extract \"{archive}\" \"{nameInArchive}\" \"{outPath}\"",
+            Arguments = $"extract \"{archive}\" \"{nameInArchive}\" \"{targetDir}\"",
             UseShellExecute = false,
             RedirectStandardError = true,
             RedirectStandardOutput = true,
         });
         if (p is null) return false;
+        var err = p.StandardError.ReadToEnd();
+        var outp = p.StandardOutput.ReadToEnd();
         p.WaitForExit();
-        return p.ExitCode == 0 && File.Exists(outPath);
+        if (!string.IsNullOrWhiteSpace(outp)) Console.WriteLine("extract: " + outp.Trim());
+        if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(err)) Console.WriteLine("extract err: " + err.Trim());
+        return p.ExitCode == 0;
     }
 
     static bool InjectFile(string editor, string archive, string filePath, string nameInArchive)
@@ -332,29 +343,29 @@ static class MapBuild
             var format = br.ReadInt32();
             if (format < 28) return false;
 
-            br.ReadInt32(); // saves
-            br.ReadInt32(); // editor
-            br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); // game version
+            br.ReadInt32();
+            br.ReadInt32();
+            br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); br.ReadInt32();
 
             for (var i = 0; i < 4; i++) SkipString(br);
 
-            br.ReadBytes(32); // camera
-            br.ReadBytes(16); // margins
-            br.ReadInt32(); br.ReadInt32(); // width/height
-            br.ReadInt32(); // flags
-            br.ReadByte(); // tileset
-            br.ReadInt32(); // loading index
+            br.ReadBytes(32);
+            br.ReadBytes(16);
+            br.ReadInt32(); br.ReadInt32();
+            br.ReadInt32();
+            br.ReadByte();
+            br.ReadInt32();
 
             if (format >= 25)
             {
                 for (var i = 0; i < 8; i++) SkipString(br);
-                br.ReadInt32(); // fog style
-                br.ReadBytes(12); // fog floats
-                br.ReadBytes(4); // fog color
-                br.ReadInt32(); // weather
-                SkipString(br); // sound
-                br.ReadByte(); // light
-                br.ReadBytes(4); // water
+                br.ReadInt32();
+                br.ReadBytes(12);
+                br.ReadBytes(4);
+                br.ReadInt32();
+                SkipString(br);
+                br.ReadByte();
+                br.ReadBytes(4);
             }
 
             var pos = (int)ms.Position;
