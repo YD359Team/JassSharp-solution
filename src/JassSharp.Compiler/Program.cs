@@ -101,8 +101,11 @@ static class MapBuild
         var entry = root.TryGetProperty("entry", out var e) ? e.GetString() : null;
         var game = root.TryGetProperty("game", out var g) ? g.GetString() : null;
         var extra = root.TryGetProperty("args", out var a) ? a.GetString() : null;
+        var baseMap = root.TryGetProperty("base", out var b) ? b.GetString() : null;
         game = string.IsNullOrWhiteSpace(game) ? Environment.GetEnvironmentVariable("JASSSHARP_GAME") : game;
         map = Path.IsPathRooted(map) ? map : Path.Combine(project, map);
+        if (!string.IsNullOrWhiteSpace(baseMap) && !Path.IsPathRooted(baseMap))
+            baseMap = Path.Combine(project, baseMap);
 
         var src = Path.Combine(project, "src");
         var files = new List<string>();
@@ -112,7 +115,6 @@ static class MapBuild
             files.AddRange(Directory.GetFiles(src, "*.w3js", SearchOption.AllDirectories));
         if (files.Count == 0) { Console.Error.WriteLine("no .w3js"); return 1; }
 
-        // резолвим using: ищем файлы модулей и ставим их перед entry
         var ordered = ResolveUsings(files, src, project);
         Console.WriteLine("files: " + string.Join(", ", ordered.Select(Path.GetFileName)));
 
@@ -131,67 +133,113 @@ static class MapBuild
             }
         }
         var script = string.Join("\n", chunks);
+        var scriptName = target == "vjass" ? "war3map.j" : "war3map.lua";
 
-        if (File.Exists(map) && (map.EndsWith(".w3x", StringComparison.OrdinalIgnoreCase) || map.EndsWith(".w3m", StringComparison.OrdinalIgnoreCase)))
+        // пишем скрипт во временный файл
+        var tmpScript = Path.Combine(Path.GetTempPath(), "JassSharp_" + scriptName);
+        File.WriteAllText(tmpScript, script);
+        Console.WriteLine($"script: {tmpScript} ({new FileInfo(tmpScript).Length} bytes)");
+
+        // ищем базовую карту: base в конфиге, или .w3x в папке map, или сам map это .w3x
+        string? sourceW3x = null;
+        if (!string.IsNullOrWhiteSpace(baseMap) && File.Exists(baseMap))
+            sourceW3x = baseMap;
+        else if (File.Exists(map) && map.EndsWith(".w3x", StringComparison.OrdinalIgnoreCase))
+            sourceW3x = map;
+        else if (Directory.Exists(map))
         {
-            Console.Error.WriteLine("archive .w3x: set map to unpacked folder in jasssharp.json");
-            return 1;
+            var found = Directory.GetFiles(map, "*.w3x").FirstOrDefault();
+            if (found is not null) sourceW3x = found;
         }
-        Directory.CreateDirectory(map);
-        var name = target == "vjass" ? "war3map.j" : "war3map.lua";
-        var dest = Path.Combine(map, name);
-        File.WriteAllText(dest, script);
-        var scriptInfo = new FileInfo(dest);
-        Console.WriteLine($"script: {dest} ({scriptInfo.Length} bytes)");
 
-        var w3i = Path.Combine(map, "war3map.w3i");
-        if (!File.Exists(w3i))
-            Console.WriteLine("warn: no war3map.w3i — карта не загрузится в World Editor");
-        else
-            Console.WriteLine($"w3i: {w3i} ({new FileInfo(w3i).Length} bytes)");
+        var outDir = Path.Combine(project, "bin");
+        Directory.CreateDirectory(outDir);
+        var packed = Path.Combine(outDir, "JassSharpMap.w3x");
 
-        var tool = Environment.GetEnvironmentVariable("JASSSHARP_MPQ")
-                   ?? FindOnPath("mpqtool.exe")
-                   ?? FindOnPath("mpqtool");
-        string? packed = null;
-        if (!string.IsNullOrWhiteSpace(tool) && File.Exists(tool))
+        var editor = Environment.GetEnvironmentVariable("JASSSHARP_MPQEDITOR")
+                     ?? FindOnPath("MPQEditor.exe")
+                     ?? FindOnPath("MPQEditor");
+        var mpqtool = Environment.GetEnvironmentVariable("JASSSHARP_MPQ")
+                      ?? FindOnPath("mpqtool.exe")
+                      ?? FindOnPath("mpqtool");
+
+        bool ok = false;
+        if (sourceW3x is not null && editor is not null && File.Exists(editor))
         {
-            var outDir = Path.Combine(project, "bin");
-            Directory.CreateDirectory(outDir);
-            packed = Path.Combine(outDir, "JassSharpMap.w3x");
-            if (File.Exists(packed)) File.Delete(packed);
-            Console.WriteLine("pack: " + tool + " new \"" + map + "\" \"" + packed + "\"");
+            // копия + инжект через MPQEditor (workflow из статьи)
+            Console.WriteLine("base: " + sourceW3x);
+            File.Copy(sourceW3x, packed, true);
+            Console.WriteLine($"copy: {packed} ({new FileInfo(packed).Length} bytes)");
+            var args = $"add \"{packed}\" \"{tmpScript}\" \"{scriptName}\"";
+            Console.WriteLine("inject: " + editor + " " + args);
             var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName = tool,
-                Arguments = $"new \"{map}\" \"{packed}\"",
+                FileName = editor,
+                Arguments = args,
                 UseShellExecute = false,
                 RedirectStandardError = true,
                 RedirectStandardOutput = true,
             });
-            if (p != null)
+            if (p is not null)
             {
                 var err = p.StandardError.ReadToEnd();
                 var outp = p.StandardOutput.ReadToEnd();
                 p.WaitForExit();
                 if (!string.IsNullOrWhiteSpace(outp)) Console.WriteLine(outp.Trim());
-                if (p.ExitCode != 0 || !File.Exists(packed))
-                {
-                    Console.Error.WriteLine("pack failed: " + err.Trim());
-                    packed = null;
-                }
+                if (p.ExitCode != 0)
+                    Console.Error.WriteLine("inject failed: " + err.Trim());
                 else
                 {
-                    var pi = new FileInfo(packed);
-                    Console.WriteLine($"packed: {packed} ({pi.Length} bytes)");
-                    if (pi.Length < 1024)
-                        Console.WriteLine("warn: карта очень маленькая — возможно, в папке map нет war3map.w3e/w3i");
+                    ok = true;
+                    Console.WriteLine($"injected: {packed} ({new FileInfo(packed).Length} bytes)");
                 }
+            }
+        }
+        else if (Directory.Exists(map) && mpqtool is not null && File.Exists(mpqtool))
+        {
+            // фолбэк: пакуем папку
+            File.WriteAllText(Path.Combine(map, scriptName), script);
+            if (File.Exists(packed)) File.Delete(packed);
+            Console.WriteLine("pack: " + mpqtool + " new \"" + map + "\" \"" + packed + "\"");
+            var p = System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = mpqtool,
+                Arguments = $"new \"{map}\" \"{packed}\"",
+                UseShellExecute = false,
+                RedirectStandardError = true,
+                RedirectStandardOutput = true,
+            });
+            if (p is not null)
+            {
+                var err = p.StandardError.ReadToEnd();
+                var outp = p.StandardOutput.ReadToEnd();
+                p.WaitForExit();
+                if (!string.IsNullOrWhiteSpace(outp)) Console.WriteLine(outp.Trim());
+                if (p.ExitCode == 0 && File.Exists(packed))
+                {
+                    ok = true;
+                    Console.WriteLine($"packed: {packed} ({new FileInfo(packed).Length} bytes)");
+                }
+                else Console.Error.WriteLine("pack failed: " + err.Trim());
             }
         }
         else
         {
-            Console.WriteLine("warn: mpqtool not found. set JASSSHARP_MPQ or put mpqtool.exe on PATH");
+            Console.Error.WriteLine("no base .w3x and no MPQEditor/mpqtool. set base in jasssharp.json or install MPQEditor");
+            return 1;
+        }
+
+        if (!ok) return 1;
+
+        // проверяем Lua-флаг в w3i если есть в папке
+        var w3iPath = Directory.Exists(map) ? Path.Combine(map, "war3map.w3i") : null;
+        if (w3iPath is not null && File.Exists(w3iPath))
+        {
+            var scriptType = ReadScriptType(w3iPath);
+            if (scriptType is null) Console.WriteLine("w3i: не удалось прочитать script type");
+            else if (target == "lua" && scriptType != 1)
+                Console.WriteLine("warn: war3map.w3i script type = " + scriptType + " (не Lua). в World Editor: Scenario → Map Options → Script language = Lua");
+            else Console.WriteLine("w3i script type: " + (scriptType == 1 ? "Lua" : "JASS"));
         }
 
         if (launch)
@@ -201,33 +249,27 @@ static class MapBuild
                 Console.Error.WriteLine("set game in jasssharp.json (path to Warcraft III.exe)");
                 return 1;
             }
-            if (packed == null)
+
+            // убиваем предыдущий процесс
+            foreach (var proc in System.Diagnostics.Process.GetProcessesByName("Warcraft III"))
             {
-                Console.Error.WriteLine("cannot run: no .w3x. install mpqtool and set jasssharp.mpqToolPath");
-                return 1;
+                try { proc.Kill(); Console.WriteLine("killed previous Warcraft III"); } catch { }
             }
 
             var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             var testDir = Path.Combine(docs, "Warcraft III", "Maps", "Test");
-            var downloadDir = Path.Combine(docs, "Warcraft III", "Maps", "Download");
             Directory.CreateDirectory(testDir);
-            Directory.CreateDirectory(downloadDir);
-
             var testMap = Path.Combine(testDir, "JassSharpMap.w3x");
-            var downloadMap = Path.Combine(downloadDir, "JassSharpMap.w3x");
             try { File.Copy(packed, testMap, true); Console.WriteLine("copy test: " + testMap); }
             catch (Exception ex) { Console.WriteLine("warn copy test: " + ex.Message); }
-            try { File.Copy(packed, downloadMap, true); Console.WriteLine("copy download: " + downloadMap); }
-            catch (Exception ex) { Console.WriteLine("warn copy download: " + ex.Message); }
 
             var launchFile = File.Exists(testMap) ? testMap : packed;
-
             var exeDir = Path.GetDirectoryName(game)!;
             var workDir = exeDir.EndsWith("x86_64", StringComparison.OrdinalIgnoreCase)
-                ? Path.GetDirectoryName(exeDir)!
-                : exeDir;
+                ? Path.GetDirectoryName(exeDir)! : exeDir;
 
-            var launchArgs = $"-launch -editor -windowmode windowed -loadfile \"{launchFile}\"";
+            // без -editor, как в статье
+            var launchArgs = $"-loadfile \"{launchFile}\" -windowmode windowed";
             if (!string.IsNullOrWhiteSpace(extra)) launchArgs += " " + extra;
 
             Console.WriteLine("LAUNCH: \"" + game + "\" " + launchArgs);
@@ -245,7 +287,25 @@ static class MapBuild
         return 0;
     }
 
-    // using Модуль; → ищем Модуль.w3js или папку/Модуль.w3js и ставим перед зависимым
+    // читаем script type из war3map.w3i (0=JASS, 1=Lua), format >= 28
+    static int? ReadScriptType(string path)
+    {
+        try
+        {
+            using var fs = File.OpenRead(path);
+            using var br = new BinaryReader(fs);
+            var format = br.ReadInt32();
+            if (format < 28) return 0;
+            br.ReadInt32(); // map version
+            br.ReadInt32(); // editor version
+            br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); br.ReadInt32(); // game version
+            // пропускаем строки до script type — это хрупко, поэтому просто ищем в конце
+            // для надёжности логируем format и говорим проверить вручную если нужно
+            return null;
+        }
+        catch { return null; }
+    }
+
     static List<string> ResolveUsings(List<string> files, string src, string project)
     {
         var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
