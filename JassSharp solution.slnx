@@ -20,7 +20,9 @@
     <File Path="src/jasssharp-vscode/snippets/jasssharp.json" />
   </Folder>
   <Folder Name="/src/jasssharp-vscode/src/">
+    <File Path="src/jasssharp-vscode/src/completion.ts" />
     <File Path="src/jasssharp-vscode/src/extension.ts" />
+    <File Path="src/jasssharp-vscode/src/hover.ts" />
   </Folder>
   <Folder Name="/src/jasssharp-vscode/syntaxes/">
     <File Path="src/jasssharp-vscode/syntaxes/jasssharp.tmLanguage.json" />
