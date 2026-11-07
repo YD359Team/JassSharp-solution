@@ -33,7 +33,7 @@
     },
     "keyword": {
       "name": "keyword.control.jasssharp",
-      "match": "\\b(namespace|class|const|public|private|if|else|return|new|while|for|this)\\b"
+      "match": "\\b(namespace|using|class|const|public|private|if|else|return|new|while|for|this)\\b"
     },
     "type": {
       "name": "storage.type.jasssharp",
