@@ -280,10 +280,11 @@ public sealed class Codegen
         return true;
     }
 
+    // If either side of + is a string literal, treat the whole expression as concatenation.
+    // This covers "text" + this.IsAI, "text" + someBool, etc.
     private bool IsStringish(Expr e) =>
-        e is StrExpr || e is BoolExpr ||
-        (e is BinaryExpr b && b.Op == "+" && (IsStringish(b.Left) || IsStringish(b.Right))) ||
-        (e is NameExpr n && _locals.TryGetValue(n.Name, out var t) && (t == "string" || t == "bool"));
+        e is StrExpr ||
+        (e is BinaryExpr b && b.Op == "+" && (IsStringish(b.Left) || IsStringish(b.Right)));
 
     private string EmitExpr(Expr e) => e switch
     {
