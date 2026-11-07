@@ -215,6 +215,10 @@ public sealed class Parser(List<Token> tokens)
             Accept(";");
             return new AssignStmt(expr, new BinaryExpr("+", expr, v));
         }
+        if (Accept("++"))
+            return new AssignStmt(expr, new BinaryExpr("+", expr, new NumExpr("1")));
+        if (Accept("--"))
+            return new AssignStmt(expr, new BinaryExpr("-", expr, new NumExpr("1")));
         Accept(";");
         return new ExprStmt(expr);
     }
@@ -292,7 +296,7 @@ public sealed class Parser(List<Token> tokens)
                 var id = Eat(TokKind.Id);
                 e = new MemberExpr(e, id.Text, id.Line, id.Col);
             }
-            else if (Accept("[") )
+            else if (Accept("["))
             {
                 var idx = ParseExpr();
                 Expect("]");
