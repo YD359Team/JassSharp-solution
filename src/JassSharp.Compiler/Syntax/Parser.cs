@@ -138,7 +138,13 @@ public sealed class Parser(List<Token> tokens)
     {
         if (Peek.Kind != TokKind.Id || _i + 1 >= tokens.Count) return false;
         var next = tokens[_i + 1];
-        if (next.Kind == TokKind.Sym && next.Text == "[") return true;
+        // Type[] name  — array declaration
+        if (next.Kind == TokKind.Sym && next.Text == "[")
+        {
+            if (_i + 3 < tokens.Count && tokens[_i + 2].Text == "]" && tokens[_i + 3].Kind == TokKind.Id)
+                return true;
+            return false;
+        }
         if (next.Kind != TokKind.Id) return false;
         var after = tokens[_i + 2];
         if (after.Kind == TokKind.Sym && after.Text == "(") return false;
