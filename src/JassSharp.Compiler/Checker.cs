@@ -22,6 +22,11 @@ public static class Checker
         return diags;
     }
 
+    private static bool Known(string name, HashSet<string> fns, HashSet<string> consts, HashSet<string> classes) =>
+        fns.Contains(name) || consts.Contains(name) || classes.Contains(name)
+        || NativeCatalog.Natives.Contains(name) || NativeCatalog.Constants.Contains(name)
+        || name.StartsWith("BJ", StringComparison.Ordinal); // blizzard.j wrappers
+
     private static void Walk(List<Stmt> body, List<ParamDecl> ps, HashSet<string> classes, HashSet<string> fns, HashSet<string> consts, List<Diagnostic> diags, string? file)
     {
         var locals = ps.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
@@ -54,14 +59,12 @@ public static class Checker
             switch (e)
             {
                 case CallExpr c when c.Callee is NameExpr id:
-                    if (!fns.Contains(id.Name) && !NativeCatalog.Natives.Contains(id.Name) && !NativeCatalog.Constants.Contains(id.Name))
+                    if (!Known(id.Name, fns, consts, classes))
                         diags.Add(new Diagnostic(id.Line, id.Col, "warning", $"неизвестный вызов {id.Name}", file));
                     foreach (var a in c.Args) Expr(a);
                     break;
                 case NameExpr n:
-                    if (!locals.Contains(n.Name) && !fns.Contains(n.Name) && !consts.Contains(n.Name)
-                        && !classes.Contains(n.Name) && !NativeCatalog.Constants.Contains(n.Name)
-                        && !NativeCatalog.Natives.Contains(n.Name))
+                    if (!locals.Contains(n.Name) && !Known(n.Name, fns, consts, classes))
                         diags.Add(new Diagnostic(n.Line, n.Col, "warning", $"неизвестное имя {n.Name}", file));
                     break;
                 case NewExpr n:
