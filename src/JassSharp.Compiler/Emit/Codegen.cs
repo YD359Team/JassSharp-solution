@@ -280,6 +280,8 @@ public sealed class Codegen
         return true;
     }
 
+    private bool IsStringish(Expr e) => e is StrExpr || (e is BinaryExpr b && b.Op == "+" && (IsStringish(b.Left) || IsStringish(b.Right)));
+
     private string EmitExpr(Expr e) => e switch
     {
         NumExpr n => n.Text,
@@ -291,7 +293,7 @@ public sealed class Codegen
         NameExpr n => n.Name,
         UnaryExpr u when u.Op == "!" && !_lua => $"not ({EmitExpr(u.Inner)})",
         UnaryExpr u => $"{(u.Op == "!" ? "not " : "-")}{EmitExpr(u.Inner)}",
-        BinaryExpr b when b.Op == "+" && _lua => $"({EmitExpr(b.Left)} .. {EmitExpr(b.Right)})",
+        BinaryExpr b when b.Op == "+" && _lua && IsStringish(b) => $"({EmitExpr(b.Left)} .. {EmitExpr(b.Right)})",
         BinaryExpr b => $"({EmitExpr(b.Left)} {Op(b.Op)} {EmitExpr(b.Right)})",
         IndexExpr ix => $"{EmitExpr(ix.Object)}[{EmitExpr(ix.Index)}]",
         NewExpr n when NativeTable.Constructors.TryGetValue(n.Type, out var ctor) =>
@@ -323,7 +325,6 @@ public sealed class Codegen
             var recv = EmitExpr(mem.Object);
             var args = c.Args.Select((a, i) => CodeArg(mem.Name, i, a)).ToList();
             if (prop?.Kind == MemberKind.Method) return Apply(prop.Read, recv, args);
-            // Class method: always use : so self is passed (works for arrays too)
             if (_lua)
                 return $"{recv}:{mem.Name}({string.Join(", ", args)})";
             return $"{recv}.{mem.Name}({string.Join(", ", args)})";
