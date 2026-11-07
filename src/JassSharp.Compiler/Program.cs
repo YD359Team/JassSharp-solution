@@ -173,6 +173,45 @@ static class MapBuild
             Console.WriteLine("mode: inject");
             File.Copy(sourceW3x, packed, true);
 
+            // извлекаем оригинал из BASE, а не из packed
+            var origDir = Path.Combine(Path.GetTempPath(), "JassSharp_orig");
+            Directory.CreateDirectory(origDir);
+            var origFile = Path.Combine(origDir, scriptName);
+            try { if (File.Exists(origFile)) File.Delete(origFile); } catch { }
+
+            string finalScript = script;
+            bool gotOrig = ExtractFile(editor, sourceW3x, scriptName, origDir) && File.Exists(origFile);
+            if (gotOrig)
+            {
+                var orig = File.ReadAllText(origFile);
+                Console.WriteLine($"original from base: {orig.Length} bytes");
+                var userOnly = System.Text.RegularExpressions.Regex.Replace(
+                    script,
+                    @"function\s+config\s*\(\s*\)\s*end\s*function\s+main\s*\(\)[\s\S]*?end\s*$",
+                    "",
+                    System.Text.RegularExpressions.RegexOptions.Multiline);
+                finalScript = orig + "\n\n-- JASS#\n" + userOnly + @"
+do
+  local _origMain = main
+  function main()
+    _origMain()
+    if OnInit then
+      local ok, err = pcall(OnInit)
+      if not ok then
+        print('JASS# OnInit error: ' .. tostring(err))
+        if BJDebugMsg then BJDebugMsg('JASS# OnInit error: ' .. tostring(err)) end
+      end
+    end
+  end
+end
+";
+                Console.WriteLine("hooking into original");
+            }
+            else Console.WriteLine("no original in base, using generated only");
+
+            File.WriteAllText(tmpScript, finalScript);
+            Console.WriteLine($"final script: {new FileInfo(tmpScript).Length} bytes");
+
             if (target == "lua")
             {
                 var tmpDir = Path.Combine(Path.GetTempPath(), "JassSharp_w3i");
@@ -202,44 +241,6 @@ static class MapBuild
 
                 try { Directory.Delete(tmpDir, true); } catch { }
             }
-
-            // пробуем сохранить оригинальный скрипт и хукнуть
-            var origDir = Path.Combine(Path.GetTempPath(), "JassSharp_orig");
-            Directory.CreateDirectory(origDir);
-            var origFile = Path.Combine(origDir, scriptName);
-            try { if (File.Exists(origFile)) File.Delete(origFile); } catch { }
-
-            string finalScript = script;
-            if (ExtractFile(editor, packed, scriptName, origDir) && File.Exists(origFile))
-            {
-                var orig = File.ReadAllText(origFile);
-                Console.WriteLine($"original {scriptName}: {orig.Length} bytes, hooking");
-                // убираем наш main/config из скрипта, добавляем хук
-                var userOnly = System.Text.RegularExpressions.Regex.Replace(
-                    script,
-                    @"function\s+config\s*\(\s*\)\s*end\s*function\s+main\s*\(\)[\s\S]*?end\s*$",
-                    "",
-                    System.Text.RegularExpressions.RegexOptions.Multiline);
-                finalScript = orig + "\n\n-- JASS#\n" + userOnly + @"
-do
-  local _origMain = main
-  function main()
-    _origMain()
-    if OnInit then
-      local ok, err = pcall(OnInit)
-      if not ok then
-        print('JASS# OnInit error: ' .. tostring(err))
-        if BJDebugMsg then BJDebugMsg('JASS# OnInit error: ' .. tostring(err)) end
-      end
-    end
-  end
-end
-";
-            }
-            else Console.WriteLine("no original script, using generated");
-
-            File.WriteAllText(tmpScript, finalScript);
-            Console.WriteLine($"final script: {new FileInfo(tmpScript).Length} bytes");
 
             Console.WriteLine("inject script: " + scriptName);
             if (InjectFile(editor, packed, tmpScript, scriptName))
