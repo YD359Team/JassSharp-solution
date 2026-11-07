@@ -176,7 +176,13 @@ static class MapBuild
         if (sourceW3x is not null && (mpqcli is not null || editor is not null))
         {
             Console.WriteLine("mode: inject");
-            File.Copy(sourceW3x, packed, true);
+
+            // для mpqcli работаем в C:\Temp без кириллицы
+            var workDir = Path.Combine(Path.GetTempPath(), "JassSharp_work");
+            Directory.CreateDirectory(workDir);
+            var workMap = Path.Combine(workDir, "map.w3x");
+            File.Copy(sourceW3x, workMap, true);
+            Console.WriteLine($"work map: {workMap}");
 
             var origDir = Path.Combine(Path.GetTempPath(), "JassSharp_orig");
             Directory.CreateDirectory(origDir);
@@ -186,9 +192,9 @@ static class MapBuild
             string finalScript = script;
             bool gotOrig = false;
             if (mpqcli is not null)
-                gotOrig = ExtractWithMpqcli(mpqcli, sourceW3x, scriptName, origFile);
+                gotOrig = ExtractWithMpqcli(mpqcli, workMap, scriptName, origFile);
             else if (editor is not null)
-                gotOrig = ExtractFile(editor, sourceW3x, scriptName, origDir) && File.Exists(origFile);
+                gotOrig = ExtractFile(editor, workMap, scriptName, origDir) && File.Exists(origFile);
 
             if (gotOrig && File.Exists(origFile))
             {
@@ -230,9 +236,9 @@ end
 
                 bool gotW3i = false;
                 if (mpqcli is not null)
-                    gotW3i = ExtractWithMpqcli(mpqcli, packed, "war3map.w3i", tmpW3i);
+                    gotW3i = ExtractWithMpqcli(mpqcli, workMap, "war3map.w3i", tmpW3i);
                 else if (editor is not null)
-                    gotW3i = ExtractFile(editor, packed, "war3map.w3i", tmpDir) && File.Exists(tmpW3i);
+                    gotW3i = ExtractFile(editor, workMap, "war3map.w3i", tmpDir) && File.Exists(tmpW3i);
 
                 if (gotW3i && File.Exists(tmpW3i))
                 {
@@ -244,9 +250,9 @@ end
                         {
                             Console.WriteLine("patched script type → 1");
                             if (mpqcli is not null)
-                                InjectWithMpqcli(mpqcli, packed, tmpW3i, "war3map.w3i");
+                                InjectWithMpqcli(mpqcli, workMap, tmpW3i, "war3map.w3i");
                             else if (editor is not null)
-                                InjectFile(editor, packed, tmpW3i, "war3map.w3i");
+                                InjectFile(editor, workMap, tmpW3i, "war3map.w3i");
                         }
                         else Console.WriteLine("warn: не удалось патчить w3i");
                     }
@@ -259,13 +265,14 @@ end
             Console.WriteLine("inject script: " + scriptName);
             bool injected = false;
             if (mpqcli is not null)
-                injected = InjectWithMpqcli(mpqcli, packed, tmpScript, scriptName);
+                injected = InjectWithMpqcli(mpqcli, workMap, tmpScript, scriptName);
             else if (editor is not null)
-                injected = InjectFile(editor, packed, tmpScript, scriptName);
+                injected = InjectFile(editor, workMap, tmpScript, scriptName);
 
             if (injected)
             {
                 ok = true;
+                File.Copy(workMap, packed, true);
                 Console.WriteLine($"injected: {packed} ({new FileInfo(packed).Length} bytes)");
 
                 var verifyDir = Path.Combine(Path.GetTempPath(), "JassSharp_verify");
@@ -274,9 +281,9 @@ end
                 try { if (File.Exists(verifyFile)) File.Delete(verifyFile); } catch { }
                 bool verified = false;
                 if (mpqcli is not null)
-                    verified = ExtractWithMpqcli(mpqcli, packed, scriptName, verifyFile);
+                    verified = ExtractWithMpqcli(mpqcli, workMap, scriptName, verifyFile);
                 else if (editor is not null)
-                    verified = ExtractFile(editor, packed, scriptName, verifyDir) && File.Exists(verifyFile);
+                    verified = ExtractFile(editor, workMap, scriptName, verifyDir) && File.Exists(verifyFile);
 
                 if (verified && File.Exists(verifyFile))
                 {
@@ -291,6 +298,7 @@ end
             else Console.Error.WriteLine("inject script failed");
 
             try { Directory.Delete(origDir, true); } catch { }
+            try { Directory.Delete(workDir, true); } catch { }
         }
         else if (Directory.Exists(map) && mpqtool is not null && File.Exists(mpqtool))
         {
@@ -425,7 +433,6 @@ end
         if (!string.IsNullOrWhiteSpace(outp)) Console.WriteLine("extract out: " + outp.Trim());
         if (p.ExitCode != 0 && !string.IsNullOrWhiteSpace(err)) Console.WriteLine("extract err: " + err.Trim());
 
-        // ищем файл в папке вывода
         var found = Directory.GetFiles(dir, "*", SearchOption.AllDirectories)
             .FirstOrDefault(f => Path.GetFileName(f).Equals(nameInArchive, StringComparison.OrdinalIgnoreCase));
         if (found is not null && found != targetFile)
