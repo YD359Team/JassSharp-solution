@@ -104,19 +104,20 @@ static class MapBuild
         game = string.IsNullOrWhiteSpace(game) ? Environment.GetEnvironmentVariable("JASSSHARP_GAME") : game;
         map = Path.IsPathRooted(map) ? map : Path.Combine(project, map);
 
+        var src = Path.Combine(project, "src");
         var files = new List<string>();
         if (!string.IsNullOrEmpty(entry))
             files.Add(Path.IsPathRooted(entry) ? entry : Path.Combine(project, entry));
-        else
-        {
-            var src = Path.Combine(project, "src");
-            if (Directory.Exists(src))
-                files.AddRange(Directory.GetFiles(src, "*.w3js", SearchOption.AllDirectories));
-        }
+        else if (Directory.Exists(src))
+            files.AddRange(Directory.GetFiles(src, "*.w3js", SearchOption.AllDirectories));
         if (files.Count == 0) { Console.Error.WriteLine("no .w3js"); return 1; }
 
+        // резолвим using: ищем файлы модулей и ставим их перед entry
+        var ordered = ResolveUsings(files, src, project);
+        Console.WriteLine("files: " + string.Join(", ", ordered.Select(Path.GetFileName)));
+
         var chunks = new List<string>();
-        foreach (var f in files)
+        foreach (var f in ordered)
         {
             try
             {
@@ -140,10 +141,14 @@ static class MapBuild
         var name = target == "vjass" ? "war3map.j" : "war3map.lua";
         var dest = Path.Combine(map, name);
         File.WriteAllText(dest, script);
-        Console.WriteLine("script: " + dest);
+        var scriptInfo = new FileInfo(dest);
+        Console.WriteLine($"script: {dest} ({scriptInfo.Length} bytes)");
 
-        if (!File.Exists(Path.Combine(map, "war3map.w3i")))
-            Console.WriteLine("warn: no war3map.w3i in map folder — World Editor will say Level Info missing");
+        var w3i = Path.Combine(map, "war3map.w3i");
+        if (!File.Exists(w3i))
+            Console.WriteLine("warn: no war3map.w3i — карта не загрузится в World Editor");
+        else
+            Console.WriteLine($"w3i: {w3i} ({new FileInfo(w3i).Length} bytes)");
 
         var tool = Environment.GetEnvironmentVariable("JASSSHARP_MPQ")
                    ?? FindOnPath("mpqtool.exe")
@@ -175,7 +180,13 @@ static class MapBuild
                     Console.Error.WriteLine("pack failed: " + err.Trim());
                     packed = null;
                 }
-                else Console.WriteLine("packed: " + packed);
+                else
+                {
+                    var pi = new FileInfo(packed);
+                    Console.WriteLine($"packed: {packed} ({pi.Length} bytes)");
+                    if (pi.Length < 1024)
+                        Console.WriteLine("warn: карта очень маленькая — возможно, в папке map нет war3map.w3e/w3i");
+                }
             }
         }
         else
@@ -196,7 +207,6 @@ static class MapBuild
                 return 1;
             }
 
-            // копируем в Documents\\Warcraft III\\Maps\\Test — единственное место, где 3.0.1 видит карту
             var docs = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
             var testDir = Path.Combine(docs, "Warcraft III", "Maps", "Test");
             var downloadDir = Path.Combine(docs, "Warcraft III", "Maps", "Download");
@@ -233,6 +243,38 @@ static class MapBuild
             Console.WriteLine("started");
         }
         return 0;
+    }
+
+    // using Модуль; → ищем Модуль.w3js или папку/Модуль.w3js и ставим перед зависимым
+    static List<string> ResolveUsings(List<string> files, string src, string project)
+    {
+        var byName = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var search = new[] { src, project }.Where(Directory.Exists);
+        foreach (var dir in search)
+            foreach (var f in Directory.GetFiles(dir, "*.w3js", SearchOption.AllDirectories))
+                byName[Path.GetFileNameWithoutExtension(f)] = f;
+
+        var result = new List<string>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        void Add(string path)
+        {
+            if (!seen.Add(path)) return;
+            if (!File.Exists(path)) return;
+            NsUnit? unit = null;
+            try { unit = new Parser(new Lexer(File.ReadAllText(path)).Lex()).ParseNamespace(); }
+            catch { }
+            if (unit is not null)
+            {
+                foreach (var u in unit.Usings)
+                {
+                    if (byName.TryGetValue(u, out var dep)) Add(dep);
+                    else Console.WriteLine("warn: using " + u + " — файл не найден");
+                }
+            }
+            result.Add(path);
+        }
+        foreach (var f in files) Add(f);
+        return result;
     }
 
     static string? FindOnPath(string name)
