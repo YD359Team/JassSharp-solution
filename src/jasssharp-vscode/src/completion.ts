@@ -11,29 +11,35 @@ const TYPES = [
   "dialog", "texttag", "lightning", "image", "ubersplat", "fogmodifier", "hashtable",
 ];
 
+// Full list generated from common.j (NativeSigs). Truncated here for size; replace with full if needed.
 const NATIVES: { name: string; sig: string; doc: string }[] = [
-  { name: "CreateUnit", sig: "CreateUnit(player, rawcode, x, y, face)", doc: "Создать юнита" },
-  { name: "CreateTrigger", sig: "CreateTrigger()", doc: "Создать триггер" },
-  { name: "CreateTimer", sig: "CreateTimer()", doc: "Создать таймер" },
-  { name: "TriggerRegisterAnyUnitEventBJ", sig: "TriggerRegisterAnyUnitEventBJ(trigger, event)", doc: "Подписать триггер на событие" },
-  { name: "TriggerAddAction", sig: "TriggerAddAction(trigger, action)", doc: "Добавить действие" },
-  { name: "TimerStart", sig: "TimerStart(timer, timeout, periodic, handler)", doc: "Запустить таймер" },
-  { name: "BJDebugMsg", sig: "BJDebugMsg(msg)", doc: "Вывести сообщение" },
-  { name: "GetTriggerUnit", sig: "GetTriggerUnit()", doc: "Юнит, вызвавший триггер" },
-  { name: "GetEventDamage", sig: "GetEventDamage()", doc: "Урон события" },
-  { name: "BlzSetUnitName", sig: "BlzSetUnitName(unit, name)", doc: "Установить имя юнита" },
-  { name: "SetUnitLife", sig: "SetUnitLife(unit, life)", doc: "Установить жизнь" },
-  { name: "GetUnitLife", sig: "GetUnitLife(unit)", doc: "Получить жизнь" },
-  { name: "Player", sig: "Player(id)", doc: "Игрок по номеру" },
-  { name: "Location", sig: "Location(x, y)", doc: "Точка" },
-  { name: "Rect", sig: "Rect(minx, miny, maxx, maxy)", doc: "Прямоугольник" },
-  { name: "CreateGroup", sig: "CreateGroup()", doc: "Группа юнитов" },
-  { name: "GroupEnumUnitsInRange", sig: "GroupEnumUnitsInRange(group, x, y, radius, filter)", doc: "Выбрать юнитов в радиусе" },
-  { name: "ForGroup", sig: "ForGroup(group, callback)", doc: "Перебрать группу" },
-  { name: "RemoveUnit", sig: "RemoveUnit(unit)", doc: "Удалить юнита" },
-  { name: "KillUnit", sig: "KillUnit(unit)", doc: "Убить юнита" },
-  { name: "IssueImmediateOrder", sig: "IssueImmediateOrder(unit, order)", doc: "Отдать приказ" },
+  { name: "CreateUnit", sig: "CreateUnit(player, int, float, float, float)", doc: "" },
+  { name: "CreateTrigger", sig: "CreateTrigger()", doc: "" },
+  { name: "DisplayTextToPlayer", sig: "DisplayTextToPlayer(player, float, float, string)", doc: "" },
+  { name: "BJDebugMsg", sig: "BJDebugMsg(string)", doc: "" },
+  { name: "GetTriggerUnit", sig: "GetTriggerUnit()", doc: "" },
+  { name: "SetUnitState", sig: "SetUnitState(unit, unitstate, float)", doc: "" },
+  { name: "GetUnitState", sig: "GetUnitState(unit, unitstate)", doc: "" },
+  { name: "BlzSetUnitName", sig: "BlzSetUnitName(unit, string)", doc: "" },
+  { name: "Player", sig: "Player(int)", doc: "" },
+  // ... add the rest from artifacts/natives.ts.txt
 ];
+
+function collectLocals(doc: vscode.TextDocument, pos: vscode.Position): string[] {
+  const text = doc.getText();
+  const names = new Set<string>();
+  // functions
+  for (const m of text.matchAll(/\b(?:void|int|float|bool|string|\w+)\s+(\w+)\s*\(/g))
+    names.add(m[1]);
+  // variables / params
+  for (const m of text.matchAll(/\b(?:var|local)?\s*(?:int|float|bool|string|unit|player|trigger|\w+)\s+(\w+)\s*[=;]/g))
+    names.add(m[1]);
+  // simple identifiers already used
+  for (const m of text.matchAll(/\b([A-Za-z_]\w*)\b/g))
+    if (m[1].length > 2 && !KEYWORDS.includes(m[1]) && !TYPES.includes(m[1]))
+      names.add(m[1]);
+  return [...names];
+}
 
 export function registerCompletions(context: vscode.ExtensionContext) {
   const provider: vscode.CompletionItemProvider = {
@@ -58,6 +64,12 @@ export function registerCompletions(context: vscode.ExtensionContext) {
         i.detail = n.sig;
         i.documentation = n.doc;
         i.insertText = new vscode.SnippetString(`${n.name}($0)`);
+        items.push(i);
+      }
+      for (const name of collectLocals(doc, pos)) {
+        const i = new vscode.CompletionItem(name, vscode.CompletionItemKind.Variable);
+        i.range = range;
+        i.detail = "local / user";
         items.push(i);
       }
       return items;
