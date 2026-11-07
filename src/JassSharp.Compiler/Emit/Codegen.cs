@@ -323,7 +323,8 @@ public sealed class Codegen
             var recv = EmitExpr(mem.Object);
             var args = c.Args.Select((a, i) => CodeArg(mem.Name, i, a)).ToList();
             if (prop?.Kind == MemberKind.Method) return Apply(prop.Read, recv, args);
-            if (_lua && rt is not null && _classes.Contains(rt))
+            // Class method: always use : so self is passed (works for arrays too)
+            if (_lua)
                 return $"{recv}:{mem.Name}({string.Join(", ", args)})";
             return $"{recv}.{mem.Name}({string.Join(", ", args)})";
         }
@@ -337,6 +338,7 @@ public sealed class Codegen
         ThisExpr => _className,
         NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
         NewExpr n => n.Type,
+        IndexExpr ix when RecvType(ix.Object) is { } t => t,
         CallExpr { Callee: MemberExpr mem } call when RecvType(mem.Object) is { } rt &&
             NativeTable.Find(rt, mem.Name) is { Kind: MemberKind.Method } => rt,
         _ => null,
