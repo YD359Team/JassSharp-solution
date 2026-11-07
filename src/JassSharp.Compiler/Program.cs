@@ -157,6 +157,9 @@ static class MapBuild
         Directory.CreateDirectory(outDir);
         var packed = Norm(Path.Combine(outDir, "JassSharpMap.w3x"));
 
+        try { if (File.Exists(packed)) File.Delete(packed); } catch { }
+        Console.WriteLine("cleaned old bin map");
+
         var envEditor = Environment.GetEnvironmentVariable("JASSSHARP_MPQEDITOR");
         var editor = !string.IsNullOrWhiteSpace(cfgEditor) && File.Exists(cfgEditor) ? cfgEditor
                      : !string.IsNullOrWhiteSpace(envEditor) && File.Exists(envEditor) ? envEditor
