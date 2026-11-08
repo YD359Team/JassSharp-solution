@@ -12,6 +12,7 @@ public sealed class Codegen
     private Dictionary<string, string> _locals = new(StringComparer.Ordinal);
     private string? _className;
     private readonly Dictionary<string, FnDecl> _inlineMethods = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, FnDecl> _methods = new(StringComparer.Ordinal);
 
     public Codegen(bool lua, IEnumerable<string> classes)
     {
@@ -21,19 +22,16 @@ public sealed class Codegen
 
     public string Emit(NsUnit unit)
     {
-        // collect inline methods
         foreach (var cls in unit.Classes)
             foreach (var m in cls.Methods)
-                if (m.Attributes?.Contains("Inline") == true)
-                    _inlineMethods[cls.Name + "." + m.Name] = m;
+                _methods[cls.Name + "." + m.Name] = m;
         foreach (var fn in unit.Functions)
-            if (fn.Attributes?.Contains("Inline") == true)
-                _inlineMethods[fn.Name] = fn;
+            _methods[fn.Name] = fn;
 
         var hasInit = unit.Functions.Any(f => f.Name == "OnInit");
         if (_lua)
         {
-            Line($"-- {unit.Name}  (JASS# \u2192 Lua)");
+            Line($"-- {unit.Name}  (JASS# → Lua)");
             if (unit.Usings.Count > 0)
                 Line("-- usings: " + string.Join(", ", unit.Usings));
             Line("if not BJDebugMsg then function BJDebugMsg(s) print(s) end end");
@@ -70,8 +68,404 @@ public sealed class Codegen
         return string.Join("\n", _lines) + "\n";
     }
 
-    // ... (rest of the methods identical to current Codegen.cs, including EmitCall with Print and ToString)
-    // Full file is the current one plus the _inlineMethods field and collection logic above.
-    // Inline call handling to be expanded in EmitCall.
+    private void EmitLuaEntry(bool hasInit)
+    {
+        Line("function config()");
+        Line("end");
+        Line("");
+        Line("function main()");
+        Line("    InitBlizzard()");
+        if (hasInit)
+        {
+            Line("    local ok, err = pcall(OnInit)");
+            Line("    if not ok then");
+            Line("        print(\"JASS# OnInit error: \" .. tostring(err))");
+            Line("        BJDebugMsg(\"JASS# OnInit error: \" .. tostring(err))");
+            Line("    end");
+        }
+        Line("end");
+    }
+
+    private void EmitClassVj(ClassDecl cls)
+    {
+        _className = cls.Name;
+        Line($"struct {cls.Name}");
+        _indent++;
+        foreach (var f in cls.Fields) Line($"{MapType(f.Type)} {f.Name}");
+        if (cls.Ctor is not null)
+        {
+            _locals = cls.Ctor.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
+            Line($"static method create takes {Params(cls.Ctor)} returns {cls.Name}");
+            _indent++;
+            Line($"local {cls.Name} this = {cls.Name}.allocate()");
+            EmitStmts(cls.Ctor.Body.Where(s => s is not ReturnStmt).ToList());
+            Line("return this");
+            _indent--;
+            Line("endmethod");
+        }
+        foreach (var m in cls.Methods) EmitFnVj(m, method: true);
+        _indent--;
+        Line("endstruct");
+        Line("");
+        _className = null;
+    }
+
+    private void EmitClassLua(ClassDecl cls)
+    {
+        _className = cls.Name;
+        Line($"local {cls.Name} = {{}}");
+        Line($"{cls.Name}.__index = {cls.Name}");
+        if (cls.Ctor is not null)
+        {
+            _locals = cls.Ctor.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
+            Line($"function {cls.Name}.new({string.Join(", ", cls.Ctor.Params.Select(p => p.Name))})");
+            _indent++;
+            Line($"local self = setmetatable({{}}, {cls.Name})");
+            EmitStmts(cls.Ctor.Body.Where(s => s is not ReturnStmt).ToList());
+            Line("return self");
+            _indent--;
+            Line("end");
+        }
+        foreach (var m in cls.Methods)
+        {
+            _locals = m.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
+            Line($"function {cls.Name}:{m.Name}({string.Join(", ", m.Params.Select(p => p.Name))})");
+            _indent++;
+            EmitStmts(m.Body);
+            _indent--;
+            Line("end");
+        }
+        Line("");
+        _className = null;
+    }
+
+    private void EmitFnVj(FnDecl fn, bool method)
+    {
+        _locals = fn.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
+        var ps = Params(fn);
+        if (method) Line($"method {fn.Name} takes {ps} returns {MapType(fn.ReturnType)}");
+        else Line($"function {fn.Name} takes {ps} returns {MapType(fn.ReturnType)}");
+        _indent++;
+        EmitStmts(fn.Body, fn.Attributes?.Contains("Trace") == true);
+        _indent--;
+        Line(method ? "endmethod" : "endfunction");
+    }
+
+    private void EmitFnLua(FnDecl fn)
+    {
+        _locals = fn.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
+        Line($"function {fn.Name}({string.Join(", ", fn.Params.Select(p => p.Name))})");
+        _indent++;
+        EmitStmts(fn.Body, fn.Attributes?.Contains("Trace") == true);
+        _indent--;
+        Line("end");
+        Line("");
+    }
+
+    private void EmitStmts(List<Stmt> ss, bool trace = false)
+    {
+        foreach (var s in ss)
+        {
+            if (trace && s is not CondStmt)
+            {
+                Line(_lua ? $"BJDebugMsg(\"[trace] line\")" : $"call BJDebugMsg(\"[trace] line\")");
+            }
+            switch (s)
+            {
+                case CondStmt c:
+                    var match = (c.Target.Equals("LUA", StringComparison.OrdinalIgnoreCase) && _lua) ||
+                                (c.Target.Equals("VJASS", StringComparison.OrdinalIgnoreCase) && !_lua);
+                    if (match)
+                        EmitStmts(c.Then, trace);
+                    else if (c.Else is not null)
+                        EmitStmts(c.Else, trace);
+                    break;
+                case VarStmt v:
+                    _locals[v.Name] = v.Type;
+                    var init = v.Init is null ? null : EmitExpr(v.Init);
+                    if (_lua) Line(init is null ? $"local {v.Name}" : $"local {v.Name} = {init}");
+                    else Line(init is null ? $"local {MapType(v.Type)} {v.Name}" : $"local {MapType(v.Type)} {v.Name} = {init}");
+                    break;
+                case AssignStmt a:
+                    EmitAssign(a.Target, a.Value);
+                    break;
+                case ExprStmt e:
+                    if (!EmitChain(e.Expr))
+                    {
+                        var ex = EmitExpr(e.Expr);
+                        Line(_lua ? ex : $"call {ex}");
+                    }
+                    break;
+                case ReturnStmt r:
+                    Line(r.Expr is null ? "return" : $"return {EmitExpr(r.Expr)}");
+                    break;
+                case IfStmt i:
+                    Line($"if {EmitExpr(i.Cond)} then");
+                    _indent++;
+                    EmitStmts(i.Then, trace);
+                    _indent--;
+                    if (i.Else is not null)
+                    {
+                        Line("else");
+                        _indent++;
+                        EmitStmts(i.Else, trace);
+                        _indent--;
+                    }
+                    Line(_lua ? "end" : "endif");
+                    break;
+                case WhileStmt w:
+                    if (_lua)
+                    {
+                        Line($"while {EmitExpr(w.Cond)} do");
+                        _indent++;
+                        EmitStmts(w.Body, trace);
+                        _indent--;
+                        Line("end");
+                    }
+                    else
+                    {
+                        Line("loop");
+                        _indent++;
+                        Line($"exitwhen not ({EmitExpr(w.Cond)})");
+                        EmitStmts(w.Body, trace);
+                        _indent--;
+                        Line("endloop");
+                    }
+                    break;
+                case ForStmt f:
+                    if (_lua)
+                    {
+                        if (f.Init is not null) EmitStmts([f.Init], trace);
+                        Line($"while {EmitExpr(f.Cond ?? new BoolExpr(true))} do");
+                        _indent++;
+                        EmitStmts(f.Body, trace);
+                        if (f.Step is not null) EmitStmts([f.Step], trace);
+                        _indent--;
+                        Line("end");
+                    }
+                    else
+                    {
+                        Line("loop");
+                        _indent++;
+                        if (f.Cond is not null) Line($"exitwhen not ({EmitExpr(f.Cond)})");
+                        EmitStmts(f.Body, trace);
+                        if (f.Step is not null) EmitStmts([f.Step], trace);
+                        _indent--;
+                        Line("endloop");
+                    }
+                    break;
+            }
+        }
+    }
+
+    private void EmitAssign(Expr target, Expr value)
+    {
+        if (target is MemberExpr m)
+        {
+            var rt = RecvType(m.Object);
+            var prop = rt is null ? null : NativeTable.Find(rt, m.Name);
+            if (prop?.Kind == MemberKind.GetSet && prop.Write is not null)
+            {
+                var call = Apply(prop.Write, EmitExpr(m.Object), [EmitExpr(value)]);
+                Line(_lua ? call : $"call {call}");
+                return;
+            }
+        }
+        var left = EmitExpr(target);
+        var v = EmitExpr(value);
+        Line(_lua ? $"{left} = {v}" : $"set {left} = {v}");
+    }
+
+    private bool EmitChain(Expr e)
+    {
+        var parts = new List<(Expr Recv, string Name, List<Expr> Args)>();
+        var cur = e;
+        while (cur is CallExpr { Callee: MemberExpr mem } call)
+        {
+            parts.Insert(0, (mem.Object, mem.Name, call.Args));
+            cur = mem.Object;
+        }
+        if (parts.Count == 0) return false;
+        var rt = RecvType(parts[0].Recv);
+        if (rt is null || NativeTable.Find(rt, parts[0].Name) is null) return false;
+        var recv = EmitExpr(parts[0].Recv);
+        foreach (var p in parts)
+        {
+            var prop = NativeTable.Find(rt, p.Name);
+            if (prop?.Kind != MemberKind.Method) return false;
+            var args = p.Args.Select((a, i) => CodeArg(p.Name, i, a)).ToList();
+            var call = Apply(prop.Read, recv, args);
+            Line(_lua ? call : $"call {call}");
+        }
+        return true;
+    }
+
+    private bool IsStringish(Expr e) =>
+        e is StrExpr ||
+        (e is BinaryExpr b && b.Op == "+" && (IsStringish(b.Left) || IsStringish(b.Right)));
+
+    private string Concat(Expr left, Expr right)
+    {
+        var l = ToStringExpr(left);
+        var r = ToStringExpr(right);
+        return $"({l} .. {r})";
+    }
+
+    private string ToStringExpr(Expr e)
+    {
+        var t = InferType(e);
+        var emitted = EmitExpr(e);
+        return t switch
+        {
+            "int" => _lua ? $"tostring({emitted})" : $"I2S({emitted})",
+            "float" => _lua ? $"tostring({emitted})" : $"R2S({emitted})",
+            "bool" => _lua ? $"tostring({emitted})" : $"B2S({emitted})",
+            "string" => emitted,
+            "unit" => $"GetUnitName({emitted})",
+            "player" => $"GetPlayerName({emitted})",
+            "item" => $"GetItemName({emitted})",
+            _ => _lua ? $"tostring({emitted})" : $"I2S(0)"
+        };
+    }
+
+    private string? InferType(Expr e) => e switch
+    {
+        NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
+        ThisExpr => _className,
+        NewExpr n => n.Type,
+        NumExpr => "int",
+        StrExpr => "string",
+        BoolExpr => "bool",
+        _ => null
+    };
+
+    private string EmitExpr(Expr e) => e switch
+    {
+    NumExpr n => n.Text,
+    StrExpr s => $"\"{Esc(s.Text)}\"",
+    RawExpr r => _lua ? Rawcode.Pack(r.Id).ToString() : $"'{r.Id}'",
+    BoolExpr b => b.Value ? "true" : "false",
+    NullExpr => "null",
+    ThisExpr => _lua ? "self" : "this",
+    NameExpr n => n.Name,
+    UnaryExpr u when u.Op == "!" && !_lua => $"not ({EmitExpr(u.Inner)})",
+    UnaryExpr u => $"{(u.Op == "!" ? "not " : "-")}{EmitExpr(u.Inner)}",
+    BinaryExpr b when b.Op == "+" && _lua && IsStringish(b) => Concat(b.Left, b.Right),
+    BinaryExpr b => $"({EmitExpr(b.Left)} {Op(b.Op)} {EmitExpr(b.Right)})",
+    IndexExpr ix => $"{EmitExpr(ix.Object)}[{EmitExpr(ix.Index)}]",
+    NewExpr n when NativeTable.Constructors.TryGetValue(n.Type, out var ctor) =>
+        $"{ctor}({string.Join(", ", n.Args.Select(EmitExpr))})",
+        NewExpr n => _lua
+    ? $"{n.Type}.new({string.Join(", ", n.Args.Select(EmitExpr))})"
+    : $"{n.Type}.create({string.Join(", ", n.Args.Select(EmitExpr))})",
+        MemberExpr m => EmitMember(m),
+        CallExpr c => EmitCall(c),
+        _ => "null",
+    };
+
+    private string EmitMember(MemberExpr m)
+    {
+        var rt = RecvType(m.Object);
+        var prop = rt is null ? null : NativeTable.Find(rt, m.Name);
+        var recv = EmitExpr(m.Object);
+        if (prop?.Kind is MemberKind.GetSet or MemberKind.GetOnly)
+            return Apply(prop.Read, recv, []);
+        return $"{recv}.{m.Name}";
+    }
+
+    private string EmitCall(CallExpr c)
+    {
+        if (c.Callee is NameExpr id && id.Name == "Print")
+        {
+            var parts = c.Args.Select(ToStringExpr).ToList();
+            var msg = parts.Count == 0 ? "\"\"" : string.Join(" .. ", parts);
+            return $"BJDebugMsg({msg})";
+        }
+        if (c.Callee is MemberExpr mem && _methods.TryGetValue((RecvType(mem.Object) ?? "") + "." + mem.Name, out var meth) && meth.Attributes?.Contains("Inline") == true)
+        {
+            return "/* inline:" + mem.Name + " */ " + EmitNormalCall(c);
+        }
+        return EmitNormalCall(c);
+    }
+
+    private string EmitNormalCall(CallExpr c)
+    {
+        if (c.Callee is MemberExpr mem)
+        {
+            var rt = RecvType(mem.Object);
+            var prop = rt is null ? null : NativeTable.Find(rt, mem.Name);
+            var recv = EmitExpr(mem.Object);
+            var args = c.Args.Select((a, i) => CodeArg(mem.Name, i, a)).ToList();
+            if (prop?.Kind == MemberKind.Method) return Apply(prop.Read, recv, args);
+            if (_lua)
+                return $"{recv}:{mem.Name}({string.Join(", ", args)})";
+            return $"{recv}.{mem.Name}({string.Join(", ", args)})";
+        }
+        if (c.Callee is NameExpr id)
+            return $"{id.Name}({string.Join(", ", c.Args.Select((a, i) => CodeArg(id.Name, i, a)))})";
+        return $"{EmitExpr(c.Callee)}({string.Join(", ", c.Args.Select(EmitExpr))})";
+    }
+
+    private string? RecvType(Expr obj) => obj switch
+    {
+        ThisExpr => _className,
+        NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
+        NewExpr n => n.Type,
+        IndexExpr ix when RecvType(ix.Object) is { } t => t,
+        CallExpr { Callee: MemberExpr mem } call when RecvType(mem.Object) is { } rt &&
+            NativeTable.Find(rt, mem.Name) is { Kind: MemberKind.Method } => rt,
+        _ => null,
+    };
+
+    private string CodeArg(string method, int index, Expr arg)
+    {
+        var codeSlot = method is "AddAction" or "AddCondition" || (method == "Start" && index == 2);
+        if (codeSlot && arg is NameExpr n && !_lua) return $"function {n.Name}";
+        return EmitExpr(arg);
+    }
+
+    private static string Apply(string tpl, string recv, List<string> args)
+    {
+        if (tpl.Contains('$') || tpl.Contains('#'))
+        {
+            var i = 0;
+            var s = tpl.Replace("$", recv);
+            var b = new System.Text.StringBuilder();
+            foreach (var ch in s)
+            {
+                if (ch == '#') b.Append(i < args.Count ? args[i++] : "null");
+                else b.Append(ch);
+            }
+            return b.ToString();
+        }
+        return $"{tpl}({string.Join(", ", new[] { recv }.Concat(args))})";
+    }
+
+    private string Op(string op) => op switch
+    {
+        "&&" => "and",
+        "||" => "or",
+        _ => op,
+    };
+
+    private static string MapType(string t) => t switch
+    {
+        "int" => "integer",
+        "float" => "real",
+        "bool" => "boolean",
+        "void" => "nothing",
+        _ => t,
+    };
+
+    private static string Params(FnDecl fn) =>
+        fn.Params.Count == 0 ? "nothing" : string.Join(", ", fn.Params.Select(p => $"{MapType(p.Type)} {p.Name}"));
+
+    private static string Esc(string s) =>
+        s.Replace("\\", "\\\\")
+         .Replace("\"", "\\\"")
+         .Replace("\n", "\\n")
+         .Replace("\r", "\\r")
+         .Replace("\t", "\\t");
+
     private void Line(string s) => _lines.Add(new string(' ', _indent * 4) + s);
 }
