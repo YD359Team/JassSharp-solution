@@ -48,6 +48,7 @@ public sealed class Codegen
             if (unit.Fields.Count > 0) Line("");
             foreach (var c in unit.Consts)
                 Line($"local {c.Name} = {EmitExpr(c.Value)}");
+            foreach (var en in unit.Enums) EmitEnum(en);
             if (unit.Consts.Count > 0) Line("");
             foreach (var cls in unit.Classes) EmitClassLua(cls);
             foreach (var fn in unit.Functions) EmitFnLua(fn);
@@ -62,6 +63,7 @@ public sealed class Codegen
                 _indent = 1;
                 foreach (var c in unit.Consts)
                     Line($"constant {MapType(c.Type)} {c.Name} = {EmitExpr(c.Value)}");
+                foreach (var en in unit.Enums) EmitEnum(en);
                 foreach (var f in unit.Fields)
                     Line(f.IsArray ? $"{MapType(f.Type)} array {f.Name}" : $"{MapType(f.Type)} {f.Name}");
                 _indent = 0;
@@ -149,6 +151,36 @@ public sealed class Codegen
         }
         Line("");
         _className = null;
+    }
+
+    private void EmitEnum(EnumDecl en)
+    {
+        int next = 0;
+        foreach (var m in en.Members)
+        {
+            string value;
+            if (m.Value is NumExpr n && int.TryParse(n.Text, out var v))
+            {
+                value = n.Text;
+                next = v + 1;
+            }
+            else if (m.Value is not null)
+            {
+                value = EmitExpr(m.Value);
+                next++; // approximate
+            }
+            else
+            {
+                value = next.ToString();
+                next++;
+            }
+
+            if (_lua)
+                Line($"{en.Name}_{m.Name} = {value}");
+            else
+                Line($"constant integer {en.Name}_{m.Name} = {value}");
+        }
+        Line("");
     }
 
     private void EmitFnVj(FnDecl fn, bool method)

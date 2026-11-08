@@ -13,7 +13,7 @@ public sealed class Parser(List<Token> tokens)
         Expect("{");
         var usings = new List<string>();
         var fields = new List<FieldDecl>();
-        var ns = new NsUnit(name, usings, [], [], [], fields);
+        var ns = new NsUnit(name, usings, [], [], [], fields, []);
         while (!Accept("}"))
         {
             if (Peek.Kind == TokKind.Eof) throw new ParseException("незакрытый namespace", Peek.Line, Peek.Col);
@@ -37,6 +37,11 @@ public sealed class Parser(List<Token> tokens)
             {
                 Eat(TokKind.Id);
                 ns.Classes.Add(ParseClass(attrs));
+            }
+            else if (CheckId("enum"))
+            {
+                Eat(TokKind.Id);
+                ns.Enums.Add(ParseEnum());
             }
             else
             {
@@ -119,6 +124,23 @@ public sealed class Parser(List<Token> tokens)
             }
         }
         return new ClassDecl(name, fields, ctor, methods);
+    }
+
+    private EnumDecl ParseEnum()
+    {
+        var name = Eat(TokKind.Id).Text;
+        Expect("{");
+        var members = new List<EnumMember>();
+        while (!Accept("}"))
+        {
+            if (Peek.Kind == TokKind.Eof) throw new ParseException("незакрытый enum", Peek.Line, Peek.Col);
+            var id = Eat(TokKind.Id).Text;
+            Expr? val = null;
+            if (Accept("=")) val = ParseExpr();
+            Accept(",");
+            members.Add(new EnumMember(id, val));
+        }
+        return new EnumDecl(name, members);
     }
 
     private List<ParamDecl> ParseParams()

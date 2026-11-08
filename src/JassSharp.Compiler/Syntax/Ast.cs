@@ -1,11 +1,20 @@
 namespace JassSharp.Syntax;
 
 public abstract record Node;
-public sealed record NsUnit(string Name, List<string> Usings, List<ConstDecl> Consts, List<ClassDecl> Classes, List<FnDecl> Functions, List<FieldDecl> Fields) : Node;
+public sealed record NsUnit(
+    string Name,
+    List<string> Usings,
+    List<ConstDecl> Consts,
+    List<ClassDecl> Classes,
+    List<FnDecl> Functions,
+    List<FieldDecl> Fields,
+    List<EnumDecl> Enums) : Node;
 public sealed record ConstDecl(string Type, string Name, Expr Value);
 public sealed record FieldDecl(string Type, string Name, bool IsArray = false);
 public sealed record ParamDecl(string Type, string Name);
 public sealed record ClassDecl(string Name, List<FieldDecl> Fields, FnDecl? Ctor, List<FnDecl> Methods);
+public sealed record EnumMember(string Name, Expr? Value);
+public sealed record EnumDecl(string Name, List<EnumMember> Members);
 public sealed record FnDecl(string ReturnType, string Name, List<ParamDecl> Params, List<Stmt> Body, HashSet<string> Attributes = null!);
 
 public abstract record Stmt;
