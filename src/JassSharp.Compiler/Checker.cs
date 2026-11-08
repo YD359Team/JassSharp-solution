@@ -7,13 +7,25 @@ public sealed record Diagnostic(int Line, int Col, string Severity, string Messa
 
 public static class Checker
 {
-    public static List<Diagnostic> Check(NsUnit unit, string? file = null)
+    public static List<Diagnostic> Check(NsUnit unit, string? file = null, IEnumerable<NsUnit>? imports = null)
     {
         var diags = new List<Diagnostic>();
         var classes = unit.Classes.Select(c => c.Name).ToHashSet(StringComparer.Ordinal);
         var fns = unit.Functions.Select(f => f.Name).ToHashSet(StringComparer.Ordinal);
         var consts = unit.Consts.Select(c => c.Name).ToHashSet(StringComparer.Ordinal);
         var fields = unit.Fields.Select(f => f.Name).ToHashSet(StringComparer.Ordinal);
+
+        if (imports is not null)
+        {
+            foreach (var imp in imports)
+            {
+                foreach (var c in imp.Classes) classes.Add(c.Name);
+                foreach (var f in imp.Functions) fns.Add(f.Name);
+                foreach (var c in imp.Consts) consts.Add(c.Name);
+                foreach (var f in imp.Fields) fields.Add(f.Name);
+            }
+        }
+
         foreach (var cls in unit.Classes)
         {
             if (cls.Ctor is not null) Walk(cls.Ctor.Body, cls.Ctor.Params, classes, fns, consts, fields, diags, file);

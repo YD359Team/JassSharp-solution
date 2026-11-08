@@ -1400,6 +1400,40 @@ static class MapBuild
         return files;
     }
 
+    public static Dictionary<string, NsUnit> LoadProject(string projectDir)
+    {
+        var units = new Dictionary<string, NsUnit>(StringComparer.Ordinal);
+        var src = Path.Combine(projectDir, "src");
+        if (!Directory.Exists(src)) return units;
+
+        foreach (var file in Directory.GetFiles(src, "*.w3js", SearchOption.AllDirectories))
+        {
+            try
+            {
+                var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
+                units[unit.Name] = unit;
+            }
+            catch { /* пропускаем битые файлы */ }
+        }
+        return units;
+    }
+
+    public static List<NsUnit> ResolveImports(NsUnit unit, Dictionary<string, NsUnit> all)
+    {
+        var result = new List<NsUnit>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        void Visit(string name)
+        {
+            if (!seen.Add(name) || !all.TryGetValue(name, out var u)) return;
+            foreach (var dep in u.Usings) Visit(dep);
+            result.Add(u);
+        }
+
+        foreach (var u in unit.Usings) Visit(u);
+        return result;
+    }
+
     private readonly record struct W3iInfo(int FormatVersion, uint? ScriptType, int? ScriptTypeOffset);
     private readonly record struct ProcessResult(int ExitCode, string StdOut, string StdErr);
     private readonly record struct LuaToken(string Text, int Start, int End);
