@@ -22,6 +22,8 @@ public sealed class Codegen
 
     public string Emit(NsUnit unit)
     {
+        _namespaceName = unit.Name;
+
         foreach (var cls in unit.Classes)
             foreach (var m in cls.Methods)
                 _methods[cls.Name + "." + m.Name] = m;
@@ -151,13 +153,25 @@ public sealed class Codegen
         Line(method ? "endmethod" : "endfunction");
     }
 
+    private string? _namespaceName;
+
     private void EmitFnLua(FnDecl fn)
     {
-        _locals = fn.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
-        Line($"function {fn.Name}({string.Join(", ", fn.Params.Select(p => p.Name))})");
+        _locals = fn.Params.ToDictionary(
+            p => p.Name,
+            p => p.Type,
+            StringComparer.Ordinal);
+
+        string functionName = fn.Name == "OnInit"
+            ? $"{_namespaceName}_OnInit"
+            : fn.Name;
+
+        Line($"function {functionName}({string.Join(", ", fn.Params.Select(p => p.Name))})");
+
         _indent++;
         EmitStmts(fn.Body, fn.Attributes?.Contains("Trace") == true);
         _indent--;
+
         Line("end");
         Line("");
     }
