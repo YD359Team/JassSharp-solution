@@ -241,8 +241,19 @@ static class MapBuild
         if (w3iInfo.ScriptType is null && target == "lua")
             return Fail("this map's W3I format predates Lua support (format version < 28). Save/upgrade the base map in a Warcraft III 1.31+ World Editor before building Lua into it");
 
-        if (!InjectArchiveFile(mpqCli, editor, workMap, w3iPath, "war3map.w3i"))
-            return Fail("failed to inject patched war3map.w3i into the working map");
+        byte[] originalW3i = File.ReadAllBytes(w3iPath);
+
+        w3iInfo = SetW3iScriptType(w3iPath, wantedScriptType);
+
+        bool w3iChanged =
+            !originalW3i.AsSpan().SequenceEqual(
+                File.ReadAllBytes(w3iPath));
+
+        if (w3iChanged &&
+            !InjectArchiveFile(mpqCli, editor, workMap, w3iPath, "war3map.w3i"))
+        {
+            return Fail("failed to inject patched war3map.w3i");
+        }
 
         string baseScriptPath = Path.Combine(workRoot, "base-script", scriptName);
         bool gotOriginalScript = ExtractArchiveFile(mpqCli, editor, workMap, scriptName, baseScriptPath);
@@ -950,9 +961,21 @@ static class MapBuild
         return result.ExitCode == 0 && File.Exists(destinationFile);
     }
 
-    private static bool InjectWithMpqCli(string mpqCli, string archive, string sourceFile, string archivePath)
+    private static bool InjectWithMpqCli(
+        string mpqCli,
+        string archive,
+        string sourceFile,
+        string archivePath)
     {
-        ProcessResult result = RunTool(mpqCli, "add", archive, sourceFile, "--path", archivePath, "--overwrite");
+        ProcessResult result = RunTool(
+            mpqCli,
+            "add",
+            archive,
+            sourceFile,
+            "--path", archivePath,
+            "--overwrite",
+            "--game", "warcraft3-map");
+
         PrintProcessResult("mpqcli add", result);
         return result.ExitCode == 0;
     }
