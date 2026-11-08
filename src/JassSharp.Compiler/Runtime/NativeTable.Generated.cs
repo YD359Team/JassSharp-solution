@@ -128,6 +128,7 @@ public static partial class NativeTable
         new("unit", "SetPosition", MemberKind.Method, "SetUnitPosition", null),
         new("unit", "IssueOrder", MemberKind.Method, "IssueImmediateOrder", null),
         new("trigger", "RegisterAnyUnitEvent", MemberKind.Method, "TriggerRegisterAnyUnitEventBJ", null),
+        new("trigger", "RegisterEnterRegion", MemberKind.Method, "TriggerRegisterEnterRegion", null),
         new("trigger", "AddAction", MemberKind.Method, "TriggerAddAction", null),
         new("trigger", "AddCondition", MemberKind.Method, "TriggerAddCondition", null),
         new("trigger", "Destroy", MemberKind.Method, "DestroyTrigger", null),
