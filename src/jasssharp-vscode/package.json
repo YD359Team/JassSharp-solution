@@ -24,8 +24,13 @@
     "languages": [
       {
         "id": "jasssharp",
-        "aliases": ["JASS#", "jasssharp"],
-        "extensions": [".w3js"],
+        "aliases": [
+          "JASS#",
+          "jasssharp"
+        ],
+        "extensions": [
+          ".w3js"
+        ],
         "configuration": "./language-configuration.json",
         "icon": {
           "light": "./image.png",
@@ -56,7 +61,11 @@
         },
         "jasssharp.defaultTarget": {
           "type": "string",
-          "enum": ["both", "vjass", "lua"],
+          "enum": [
+            "both",
+            "vjass",
+            "lua"
+          ],
           "default": "both",
           "description": "Цель по умолчанию для команды Build."
         },
@@ -83,13 +92,39 @@
       }
     },
     "commands": [
-      { "command": "jasssharp.build", "title": "JASS#: Build", "icon": "$(tools)" },
-      { "command": "jasssharp.buildVjass", "title": "JASS#: Build vJASS" },
-      { "command": "jasssharp.buildLua", "title": "JASS#: Build Lua" },
-      { "command": "jasssharp.buildMap", "title": "JASS#: Build Map", "icon": "$(package)" },
-      { "command": "jasssharp.runMap", "title": "JASS#: Run Map", "icon": "$(play)" },
-      { "command": "jasssharp.openEditor", "title": "JASS#: Open in World Editor", "icon": "$(edit)" },
-      { "command": "jasssharp.packMap", "title": "JASS#: Pack Map", "icon": "$(archive)" }
+      {
+        "command": "jasssharp.build",
+        "title": "JASS#: Build",
+        "icon": "$(tools)"
+      },
+      {
+        "command": "jasssharp.buildVjass",
+        "title": "JASS#: Build vJASS"
+      },
+      {
+        "command": "jasssharp.buildLua",
+        "title": "JASS#: Build Lua"
+      },
+      {
+        "command": "jasssharp.buildMap",
+        "title": "JASS#: Build Map",
+        "icon": "$(package)"
+      },
+      {
+        "command": "jasssharp.runMap",
+        "title": "JASS#: Run Map",
+        "icon": "$(play)"
+      },
+      {
+        "command": "jasssharp.openEditor",
+        "title": "JASS#: Open in World Editor",
+        "icon": "$(edit)"
+      },
+      {
+        "command": "jasssharp.packMap",
+        "title": "JASS#: Pack Map",
+        "icon": "$(archive)"
+      }
     ],
     "menus": {
       "editor/context": [
@@ -134,7 +169,7 @@
     "package": "npm run compile && vsce package"
   },
   "devDependencies": {
-    "@types/node": "^20.0.0",
+    "@types/node": "^20.19.43",
     "@types/vscode": "^1.85.0",
     "@vscode/vsce": "^3.0.0",
     "typescript": "^5.4.0"

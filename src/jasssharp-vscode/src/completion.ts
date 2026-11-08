@@ -2,15 +2,75 @@ import { MEMBERS } from "./members";
 import * as vscode from "vscode";
 import { CONSTANTS } from "./constants";
 
+import * as cp from "child_process";
+import * as path from "path";
+
+interface SymbolsResult {
+    namespaces: Record<string, {
+        classes: string[];
+        functions: string[];
+        consts: string[];
+        fields: string[];
+    }>;
+    currentImports: string[];
+}
+
+let symbolsCache: SymbolsResult | null = null;
+let lastFetch = 0;
+
+function getCompilerPath(): string | undefined {
+    return vscode.workspace.getConfiguration("jasssharp").get<string>("compilerPath");
+}
+
+function getProjectDir(doc: vscode.TextDocument): string {
+    const folder = vscode.workspace.getWorkspaceFolder(doc.uri);
+    return folder ? folder.uri.fsPath : path.dirname(doc.uri.fsPath);
+}
+
+async function fetchSymbols(projectDir: string, currentFile: string): Promise<SymbolsResult | null> {
+    const now = Date.now();
+    if (symbolsCache && now - lastFetch < 1500) return symbolsCache;
+    const compiler = getCompilerPath();
+    if (!compiler) return null;
+    try {
+        const out = cp.execFileSync(compiler, ["symbols", currentFile, "--project", projectDir], {
+            encoding: "utf8",
+            timeout: 4000,
+            windowsHide: true,
+        });
+        symbolsCache = JSON.parse(out) as SymbolsResult;
+        lastFetch = now;
+        return symbolsCache;
+    } catch {
+        return symbolsCache;
+    }
+}
+
 const KEYWORDS = [
     "namespace", "using", "class", "void", "int", "float", "bool", "string", "const",
     "new", "this", "if", "else", "while", "return", "true", "false", "null",
 ];
 
 const TYPES = [
-    "unit", "player", "trigger", "timer", "group", "effect", "item", "location",
-    "rect", "force", "region", "sound", "quest", "leaderboard", "multiboard",
-    "dialog", "texttag", "lightning", "image", "ubersplat", "fogmodifier", "hashtable",
+    "ability", "abilitybooleanfield", "abilitybooleanlevelarrayfield", "abilitybooleanlevelfield", "abilityintegerfield",
+    "abilityintegerlevelarrayfield", "abilityintegerlevelfield", "abilityrealfield", "abilityreallevelarrayfield",
+    "abilityreallevelfield", "abilitystringfield", "abilitystringlevelarrayfield", "abilitystringlevelfield", "agent",
+    "aidifficulty", "alliancetype", "animtype", "armortype", "attacktype", "boolexpr", "buff", "button", "camerafield",
+    "camerasetup", "code", "commandbuttoneffect", "conditionfunc", "damagetype", "defeatcondition", "defensetype",
+    "destructable", "dialog", "dialogevent", "effect", "effecttype", "event", "eventid", "fgamestate", "filterfunc",
+    "fogmodifier", "fogstate", "fogstyle", "force", "frameeventtype", "framehandle", "framepointtype", "gamecache",
+    "gamedifficulty", "gameevent", "gamespeed", "gamestate", "gametype", "group", "handle", "hashtable", "heroattribute",
+    "igamestate", "image", "integer", "item", "itembooleanfield", "itemintegerfield", "itempool", "itemrealfield",
+    "itemstringfield", "itemTag", "itemtype", "leaderboard", "lightning", "limitop", "loadoutslot", "location",
+    "mapcontrol", "mapdensity", "mapflag", "mapsetting", "mapvisibility", "metakeytype", "minimapicon", "mousebuttontype",
+    "movetype", "multiboard", "multiboarditem", "nothing", "originframetype", "oskeytype", "pathingflag", "pathingtype",
+    "placement", "player", "playercolor", "playergameresult", "playerevent", "playerscore", "playerslotstate", "playerstate",
+    "playerunitevent", "quest", "questitem", "race", "racepreference", "raritycontrol", "real", "rect", "regentype", "region",
+    "sound", "soundtype", "startlocprio", "string", "subanimtype", "targetflag", "terraindeformation", "texmapflags",
+    "textaligntype", "texttag", "timerdialog", "timer", "trackable", "trigger", "triggeraction", "triggercondition",
+    "ubersplat", "unit", "unitbooleanfield", "unitcategory", "unitevent", "unitintegerfield", "unitpool", "unitrealfield",
+    "unitstate", "unitstringfield", "unittype", "unitweaponbooleanfield", "unitweaponintegerfield", "unitweaponrealfield",
+    "unitweaponstringfield", "version", "volumegroup", "weapontype", "weathereffect", "widget", "widgetevent",
 ];
 
 export const NATIVES: { name: string; sig: string; doc: string }[] = [
@@ -1739,9 +1799,52 @@ function collectLocals(doc: vscode.TextDocument, pos: vscode.Position): string[]
 
 export function registerCompletions(context: vscode.ExtensionContext) {
     const provider: vscode.CompletionItemProvider = {
-        provideCompletionItems(doc, pos) {
+        async provideCompletionItems(doc, pos) {
             const range = doc.getWordRangeAtPosition(pos) ?? new vscode.Range(pos, pos);
             const items: vscode.CompletionItem[] = [];
+
+            const projectDir = getProjectDir(doc);
+            const symbols = await fetchSymbols(projectDir, doc.uri.fsPath);
+            if (symbols) {
+                const seen = new Set<string>();
+                for (const ns of symbols.currentImports) {
+                    const mod = symbols.namespaces[ns];
+                    if (!mod) continue;
+                    for (const name of mod.classes) {
+                        if (seen.has(name)) continue;
+                        seen.add(name);
+                        const i = new vscode.CompletionItem(name, vscode.CompletionItemKind.Class);
+                        i.range = range;
+                        i.detail = `${ns} class`;
+                        items.push(i);
+                    }
+                    for (const name of mod.functions) {
+                        if (seen.has(name)) continue;
+                        seen.add(name);
+                        const i = new vscode.CompletionItem(name, vscode.CompletionItemKind.Function);
+                        i.range = range;
+                        i.detail = `${ns} function`;
+                        i.insertText = new vscode.SnippetString(`${name}($0)`);
+                        items.push(i);
+                    }
+                    for (const name of mod.consts) {
+                        if (seen.has(name)) continue;
+                        seen.add(name);
+                        const i = new vscode.CompletionItem(name, vscode.CompletionItemKind.Constant);
+                        i.range = range;
+                        i.detail = `${ns} const`;
+                        items.push(i);
+                    }
+                    for (const name of mod.fields) {
+                        if (seen.has(name)) continue;
+                        seen.add(name);
+                        const i = new vscode.CompletionItem(name, vscode.CompletionItemKind.Field);
+                        i.range = range;
+                        i.detail = `${ns} field`;
+                        items.push(i);
+                    }
+                }
+            }
 
             const line = doc.lineAt(pos.line).text.slice(0, pos.character);
             const afterDot = /(\w+)\.\w*$/.exec(line);
