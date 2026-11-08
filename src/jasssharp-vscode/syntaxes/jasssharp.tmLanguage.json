@@ -8,6 +8,7 @@
     { "include": "#string" },
     { "include": "#keyword" },
     { "include": "#type" },
+    { "include": "#native" },
     { "include": "#constant" },
     { "include": "#number" },
     { "include": "#operator" }
@@ -37,11 +38,15 @@
     },
     "type": {
       "name": "storage.type.jasssharp",
-      "match": "\\b(void|int|float|bool|string|code|unit|player|trigger|timer|group|effect|item|location|rect|force|widget|handle|ability|destructable|sound|quest|leaderboard|multiboard|dialog|button|texttag|lightning|image|ubersplat|fogmodifier|hashtable|framehandle|agent)\\b"
+      "match": "\\b(void|int|float|bool|string|code|unit|player|trigger|timer|group|effect|item|location|rect|region|force|widget|handle|ability|destructable|sound|quest|leaderboard|multiboard|dialog|button|texttag|lightning|image|ubersplat|fogmodifier|hashtable|framehandle|agent)\\b"
+    },
+    "native": {
+      "name": "support.function.jasssharp",
+      "match": "\\b(Get|Set|Blz|Create|Trigger|Add|Remove|Kill|Issue|Display|BJ)[A-Z]\\w*\\b"
     },
     "constant": {
       "name": "constant.language.jasssharp",
-      "match": "\\b(true|false|null)\\b"
+      "match": "\\b(true|false|null|[A-Z][A-Z0-9_]{2,})\\b"
     },
     "number": {
       "name": "constant.numeric.jasssharp",
