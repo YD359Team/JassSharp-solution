@@ -1394,10 +1394,33 @@ static class MapBuild
         return 1;
     }
 
-    private static List<string> ResolveUsings(List<string> files, string src, string project)
+    static List<string> ResolveUsings(List<string> files, string src, string project)
     {
-        // TODO: resolve JASS# using directives and sort dependencies.
-        return files;
+        var units = new Dictionary<string, NsUnit>(StringComparer.Ordinal);
+        var fileByNs = new Dictionary<string, string>(StringComparer.Ordinal);
+        foreach (var f in files)
+        {
+            try
+            {
+                var unit = new Parser(new Lexer(File.ReadAllText(f)).Lex()).ParseNamespace();
+                units[unit.Name] = unit;
+                fileByNs[unit.Name] = f;
+            }
+            catch { }
+        }
+
+        var ordered = new List<string>();
+        var seen = new HashSet<string>(StringComparer.Ordinal);
+
+        void Visit(string ns)
+        {
+            if (!seen.Add(ns) || !units.TryGetValue(ns, out var u)) return;
+            foreach (var dep in u.Usings) Visit(dep);
+            if (fileByNs.TryGetValue(ns, out var f)) ordered.Add(f);
+        }
+
+        foreach (var ns in units.Keys) Visit(ns);
+        return ordered.Count > 0 ? ordered : files;
     }
 
     public static Dictionary<string, NsUnit> LoadProject(string projectDir)
