@@ -23,7 +23,7 @@ public sealed class Codegen
         var hasInit = unit.Functions.Any(f => f.Name == "OnInit");
         if (_lua)
         {
-            Line($"-- {unit.Name}  (JASS# → Lua)");
+            Line($"-- {unit.Name}  (JASS# \u2192 Lua)");
             if (unit.Usings.Count > 0)
                 Line("-- usings: " + string.Join(", ", unit.Usings));
             Line("if not BJDebugMsg then function BJDebugMsg(s) print(s) end end");
@@ -48,7 +48,7 @@ public sealed class Codegen
                 foreach (var c in unit.Consts)
                     Line($"constant {MapType(c.Type)} {c.Name} = {EmitExpr(c.Value)}");
                 foreach (var f in unit.Fields)
-                    Line($"{MapType(f.Type)} array {f.Name}");
+                    Line(f.IsArray ? $"{MapType(f.Type)} array {f.Name}" : $"{MapType(f.Type)} {f.Name}");
                 _indent = 0;
                 Line("endglobals");
                 Line("");
@@ -160,6 +160,12 @@ public sealed class Codegen
         {
             switch (s)
             {
+                case CondStmt c:
+                    var match = (c.Target.Equals("LUA", StringComparison.OrdinalIgnoreCase) && _lua) ||
+                                (c.Target.Equals("VJASS", StringComparison.OrdinalIgnoreCase) && !_lua);
+                    if (match) EmitStmts(c.Then);
+                    else if (c.Else is not null) EmitStmts(c.Else);
+                    break;
                 case VarStmt v:
                     _locals[v.Name] = v.Type;
                     var init = v.Init is null ? null : EmitExpr(v.Init);
@@ -286,12 +292,38 @@ public sealed class Codegen
 
     private string Concat(Expr left, Expr right)
     {
-        var l = EmitExpr(left);
-        var r = EmitExpr(right);
-        if (left is not StrExpr) l = $"tostring({l})";
-        if (right is not StrExpr) r = $"tostring({r})";
+        var l = ToStringExpr(left);
+        var r = ToStringExpr(right);
         return $"({l} .. {r})";
     }
+
+    private string ToStringExpr(Expr e)
+    {
+        var t = InferType(e);
+        var emitted = EmitExpr(e);
+        return t switch
+        {
+            "int" => _lua ? $"tostring({emitted})" : $"I2S({emitted})",
+            "float" => _lua ? $"tostring({emitted})" : $"R2S({emitted})",
+            "bool" => _lua ? $"tostring({emitted})" : $"B2S({emitted})",
+            "string" => emitted,
+            "unit" => $"GetUnitName({emitted})",
+            "player" => $"GetPlayerName({emitted})",
+            "item" => $"GetItemName({emitted})",
+            _ => _lua ? $"tostring({emitted})" : $"I2S(0)"
+        };
+    }
+
+    private string? InferType(Expr e) => e switch
+    {
+        NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
+        ThisExpr => _className,
+        NewExpr n => n.Type,
+        NumExpr => "int",
+        StrExpr => "string",
+        BoolExpr => "bool",
+        _ => null
+    };
 
     private string EmitExpr(Expr e) => e switch
     {
@@ -329,6 +361,12 @@ public sealed class Codegen
 
     private string EmitCall(CallExpr c)
     {
+        if (c.Callee is NameExpr id && id.Name == "Print")
+        {
+            var parts = c.Args.Select(ToStringExpr).ToList();
+            var msg = parts.Count == 0 ? "\"\"" : string.Join(" .. ", parts);
+            return $"BJDebugMsg({msg})";
+        }
         if (c.Callee is MemberExpr mem)
         {
             var rt = RecvType(mem.Object);
@@ -399,7 +437,12 @@ public sealed class Codegen
     private static string Params(FnDecl fn) =>
         fn.Params.Count == 0 ? "nothing" : string.Join(", ", fn.Params.Select(p => $"{MapType(p.Type)} {p.Name}"));
 
-    private static string Esc(string s) => s.Replace("\\", "\\\\").Replace("\"", "\\\"");
+    private static string Esc(string s) =>
+        s.Replace("\\", "\\\\")
+         .Replace("\"", "\\\"")
+         .Replace("\n", "\\n")
+         .Replace("\r", "\\r")
+         .Replace("\t", "\\t");
 
     private void Line(string s) => _lines.Add(new string(' ', _indent * 4) + s);
 }
