@@ -120,7 +120,7 @@ public sealed class Codegen
     private void EmitClassLua(ClassDecl cls)
     {
         _className = cls.Name;
-        Line($"local {cls.Name} = {{}}");
+        Line($"{cls.Name} = {{}}");
         Line($"{cls.Name}.__index = {cls.Name}");
         if (cls.Ctor is not null)
         {
