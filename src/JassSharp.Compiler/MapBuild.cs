@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -458,14 +458,13 @@ static class MapBuild
             Console.WriteLine("LAUNCH: \"" + Path.GetFileName(game) + "\" " + arguments);
             Console.WriteLine("WORKDIR: " + workingDirectory);
 
-            Process? proc = Process.Start(new ProcessStartInfo
+            Process.Start(new ProcessStartInfo
             {
                 FileName = game,
                 Arguments = arguments,
                 WorkingDirectory = workingDirectory,
                 UseShellExecute = true
-            });
-            if (proc is null) throw new InvalidOperationException("Process.Start returned null");
+            }) ?? throw new InvalidOperationException("Process.Start returned null");
 
             Console.WriteLine("started");
             return 0;
@@ -541,9 +540,12 @@ static class MapBuild
         SkipBytes(reader, 7 * sizeof(uint));
         SkipBytes(reader, sizeof(byte));
 
-        _ = reader.ReadUInt32(); // loading screen number
+        _ = reader.ReadUInt32(); // loading screen background number
+        if (formatVersion >= 39)
+            _ = reader.ReadUInt32(); // RaceHud (added in W3I v39)
+
         if (formatVersion >= 25)
-            SkipCString(reader); // loading screen model
+            SkipCString(reader); // loading screen path
 
         SkipCString(reader); // loading screen text
         SkipCString(reader); // loading screen title
@@ -566,7 +568,15 @@ static class MapBuild
         {
             _ = reader.ReadUInt32(); // fog style
             SkipBytes(reader, 3 * sizeof(float)); // fog start, end, density
-            SkipBytes(reader, 4); // fog RGBA
+            SkipBytes(reader, 4); // fog BGRA
+
+            if (formatVersion >= 39)
+            {
+                // Warcraft III 3.0 added six fields between FogColor and GlobalWeather.
+                SkipBytes(reader, 5 * sizeof(float)); // fog height start/end, linear start/end, max opacity
+                _ = reader.ReadUInt32(); // draw fog over sky
+            }
+
             _ = reader.ReadUInt32(); // weather id
             SkipCString(reader); // custom sound environment
             SkipBytes(reader, 1); // custom light tileset
