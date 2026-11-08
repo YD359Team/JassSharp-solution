@@ -280,11 +280,18 @@ public sealed class Codegen
         return true;
     }
 
-    // If either side of + is a string literal, treat the whole expression as concatenation.
-    // This covers "text" + this.IsAI, "text" + someBool, etc.
     private bool IsStringish(Expr e) =>
         e is StrExpr ||
         (e is BinaryExpr b && b.Op == "+" && (IsStringish(b.Left) || IsStringish(b.Right)));
+
+    private string Concat(Expr left, Expr right)
+    {
+        var l = EmitExpr(left);
+        var r = EmitExpr(right);
+        if (left is not StrExpr) l = $"tostring({l})";
+        if (right is not StrExpr) r = $"tostring({r})";
+        return $"({l} .. {r})";
+    }
 
     private string EmitExpr(Expr e) => e switch
     {
@@ -297,7 +304,7 @@ public sealed class Codegen
         NameExpr n => n.Name,
         UnaryExpr u when u.Op == "!" && !_lua => $"not ({EmitExpr(u.Inner)})",
         UnaryExpr u => $"{(u.Op == "!" ? "not " : "-")}{EmitExpr(u.Inner)}",
-        BinaryExpr b when b.Op == "+" && _lua && IsStringish(b) => $"({EmitExpr(b.Left)} .. {EmitExpr(b.Right)})",
+        BinaryExpr b when b.Op == "+" && _lua && IsStringish(b) => Concat(b.Left, b.Right),
         BinaryExpr b => $"({EmitExpr(b.Left)} {Op(b.Op)} {EmitExpr(b.Right)})",
         IndexExpr ix => $"{EmitExpr(ix.Object)}[{EmitExpr(ix.Index)}]",
         NewExpr n when NativeTable.Constructors.TryGetValue(n.Type, out var ctor) =>
