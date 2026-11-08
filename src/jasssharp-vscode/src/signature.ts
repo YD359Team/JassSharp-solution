@@ -24,5 +24,54 @@ export function registerSignatureHelp(context: vscode.ExtensionContext) {
 
   context.subscriptions.push(
     vscode.languages.registerSignatureHelpProvider({ language: "jasssharp" }, provider, "(", ",")
-  );
+    );
+
+    context.subscriptions.push(
+        vscode.languages.registerDocumentFormattingEditProvider("jasssharp", {
+            provideDocumentFormattingEdits(doc) {
+                const edits: vscode.TextEdit[] = [];
+                const text = doc.getText();
+                const lines = text.split(/\r?\n/);
+                const out: string[] = [];
+                let indent = 0;
+                const tab = "    ";
+
+                for (let raw of lines) {
+                    let line = raw.trimEnd();
+                    const trimmed = line.trim();
+                    if (trimmed === "") {
+                        out.push("");
+                        continue;
+                    }
+
+                    // decrease indent before closing brace
+                    if (trimmed.startsWith("}")) indent = Math.max(0, indent - 1);
+
+                    // if line ends with { and is not empty before it, split
+                    if (trimmed.endsWith("{") && trimmed !== "{") {
+                        const before = trimmed.slice(0, -1).trimEnd();
+                        if (before.length > 0) {
+                            out.push(tab.repeat(indent) + before);
+                            out.push(tab.repeat(indent) + "{");
+                        } else {
+                            out.push(tab.repeat(indent) + "{");
+                        }
+                        indent++;
+                        continue;
+                    }
+
+                    out.push(tab.repeat(indent) + trimmed);
+
+                    if (trimmed.endsWith("{")) indent++;
+                }
+
+                const formatted = out.join("\n");
+                if (formatted !== text.replace(/\r\n/g, "\n")) {
+                    const full = new vscode.Range(doc.positionAt(0), doc.positionAt(text.length));
+                    edits.push(vscode.TextEdit.replace(full, formatted));
+                }
+                return edits;
+            },
+        })
+    );
 }
