@@ -144,9 +144,25 @@ public sealed class Parser(List<Token> tokens)
 
     private static readonly HashSet<string> TypeNames = new(StringComparer.Ordinal)
     {
-        "int", "float", "bool", "string", "void", "unit", "player", "trigger", "timer",
-        "group", "effect", "item", "location", "rect", "region", "force", "widget", "handle",
-        "code", "hashtable"
+        "ability", "abilitybooleanfield", "abilitybooleanlevelarrayfield", "abilitybooleanlevelfield", "abilityintegerfield", 
+        "abilityintegerlevelarrayfield", "abilityintegerlevelfield", "abilityrealfield", "abilityreallevelarrayfield", 
+        "abilityreallevelfield", "abilitystringfield", "abilitystringlevelarrayfield", "abilitystringlevelfield", "agent", 
+        "aidifficulty", "alliancetype", "animtype", "armortype", "attacktype", "boolexpr", "buff", "button", "camerafield", 
+        "camerasetup", "code", "commandbuttoneffect", "conditionfunc", "damagetype", "defeatcondition", "defensetype", 
+        "destructable", "dialog", "dialogevent", "effect", "effecttype", "event", "eventid", "fgamestate", "filterfunc", 
+        "fogmodifier", "fogstate", "fogstyle", "force", "frameeventtype", "framehandle", "framepointtype", "gamecache", 
+        "gamedifficulty", "gameevent", "gamespeed", "gamestate", "gametype", "group", "handle", "hashtable", "heroattribute", 
+        "igamestate", "image", "integer", "item", "itembooleanfield", "itemintegerfield", "itempool", "itemrealfield", 
+        "itemstringfield", "itemTag", "itemtype", "leaderboard", "lightning", "limitop", "loadoutslot", "location", 
+        "mapcontrol", "mapdensity", "mapflag", "mapsetting", "mapvisibility", "metakeytype", "minimapicon", "mousebuttontype", 
+        "movetype", "multiboard", "multiboarditem", "nothing", "originframetype", "oskeytype", "pathingflag", "pathingtype", 
+        "placement", "player", "playercolor", "playergameresult", "playerevent", "playerscore", "playerslotstate", "playerstate", 
+        "playerunitevent", "quest", "questitem", "race", "racepreference", "raritycontrol", "real", "rect", "regentype", "region", 
+        "sound", "soundtype", "startlocprio", "string", "subanimtype", "targetflag", "terraindeformation", "texmapflags", 
+        "textaligntype", "texttag", "timerdialog", "timer", "trackable", "trigger", "triggeraction", "triggercondition", 
+        "ubersplat", "unit", "unitbooleanfield", "unitcategory", "unitevent", "unitintegerfield", "unitpool", "unitrealfield", 
+        "unitstate", "unitstringfield", "unittype", "unitweaponbooleanfield", "unitweaponintegerfield", "unitweaponrealfield", 
+        "unitweaponstringfield", "version", "volumegroup", "weapontype", "weathereffect", "widget", "widgetevent",
     };
 
     private bool LooksLikeDecl()
