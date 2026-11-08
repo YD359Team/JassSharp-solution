@@ -145,7 +145,8 @@ public sealed class Parser(List<Token> tokens)
     private static readonly HashSet<string> TypeNames = new(StringComparer.Ordinal)
     {
         "int", "float", "bool", "string", "void", "unit", "player", "trigger", "timer",
-        "group", "effect", "item", "location", "rect", "force", "widget", "handle", "code"
+        "group", "effect", "item", "location", "rect", "region", "force", "widget", "handle",
+        "code", "hashtable"
     };
 
     private bool LooksLikeDecl()
