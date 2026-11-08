@@ -83,9 +83,42 @@ static class MapBuild
 
     static List<string> ResolveUsings(List<string> files, string src, string project)
     {
-        // Simple topo: for now return as-is; full version would parse usings and sort
-        // TODO: parse each file's using and topological sort
-        return files;
+        // Простой топосорт по using (имя файла ≈ namespace)
+        var graph = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+        var nameToPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var f in files)
+        {
+            var name = Path.GetFileNameWithoutExtension(f);
+            nameToPath[name] = f;
+            graph[name] = new List<string>();
+            try
+            {
+                var unit = new Parser(new Lexer(File.ReadAllText(f)).Lex()).ParseNamespace();
+                foreach (var u in unit.Usings)
+                    graph[name].Add(u.Replace(".", "_")); // упрощённо
+            }
+            catch { /* ignore parse errors here */ }
+        }
+
+        var result = new List<string>();
+        var visited = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var temp = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        void Visit(string name)
+        {
+            if (visited.Contains(name) || !graph.ContainsKey(name)) return;
+            if (temp.Contains(name)) return; // cycle
+            temp.Add(name);
+            foreach (var dep in graph[name]) Visit(dep);
+            temp.Remove(name);
+            visited.Add(name);
+            if (nameToPath.TryGetValue(name, out var path))
+                result.Add(path);
+        }
+        foreach (var name in graph.Keys) Visit(name);
+        // добавляем файлы, которых не было в графе
+        foreach (var f in files)
+            if (!result.Contains(f)) result.Add(f);
+        return result;
     }
 
     static string Norm(string p) => Path.GetFullPath(p);
