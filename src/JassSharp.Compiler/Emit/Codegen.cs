@@ -192,7 +192,19 @@ public sealed class Codegen
         {
             if (trace && s is not CondStmt)
             {
-                Line(_lua ? $"BJDebugMsg(\"[trace] line\")" : $"call BJDebugMsg(\"[trace] line\")");
+                var loc = s switch
+                {
+                    VarStmt v => $"{v.Line}:{v.Col}",
+                    AssignStmt a => $"{a.Target.Line}:{a.Target.Col}",
+                    ExprStmt e => $"{e.Expr.Line}:{e.Expr.Col}",
+                    ReturnStmt r => r.Expr is null ? "return" : $"{r.Expr.Line}:{r.Expr.Col}",
+                    IfStmt i => $"{i.Cond.Line}:{i.Cond.Col}",
+                    WhileStmt w => $"{w.Cond.Line}:{w.Cond.Col}",
+                    ForStmt f => f.Init is VarStmt vs ? $"{vs.Line}:{vs.Col}" : "for",
+                    _ => "?"
+                };
+                var msg = $"[trace] {loc}";
+                Line(_lua ? $"BJDebugMsg(\"{Esc(msg)}\")" : $"call BJDebugMsg(\"{Esc(msg)}\")");
             }
             switch (s)
             {

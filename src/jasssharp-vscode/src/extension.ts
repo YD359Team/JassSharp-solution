@@ -60,7 +60,32 @@ export function activate(context: vscode.ExtensionContext) {
     vscode.workspace.onDidChangeTextDocument((e) => {
       if (e.document.languageId === "jasssharp") debounce(() => check(e.document, diags));
     })
-  );
+    );
+
+    context.subscriptions.push(
+        vscode.languages.registerOnTypeFormattingEditProvider(
+            "jasssharp",
+            {
+                provideOnTypeFormattingEdits(doc, pos, ch) {
+                    if (ch !== "{") return [];
+                    const line = doc.lineAt(pos.line);
+                    const text = line.text;
+                    const before = text.slice(0, pos.character - 1).trimEnd();
+                    if (before.length === 0) return []; // already alone
+
+                    const indent = text.match(/^(\s*)/)?.[1] ?? "";
+                    const edits: vscode.TextEdit[] = [];
+
+                    // replace "something {" with "something\n{"
+                    const range = new vscode.Range(pos.line, 0, pos.line, text.length);
+                    const newText = indent + before + "\n" + indent + "{";
+                    edits.push(vscode.TextEdit.replace(range, newText));
+                    return edits;
+                },
+            },
+            "{"
+        )
+    );
 
   for (const d of vscode.workspace.textDocuments) check(d, diags);
 }
