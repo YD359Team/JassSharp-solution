@@ -13,17 +13,18 @@ public static class Checker
         var classes = unit.Classes.Select(c => c.Name).ToHashSet(StringComparer.Ordinal);
         var fns = unit.Functions.Select(f => f.Name).ToHashSet(StringComparer.Ordinal);
         var consts = unit.Consts.Select(c => c.Name).ToHashSet(StringComparer.Ordinal);
+        var fields = unit.Fields.Select(f => f.Name).ToHashSet(StringComparer.Ordinal);
         foreach (var cls in unit.Classes)
         {
-            if (cls.Ctor is not null) Walk(cls.Ctor.Body, cls.Ctor.Params, classes, fns, consts, diags, file);
-            foreach (var m in cls.Methods) Walk(m.Body, m.Params, classes, fns, consts, diags, file);
+            if (cls.Ctor is not null) Walk(cls.Ctor.Body, cls.Ctor.Params, classes, fns, consts, fields, diags, file);
+            foreach (var m in cls.Methods) Walk(m.Body, m.Params, classes, fns, consts, fields, diags, file);
         }
-        foreach (var fn in unit.Functions) Walk(fn.Body, fn.Params, classes, fns, consts, diags, file);
+        foreach (var fn in unit.Functions) Walk(fn.Body, fn.Params, classes, fns, consts, fields, diags, file);
         return diags;
     }
 
-    private static bool Known(string name, HashSet<string> fns, HashSet<string> consts, HashSet<string> classes) =>
-        fns.Contains(name) || consts.Contains(name) || classes.Contains(name)
+    private static bool Known(string name, HashSet<string> fns, HashSet<string> consts, HashSet<string> classes, HashSet<string> fields) =>
+        fns.Contains(name) || consts.Contains(name) || classes.Contains(name) || fields.Contains(name)
         || NativeCatalog.Natives.Contains(name) || NativeCatalog.Constants.Contains(name)
         || name.StartsWith("BJ", StringComparison.Ordinal);
 
@@ -41,7 +42,7 @@ public static class Checker
         };
     }
 
-    private static void Walk(List<Stmt> body, List<ParamDecl> ps, HashSet<string> classes, HashSet<string> fns, HashSet<string> consts, List<Diagnostic> diags, string? file)
+    private static void Walk(List<Stmt> body, List<ParamDecl> ps, HashSet<string> classes, HashSet<string> fns, HashSet<string> consts, HashSet<string> fields, List<Diagnostic> diags, string? file)
     {
         var locals = ps.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
         var types = ps.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
@@ -87,7 +88,7 @@ public static class Checker
             switch (e)
             {
                 case CallExpr c when c.Callee is NameExpr id:
-                    if (!Known(id.Name, fns, consts, classes))
+                    if (!Known(id.Name, fns, consts, classes, fields))
                         diags.Add(new Diagnostic(id.Line, id.Col, "warning", $"неизвестный вызов {id.Name}", file));
                     else if (NativeSigs.Map.TryGetValue(id.Name, out var sig))
                     {
@@ -108,7 +109,7 @@ public static class Checker
                     foreach (var a in c.Args) Expr(a);
                     break;
                 case NameExpr n:
-                    if (!locals.Contains(n.Name) && !Known(n.Name, fns, consts, classes))
+                    if (!locals.Contains(n.Name) && !Known(n.Name, fns, consts, classes, fields))
                         diags.Add(new Diagnostic(n.Line, n.Col, "warning", $"неизвестное имя {n.Name}", file));
                     break;
                 case NewExpr n:
