@@ -248,10 +248,22 @@ public sealed class Parser(List<Token> tokens)
             Accept(";");
             return new AssignStmt(expr, v);
         }
-        if (Accept("+"))
+        if (Accept("+="))
         {
-            // handled by += in original, but keep structure
+            var v = ParseExpr();
+            Accept(";");
+            return new AssignStmt(expr, new BinaryExpr("+", expr, v));
         }
+        if (Accept("-="))
+        {
+            var v = ParseExpr();
+            Accept(";");
+            return new AssignStmt(expr, new BinaryExpr("-", expr, v));
+        }
+        if (Accept("++"))
+            return new AssignStmt(expr, new BinaryExpr("+", expr, new NumExpr("1")));
+        if (Accept("--"))
+            return new AssignStmt(expr, new BinaryExpr("-", expr, new NumExpr("1")));
         Accept(";");
         return new ExprStmt(expr);
     }
