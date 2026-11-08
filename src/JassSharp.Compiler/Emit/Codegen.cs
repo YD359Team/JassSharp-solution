@@ -13,6 +13,7 @@ public sealed class Codegen
     private string? _className;
     private readonly Dictionary<string, FnDecl> _inlineMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FnDecl> _methods = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, EnumDecl> _enums = new(StringComparer.Ordinal);
 
     public Codegen(bool lua, IEnumerable<string> classes)
     {
@@ -27,6 +28,8 @@ public sealed class Codegen
         foreach (var cls in unit.Classes)
             foreach (var m in cls.Methods)
                 _methods[cls.Name + "." + m.Name] = m;
+        foreach (var en in unit.Enums)
+            _enums[en.Name] = en;
         foreach (var fn in unit.Functions)
             _methods[fn.Name] = fn;
 
@@ -167,7 +170,7 @@ public sealed class Codegen
             else if (m.Value is not null)
             {
                 value = EmitExpr(m.Value);
-                next++; // approximate
+                next++;
             }
             else
             {
@@ -500,6 +503,13 @@ public sealed class Codegen
 
     private string EmitMember(MemberExpr m)
     {
+        // Enum.Member → Enum_Member
+        if (m.Object is NameExpr ne && _enums.TryGetValue(ne.Name, out var en))
+        {
+            if (en.Members.Any(mem => mem.Name == m.Name))
+                return $"{en.Name}_{m.Name}";
+        }
+
         var rt = RecvType(m.Object);
         var prop = rt is null ? null : NativeTable.Find(rt, m.Name);
         var recv = EmitExpr(m.Object);
