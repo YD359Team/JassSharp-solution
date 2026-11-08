@@ -458,13 +458,14 @@ static class MapBuild
             Console.WriteLine("LAUNCH: \"" + Path.GetFileName(game) + "\" " + arguments);
             Console.WriteLine("WORKDIR: " + workingDirectory);
 
-            Process.Start(new ProcessStartInfo
+            Process? proc = Process.Start(new ProcessStartInfo
             {
                 FileName = game,
                 Arguments = arguments,
                 WorkingDirectory = workingDirectory,
                 UseShellExecute = true
-            }) ?? throw new InvalidOperationException("Process.Start returned null");
+            });
+            if (proc is null) throw new InvalidOperationException("Process.Start returned null");
 
             Console.WriteLine("started");
             return 0;
