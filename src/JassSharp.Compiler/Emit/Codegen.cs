@@ -460,20 +460,32 @@ public sealed class Codegen
         return EmitExpr(arg);
     }
 
-    private static string Apply(string tpl, string recv, List<string> args)
+    private string Apply(string tpl, string recv, List<string> args)
     {
         if (tpl.Contains('$') || tpl.Contains('#'))
         {
-            var i = 0;
-            var s = tpl.Replace("$", recv);
+            int i = 0;
+            string s = tpl.Replace("$", recv);
             var b = new System.Text.StringBuilder();
-            foreach (var ch in s)
+
+            foreach (char ch in s)
             {
-                if (ch == '#') b.Append(i < args.Count ? args[i++] : "null");
-                else b.Append(ch);
+                if (ch == '#')
+                {
+                    b.Append(
+                        i < args.Count
+                            ? args[i++]
+                            : (_lua ? "nil" : "null"));
+                }
+                else
+                {
+                    b.Append(ch);
+                }
             }
+
             return b.ToString();
         }
+
         return $"{tpl}({string.Join(", ", new[] { recv }.Concat(args))})";
     }
 
