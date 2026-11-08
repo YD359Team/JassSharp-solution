@@ -39,6 +39,8 @@ namespace MyMap.Spells
         hero.Name = "Arthas";
         hero.Life = 500.0;
         hero.SetPosition(100.0, 200.0).Kill();
+
+        Print("Hero: ", hero, " at ", hero.X);
     }
 }
 ```
@@ -50,6 +52,10 @@ namespace MyMap.Spells
 - `OnInit` — точка входа (в vJASS — `initializer`, в Lua — вызов в конце)
 - Цепочки: `hero.SetPosition(x, y).Kill()`
 - Триггеры: явный `new trigger()`, методы `Register...` / `AddAction`
+- `Print(...)` — любое количество аргументов любых типов → `BJDebugMsg` с автоматическим `ToString`
+- `ToString` для unit/player/item и базовых типов
+- `#if LUA { ... } else { ... }` и `#if VJASS` — условная компиляция
+- `[Trace]` на функции — вставка отладочных сообщений
 
 Каталог нативов — полный `common.j` (jassdoc). Свойства генерируются из пар Get/Set (119) плюс ручные `Life`/`Mana`/`Name`.
 
@@ -98,6 +104,7 @@ dotnet run --project src/JassSharp.Compiler -- map --project . --run
 ```
 src/JassSharp.Compiler/     компилятор (C#)
 src/jasssharp-vscode/       расширение VS Code
+samples/                    примеры
 ```
 
 ## Сборка

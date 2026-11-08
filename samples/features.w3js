@@ -1,0 +1,36 @@
+namespace Samples.Features
+{
+    class Hero
+    {
+        unit U;
+        public Hero(unit u) { this.U = u; }
+
+        public string ToString()
+        {
+            return "Hero(" + this.U.Name + ")";
+        }
+    }
+
+    [Trace]
+    void DebugStuff()
+    {
+        unit h = new unit(Player(0), 'Hpal', 0, 0, 270);
+        Print("Created: ", h);
+
+        #if LUA
+        {
+            Print("Running under Lua");
+        }
+        #else
+        {
+            Print("Running under vJASS");
+        }
+        #endif
+    }
+
+    void OnInit()
+    {
+        DebugStuff();
+        Print("Hello from OnInit");
+    }
+}
