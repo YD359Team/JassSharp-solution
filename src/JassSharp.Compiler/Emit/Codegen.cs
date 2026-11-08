@@ -75,16 +75,21 @@ public sealed class Codegen
         Line("function config()");
         Line("end");
         Line("");
+
         Line("function main()");
         Line("    InitBlizzard()");
+
         if (hasInit)
         {
-            Line("    local ok, err = pcall(OnInit)");
+            string initializerName = $"{_namespaceName}_OnInit";
+
+            Line($"    local ok, err = pcall({initializerName})");
             Line("    if not ok then");
             Line("        print(\"JASS# OnInit error: \" .. tostring(err))");
             Line("        BJDebugMsg(\"JASS# OnInit error: \" .. tostring(err))");
             Line("    end");
         }
+
         Line("end");
     }
 
@@ -355,26 +360,43 @@ public sealed class Codegen
 
     private string EmitExpr(Expr e) => e switch
     {
-    NumExpr n => n.Text,
-    StrExpr s => $"\"{Esc(s.Text)}\"",
-    RawExpr r => _lua ? Rawcode.Pack(r.Id).ToString() : $"'{r.Id}'",
-    BoolExpr b => b.Value ? "true" : "false",
-    NullExpr => "null",
-    ThisExpr => _lua ? "self" : "this",
-    NameExpr n => n.Name,
-    UnaryExpr u when u.Op == "!" && !_lua => $"not ({EmitExpr(u.Inner)})",
-    UnaryExpr u => $"{(u.Op == "!" ? "not " : "-")}{EmitExpr(u.Inner)}",
-    BinaryExpr b when b.Op == "+" && _lua && IsStringish(b) => Concat(b.Left, b.Right),
-    BinaryExpr b => $"({EmitExpr(b.Left)} {Op(b.Op)} {EmitExpr(b.Right)})",
-    IndexExpr ix => $"{EmitExpr(ix.Object)}[{EmitExpr(ix.Index)}]",
-    NewExpr n when NativeTable.Constructors.TryGetValue(n.Type, out var ctor) =>
-        $"{ctor}({string.Join(", ", n.Args.Select(EmitExpr))})",
-        NewExpr n => _lua
-    ? $"{n.Type}.new({string.Join(", ", n.Args.Select(EmitExpr))})"
-    : $"{n.Type}.create({string.Join(", ", n.Args.Select(EmitExpr))})",
+        NumExpr n => n.Text,
+        StrExpr s => $"\"{Esc(s.Text)}\"",
+        RawExpr r => _lua ? Rawcode.Pack(r.Id).ToString() : $"'{r.Id}'",
+        BoolExpr b => b.Value ? "true" : "false",
+        NullExpr => _lua ? "nil" : "null",
+        ThisExpr => _lua ? "self" : "this",
+        NameExpr n => n.Name,
+
+        UnaryExpr u when u.Op == "!" && !_lua =>
+            $"not ({EmitExpr(u.Inner)})",
+
+        UnaryExpr u =>
+            $"{(u.Op == "!" ? "not " : "-")}{EmitExpr(u.Inner)}",
+
+        BinaryExpr b when b.Op == "+" && _lua && IsStringish(b) =>
+            Concat(b.Left, b.Right),
+
+        BinaryExpr b =>
+            $"({EmitExpr(b.Left)} {Op(b.Op)} {EmitExpr(b.Right)})",
+
+        IndexExpr ix =>
+            $"{EmitExpr(ix.Object)}[{EmitExpr(ix.Index)}]",
+
+        NewExpr n when NativeTable.Constructors.TryGetValue(n.Type, out var ctor) =>
+            $"{ctor}({string.Join(", ", n.Args.Select(EmitExpr))})",
+
+        NewExpr n when _lua =>
+            $"{n.Type}.new({string.Join(", ", n.Args.Select(EmitExpr))})",
+
+        NewExpr n =>
+            $"{n.Type}.create({string.Join(", ", n.Args.Select(EmitExpr))})",
+
         MemberExpr m => EmitMember(m),
         CallExpr c => EmitCall(c),
-        _ => "null",
+
+        _ => throw new NotSupportedException(
+            $"Unsupported expression node: {e.GetType().Name}")
     };
 
     private string EmitMember(MemberExpr m)

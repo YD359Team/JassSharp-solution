@@ -123,7 +123,11 @@ static class MapBuild
 
             string outDir = Path.Combine(project, "bin");
             Directory.CreateDirectory(outDir);
-            string packed = Path.GetFullPath(Path.Combine(outDir, "JassSharpMap.w3x"));
+
+            string packed = Path.GetFullPath(
+                Path.Combine(outDir, "JassSharpMap.w3x"));
+
+            string objDir = Path.Combine(project, "obj");
 
             string? sourceW3x = FindSourceMap(map, baseMap);
 
@@ -158,6 +162,7 @@ static class MapBuild
                 return BuildFromArchive(
                     sourceW3x,
                     packed,
+                    objDir,
                     scriptName,
                     target,
                     generatedScript,
@@ -175,6 +180,7 @@ static class MapBuild
                 return BuildFromFolder(
                     map,
                     packed,
+                    objDir,
                     scriptName,
                     target,
                     generatedScript,
@@ -204,6 +210,7 @@ static class MapBuild
     private static int BuildFromArchive(
         string sourceW3x,
         string packed,
+        string objDir,
         string scriptName,
         string target,
         string generatedScript,
@@ -216,18 +223,35 @@ static class MapBuild
         bool launch)
     {
         string workMap = Path.Combine(workRoot, "map.w3x");
+
         File.Copy(sourceW3x, workMap, overwrite: true);
+
         Console.WriteLine("work map: " + workMap);
 
         string w3iDir = Path.Combine(workRoot, "w3i");
         string w3iPath = Path.Combine(w3iDir, "war3map.w3i");
-        bool gotW3i = ExtractArchiveFile(mpqCli, editor, workMap, "war3map.w3i", w3iPath);
+
+        bool gotW3i = ExtractArchiveFile(
+            mpqCli,
+            editor,
+            workMap,
+            "war3map.w3i",
+            w3iPath);
 
         if (!gotW3i)
-            return Fail("could not extract war3map.w3i from the base map; refusing to build an archive with an unknown map/script format");
+        {
+            return Fail(
+                "could not extract war3map.w3i from the base map; " +
+                "refusing to build an archive with an unknown map/script format");
+        }
 
         int wantedScriptType = target == "lua" ? 1 : 0;
+
+        // Сохраняем оригинал до изменения.
+        byte[] originalW3i = File.ReadAllBytes(w3iPath);
+
         W3iInfo w3iInfo;
+
         try
         {
             w3iInfo = SetW3iScriptType(w3iPath, wantedScriptType);
@@ -237,26 +261,50 @@ static class MapBuild
             return Fail("invalid or unsupported war3map.w3i: " + ex.Message);
         }
 
-        Console.WriteLine($"w3i format: {w3iInfo.FormatVersion}; script type: {FormatScriptType(w3iInfo.ScriptType)}");
+        Console.WriteLine(
+            $"w3i format: {w3iInfo.FormatVersion}; " +
+            $"script type: {FormatScriptType(w3iInfo.ScriptType)}");
+
         if (w3iInfo.ScriptType is null && target == "lua")
-            return Fail("this map's W3I format predates Lua support (format version < 28). Save/upgrade the base map in a Warcraft III 1.31+ World Editor before building Lua into it");
-
-        byte[] originalW3i = File.ReadAllBytes(w3iPath);
-
-        w3iInfo = SetW3iScriptType(w3iPath, wantedScriptType);
-
-        bool w3iChanged =
-            !originalW3i.AsSpan().SequenceEqual(
-                File.ReadAllBytes(w3iPath));
-
-        if (w3iChanged &&
-            !InjectArchiveFile(mpqCli, editor, workMap, w3iPath, "war3map.w3i"))
         {
-            return Fail("failed to inject patched war3map.w3i");
+            return Fail(
+                "this map's W3I format predates Lua support " +
+                "(format version < 28). Save/upgrade the base map " +
+                "in a Warcraft III 1.31+ World Editor before building Lua into it");
         }
 
-        string baseScriptPath = Path.Combine(workRoot, "base-script", scriptName);
-        bool gotOriginalScript = ExtractArchiveFile(mpqCli, editor, workMap, scriptName, baseScriptPath);
+        byte[] patchedW3i = File.ReadAllBytes(w3iPath);
+
+        bool w3iChanged =
+            !originalW3i.AsSpan().SequenceEqual(patchedW3i);
+
+        if (w3iChanged)
+        {
+            Console.WriteLine("W3I script type changed; injecting updated war3map.w3i");
+
+            if (!InjectArchiveFile(
+                    mpqCli,
+                    editor,
+                    workMap,
+                    w3iPath,
+                    "war3map.w3i"))
+            {
+                return Fail("failed to inject patched war3map.w3i");
+            }
+        }
+
+        string baseScriptPath = Path.Combine(
+            workRoot,
+            "base-script",
+            scriptName);
+
+        bool gotOriginalScript = ExtractArchiveFile(
+            mpqCli,
+            editor,
+            workMap,
+            scriptName,
+            baseScriptPath);
+
         string finalScript;
 
         if (target == "lua")
@@ -268,27 +316,49 @@ static class MapBuild
             if (gotOriginalScript)
             {
                 string original = File.ReadAllText(baseScriptPath);
-                Console.WriteLine($"original Lua script: {new FileInfo(baseScriptPath).Length} bytes");
-                finalScript = original
-                    + "\n\n-- JASS# generated code\n"
-                    + userCode
-                    + CreateLuaMainWrapper(onInits, callInitBlizzardWhenMissingOriginalMain: true);
+
+                Console.WriteLine(
+                    $"original Lua script: {new FileInfo(baseScriptPath).Length} bytes");
+
+                finalScript =
+                    original +
+                    "\n\n-- JASS# generated code\n" +
+                    userCode +
+                    CreateLuaMainWrapper(
+                        onInits,
+                        callInitBlizzardWhenMissingOriginalMain: true);
             }
             else
             {
-                Console.WriteLine("warning: base map has no extractable war3map.lua; only generated JASS# code will be included");
-                Console.WriteLine("warning: existing JASS triggers/scripts are not converted to Lua automatically");
-                finalScript = userCode + CreateLuaMainWrapper(onInits, callInitBlizzardWhenMissingOriginalMain: true);
+                Console.WriteLine(
+                    "warning: base map has no extractable war3map.lua; " +
+                    "only generated JASS# code will be included");
+
+                Console.WriteLine(
+                    "warning: existing JASS triggers/scripts are not converted to Lua automatically");
+
+                finalScript =
+                    userCode +
+                    CreateLuaMainWrapper(
+                        onInits,
+                        callInitBlizzardWhenMissingOriginalMain: true);
             }
         }
         else
         {
             string userCode = generatedScript;
+
             if (gotOriginalScript)
             {
                 string original = File.ReadAllText(baseScriptPath);
-                Console.WriteLine($"original JASS script: {new FileInfo(baseScriptPath).Length} bytes");
-                finalScript = original + "\n\n// JASS# generated code\n" + userCode;
+
+                Console.WriteLine(
+                    $"original JASS script: {new FileInfo(baseScriptPath).Length} bytes");
+
+                finalScript =
+                    original +
+                    "\n\n// JASS# generated code\n" +
+                    userCode;
             }
             else
             {
@@ -296,50 +366,106 @@ static class MapBuild
             }
         }
 
-        string finalScriptPath = Path.Combine(workRoot, scriptName);
-        File.WriteAllText(finalScriptPath, finalScript, Utf8NoBom);
+        // Сохраняем именно итоговый скрипт, который попадёт в MPQ.
+        string artifactPath = WriteBuildArtifact(
+            objDir,
+            scriptName,
+            finalScript);
 
-        Console.WriteLine($"final script: {new FileInfo(finalScriptPath).Length} bytes");
+        string finalScriptPath = Path.Combine(workRoot, scriptName);
+
+        File.Copy(
+            artifactPath,
+            finalScriptPath,
+            overwrite: true);
+
+        Console.WriteLine(
+            $"final script: {new FileInfo(finalScriptPath).Length} bytes");
+
         Console.WriteLine("inject script: " + scriptName);
 
-        if (!InjectArchiveFile(mpqCli, editor, workMap, finalScriptPath, scriptName))
+        if (!InjectArchiveFile(
+                mpqCli,
+                editor,
+                workMap,
+                finalScriptPath,
+                scriptName))
+        {
             return Fail("script injection failed");
+        }
 
         string verifyDir = Path.Combine(workRoot, "verify");
+
         string verifyScript = Path.Combine(verifyDir, scriptName);
         string verifyW3i = Path.Combine(verifyDir, "war3map.w3i");
 
-        if (!ExtractArchiveFile(mpqCli, editor, workMap, scriptName, verifyScript))
-            return Fail("script was injected, but could not be extracted back for verification");
+        if (!ExtractArchiveFile(
+                mpqCli,
+                editor,
+                workMap,
+                scriptName,
+                verifyScript))
+        {
+            return Fail(
+                "script was injected, but could not be extracted back for verification");
+        }
 
         string extractedScript = File.ReadAllText(verifyScript);
-        if (!string.Equals(extractedScript, finalScript, StringComparison.Ordinal))
-            return Fail("MPQ verification failed: extracted script differs from the script that was injected");
 
-        if (!ExtractArchiveFile(mpqCli, editor, workMap, "war3map.w3i", verifyW3i))
-            return Fail("script was injected, but war3map.w3i could not be extracted back for verification");
+        if (!string.Equals(
+                extractedScript,
+                finalScript,
+                StringComparison.Ordinal))
+        {
+            return Fail(
+                "MPQ verification failed: extracted script differs from the script that was injected");
+        }
+
+        if (!ExtractArchiveFile(
+                mpqCli,
+                editor,
+                workMap,
+                "war3map.w3i",
+                verifyW3i))
+        {
+            return Fail(
+                "script was injected, but war3map.w3i could not be extracted back for verification");
+        }
 
         W3iInfo verifiedW3i;
+
         try
         {
             verifiedW3i = ReadW3i(File.ReadAllBytes(verifyW3i));
         }
         catch (Exception ex)
         {
-            return Fail("MPQ verification failed: extracted war3map.w3i is invalid: " + ex.Message);
+            return Fail(
+                "MPQ verification failed: extracted war3map.w3i is invalid: " +
+                ex.Message);
         }
 
         bool scriptTypeMismatch = verifiedW3i.ScriptType.HasValue
             ? verifiedW3i.ScriptType.Value != (uint)wantedScriptType
             : wantedScriptType != 0;
-        if (scriptTypeMismatch)
-            return Fail($"MPQ verification failed: expected script type {wantedScriptType}, got {FormatScriptType(verifiedW3i.ScriptType)}");
 
-        Console.WriteLine($"verified: {scriptName} ({extractedScript.Length} characters)");
-        Console.WriteLine($"verified W3I script type: {FormatScriptType(verifiedW3i.ScriptType)}");
+        if (scriptTypeMismatch)
+        {
+            return Fail(
+                $"MPQ verification failed: expected script type {wantedScriptType}, " +
+                $"got {FormatScriptType(verifiedW3i.ScriptType)}");
+        }
+
+        Console.WriteLine(
+            $"verified: {scriptName} ({extractedScript.Length} characters)");
+
+        Console.WriteLine(
+            $"verified W3I script type: {FormatScriptType(verifiedW3i.ScriptType)}");
 
         File.Copy(workMap, packed, overwrite: true);
-        Console.WriteLine($"built: {packed} ({new FileInfo(packed).Length} bytes)");
+
+        Console.WriteLine(
+            $"built: {packed} ({new FileInfo(packed).Length} bytes)");
 
         return LaunchIfRequested(packed, game, extra, launch);
     }
@@ -347,6 +473,7 @@ static class MapBuild
     private static int BuildFromFolder(
         string mapFolder,
         string packed,
+        string objDir,
         string scriptName,
         string target,
         string generatedScript,
@@ -357,11 +484,14 @@ static class MapBuild
         bool launch)
     {
         string w3iPath = Path.Combine(mapFolder, "war3map.w3i");
+
         if (!File.Exists(w3iPath))
             return Fail($"map folder does not contain war3map.w3i: {mapFolder}");
 
         int wantedScriptType = target == "lua" ? 1 : 0;
+
         W3iInfo w3iInfo;
+
         try
         {
             w3iInfo = SetW3iScriptType(w3iPath, wantedScriptType);
@@ -371,16 +501,26 @@ static class MapBuild
             return Fail("invalid or unsupported war3map.w3i: " + ex.Message);
         }
 
-        Console.WriteLine($"w3i format: {w3iInfo.FormatVersion}; script type: {FormatScriptType(w3iInfo.ScriptType)}");
+        Console.WriteLine(
+            $"w3i format: {w3iInfo.FormatVersion}; " +
+            $"script type: {FormatScriptType(w3iInfo.ScriptType)}");
+
         if (w3iInfo.ScriptType is null && target == "lua")
-            return Fail("this map's W3I format predates Lua support (format version < 28). Save/upgrade the base map in a Warcraft III 1.31+ World Editor before building Lua into it");
+        {
+            return Fail(
+                "this map's W3I format predates Lua support " +
+                "(format version < 28). Save/upgrade the base map " +
+                "in a Warcraft III 1.31+ World Editor before building Lua into it");
+        }
 
         string scriptPath = Path.Combine(mapFolder, scriptName);
+
         string finalScript;
 
         if (target == "lua")
         {
             bool hasOriginal = File.Exists(scriptPath);
+
             string userCode = hasOriginal
                 ? RemoveLuaFunctions(generatedScript, "config", "main")
                 : RemoveLuaFunctions(generatedScript, "main");
@@ -388,36 +528,65 @@ static class MapBuild
             if (hasOriginal)
             {
                 string original = File.ReadAllText(scriptPath);
-                finalScript = original
-                    + "\n\n-- JASS# generated code\n"
-                    + userCode
-                    + CreateLuaMainWrapper(onInits, callInitBlizzardWhenMissingOriginalMain: true);
+
+                finalScript =
+                    original +
+                    "\n\n-- JASS# generated code\n" +
+                    userCode +
+                    CreateLuaMainWrapper(
+                        onInits,
+                        callInitBlizzardWhenMissingOriginalMain: true);
             }
             else
             {
-                finalScript = userCode + CreateLuaMainWrapper(onInits, callInitBlizzardWhenMissingOriginalMain: true);
+                finalScript =
+                    userCode +
+                    CreateLuaMainWrapper(
+                        onInits,
+                        callInitBlizzardWhenMissingOriginalMain: true);
             }
         }
         else
         {
             finalScript = File.Exists(scriptPath)
-                ? File.ReadAllText(scriptPath) + "\n\n// JASS# generated code\n" + generatedScript
+                ? File.ReadAllText(scriptPath) +
+                  "\n\n// JASS# generated code\n" +
+                  generatedScript
                 : generatedScript;
         }
 
-        File.WriteAllText(scriptPath, finalScript, Utf8NoBom);
-        Console.WriteLine($"wrote {scriptName}: {new FileInfo(scriptPath).Length} bytes");
+        // Артефакт для просмотра и отладки в VS Code.
+        WriteBuildArtifact(
+            objDir,
+            scriptName,
+            finalScript);
+
+        // Рабочая папка карты получает тот же скрипт.
+        File.WriteAllText(
+            scriptPath,
+            finalScript,
+            Utf8NoBom);
+
+        Console.WriteLine(
+            $"wrote {scriptName}: {new FileInfo(scriptPath).Length} bytes");
 
         if (File.Exists(packed))
             File.Delete(packed);
 
-        ProcessResult pack = RunTool(mpqTool, "new", mapFolder, packed);
+        ProcessResult pack = RunTool(
+            mpqTool,
+            "new",
+            mapFolder,
+            packed);
+
         PrintProcessResult("mpqtool", pack);
 
         if (pack.ExitCode != 0 || !File.Exists(packed))
             return Fail("mpqtool failed to pack the map folder");
 
-        Console.WriteLine($"built: {packed} ({new FileInfo(packed).Length} bytes)");
+        Console.WriteLine(
+            $"built: {packed} ({new FileInfo(packed).Length} bytes)");
+
         return LaunchIfRequested(packed, game, extra, launch);
     }
 
@@ -663,6 +832,26 @@ static class MapBuild
         sb.AppendLine("    end");
         sb.AppendLine("end");
         return sb.ToString();
+    }
+
+    private static string WriteBuildArtifact(
+    string objDir,
+    string scriptName,
+    string content)
+    {
+        Directory.CreateDirectory(objDir);
+
+        string path = Path.Combine(objDir, scriptName);
+
+        File.WriteAllText(
+            path,
+            content,
+            Utf8NoBom);
+
+        Console.WriteLine(
+            $"artifact: {path} ({new FileInfo(path).Length} bytes)");
+
+        return path;
     }
 
     private static string LuaString(string value)

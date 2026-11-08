@@ -144,5 +144,9 @@ public static partial class NativeTable
         new("effect", "Destroy", MemberKind.Method, "DestroyEffect", null),
         new("effect", "SetPosition", MemberKind.Method, "BlzSetSpecialEffectPosition", null),
         new("item", "Remove", MemberKind.Method, "RemoveItem", null),
+        new("region", "AddRect", MemberKind.Method, "RegionAddRect", null),
+        new("region", "ClearRect", MemberKind.Method, "RegionClearRect", null),
+        new("region", "AddCell", MemberKind.Method, "RegionAddCell", null),
+        new("region", "ClearCell", MemberKind.Method, "RegionClearCell", null),
     ];
 }
