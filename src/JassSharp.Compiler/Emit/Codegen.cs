@@ -30,6 +30,11 @@ public sealed class Codegen
         foreach (var fn in unit.Functions)
             _methods[fn.Name] = fn;
 
+        // collect inline
+        foreach (var kv in _methods)
+            if (kv.Value.Attributes?.Contains("Inline") == true)
+                _inlineMethods[kv.Key] = kv.Value;
+
         var hasInit = unit.Functions.Any(f => f.Name == "OnInit");
         if (_lua)
         {
@@ -209,6 +214,8 @@ public sealed class Codegen
                     EmitAssign(a.Target, a.Value);
                     break;
                 case ExprStmt e:
+                    if (TryEmitInline(e.Expr))
+                        break;
                     if (!EmitChain(e.Expr))
                     {
                         var ex = EmitExpr(e.Expr);
@@ -275,6 +282,54 @@ public sealed class Codegen
                     break;
             }
         }
+    }
+
+    private bool TryEmitInline(Expr e)
+    {
+        if (e is not CallExpr c) return false;
+
+        FnDecl? meth = null;
+        string? recvName = null;
+        List<Expr> args = c.Args;
+
+        if (c.Callee is NameExpr id && _inlineMethods.TryGetValue(id.Name, out meth))
+        {
+            // free function
+        }
+        else if (c.Callee is MemberExpr mem)
+        {
+            var key = (RecvType(mem.Object) ?? "") + "." + mem.Name;
+            if (!_inlineMethods.TryGetValue(key, out meth)) return false;
+            recvName = EmitExpr(mem.Object);
+        }
+        else return false;
+
+        if (meth is null) return false;
+
+        // save locals
+        var saved = new Dictionary<string, string>(_locals, StringComparer.Ordinal);
+
+        // bind params
+        for (int i = 0; i < meth.Params.Count && i < args.Count; i++)
+        {
+            var p = meth.Params[i];
+            var argExpr = EmitExpr(args[i]);
+            // simple: introduce temp or just substitute by emitting as local
+            Line(_lua ? $"local {p.Name} = {argExpr}" : $"local {MapType(p.Type)} {p.Name} = {argExpr}");
+            _locals[p.Name] = p.Type;
+        }
+
+        // if method, bind self/this
+        if (recvName is not null && _className is not null)
+        {
+            Line(_lua ? $"local self = {recvName}" : $"local {_className} this = {recvName}");
+        }
+
+        EmitStmts(meth.Body);
+
+        // restore locals
+        _locals = saved;
+        return true;
     }
 
     private void EmitAssign(Expr target, Expr value)
@@ -416,10 +471,6 @@ public sealed class Codegen
             var parts = c.Args.Select(ToStringExpr).ToList();
             var msg = parts.Count == 0 ? "\"\"" : string.Join(" .. ", parts);
             return $"BJDebugMsg({msg})";
-        }
-        if (c.Callee is MemberExpr mem && _methods.TryGetValue((RecvType(mem.Object) ?? "") + "." + mem.Name, out var meth) && meth.Attributes?.Contains("Inline") == true)
-        {
-            return "/* inline:" + mem.Name + " */ " + EmitNormalCall(c);
         }
         return EmitNormalCall(c);
     }
