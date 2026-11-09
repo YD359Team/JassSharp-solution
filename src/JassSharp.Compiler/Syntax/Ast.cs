@@ -16,6 +16,7 @@ public sealed record ClassDecl(string Name, List<FieldDecl> Fields, FnDecl? Ctor
 public sealed record EnumMember(string Name, Expr? Value);
 public sealed record EnumDecl(string Name, List<EnumMember> Members);
 public sealed record FnDecl(string ReturnType, string Name, List<ParamDecl> Params, List<Stmt> Body, HashSet<string> Attributes = null!);
+public sealed record LambdaExpr(List<ParamDecl> Params, List<Stmt> Body, int Line = 1, int Col = 1) : Expr(Line, Col);
 
 public abstract record Stmt;
 public sealed record VarStmt(string Type, string Name, Expr? Init, int Line = 1, int Col = 1) : Stmt;

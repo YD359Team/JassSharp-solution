@@ -7,7 +7,7 @@ public sealed class Codegen
 {
     private readonly bool _lua;
     private readonly HashSet<string> _classes;
-    private readonly List<string> _lines = [];
+    private List<string> _lines = [];
     private int _indent;
     private Dictionary<string, string> _locals = new(StringComparer.Ordinal);
     private string? _className;
@@ -518,10 +518,36 @@ public sealed class Codegen
 
         MemberExpr m => EmitMember(m),
         CallExpr c => EmitCall(c),
+        LambdaExpr l when _lua => EmitLambda(l),
+        LambdaExpr l => throw new NotSupportedException($"лямбды поддерживаются только в Lua (строка {l.Line})"),
 
         _ => throw new NotSupportedException(
             $"Unsupported expression node: {e.GetType().Name}")
     };
+
+    private string EmitLambda(LambdaExpr l)
+    {
+        var saved = _locals;
+        _locals = new Dictionary<string, string>(saved, StringComparer.Ordinal);
+        foreach (var p in l.Params)
+            _locals[p.Name] = p.Type;
+
+        var lines = new List<string>();
+        var oldLines = _lines;
+        _lines = lines;
+
+        var ps = string.Join(", ", l.Params.Select(p => p.Name));
+        Line($"function({ps})");
+        _indent++;
+        EmitStmts(l.Body);
+        _indent--;
+        Line("end");
+
+        _lines = oldLines;
+        _locals = saved;
+
+        return string.Join("\n" + new string(' ', _indent * 4), lines);
+    }
 
     private string EmitMember(MemberExpr m)
     {

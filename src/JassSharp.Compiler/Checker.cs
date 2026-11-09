@@ -120,6 +120,20 @@ public static class Checker
                     }
                     foreach (var a in c.Args) Expr(a);
                     break;
+                case LambdaExpr l:
+                    var savedLocals = locals;
+                    var savedTypes = types;
+                    locals = new HashSet<string>(locals, StringComparer.Ordinal);
+                    types = new Dictionary<string, string>(types, StringComparer.Ordinal);
+                    foreach (var p in l.Params)
+                    {
+                        locals.Add(p.Name);
+                        types[p.Name] = p.Type;
+                    }
+                    foreach (var s in l.Body) Stmt(s);
+                    locals = savedLocals;
+                    types = savedTypes;
+                    break;
                 case NameExpr n:
                     if (!locals.Contains(n.Name) && !Known(n.Name, fns, consts, classes, fields))
                         diags.Add(new Diagnostic(n.Line, n.Col, "warning", $"неизвестное имя {n.Name}", file));

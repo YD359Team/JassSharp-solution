@@ -169,24 +169,24 @@ public sealed class Parser(List<Token> tokens)
         // common types
         "int", "float", "bool", "void", "string",
         // warctaft 3 types
-        "ability", "abilitybooleanfield", "abilitybooleanlevelarrayfield", "abilitybooleanlevelfield", "abilityintegerfield", 
-        "abilityintegerlevelarrayfield", "abilityintegerlevelfield", "abilityrealfield", "abilityreallevelarrayfield", 
-        "abilityreallevelfield", "abilitystringfield", "abilitystringlevelarrayfield", "abilitystringlevelfield", "agent", 
-        "aidifficulty", "alliancetype", "animtype", "armortype", "attacktype", "boolexpr", "buff", "button", "camerafield", 
-        "camerasetup", "code", "commandbuttoneffect", "conditionfunc", "damagetype", "defeatcondition", "defensetype", 
-        "destructable", "dialog", "dialogevent", "effect", "effecttype", "event", "eventid", "fgamestate", "filterfunc", 
-        "fogmodifier", "fogstate", "fogstyle", "force", "frameeventtype", "framehandle", "framepointtype", "gamecache", 
-        "gamedifficulty", "gameevent", "gamespeed", "gamestate", "gametype", "group", "handle", "hashtable", "heroattribute", 
-        "igamestate", "image", "integer", "item", "itembooleanfield", "itemintegerfield", "itempool", "itemrealfield", 
-        "itemstringfield", "itemTag", "itemtype", "leaderboard", "lightning", "limitop", "loadoutslot", "location", 
-        "mapcontrol", "mapdensity", "mapflag", "mapsetting", "mapvisibility", "metakeytype", "minimapicon", "mousebuttontype", 
-        "movetype", "multiboard", "multiboarditem", "nothing", "originframetype", "oskeytype", "pathingflag", "pathingtype", 
-        "placement", "player", "playercolor", "playergameresult", "playerevent", "playerscore", "playerslotstate", "playerstate", 
-        "playerunitevent", "quest", "questitem", "race", "racepreference", "raritycontrol", "real", "rect", "regentype", "region", 
-        "sound", "soundtype", "startlocprio", "string", "subanimtype", "targetflag", "terraindeformation", "texmapflags", 
-        "textaligntype", "texttag", "timerdialog", "timer", "trackable", "trigger", "triggeraction", "triggercondition", 
-        "ubersplat", "unit", "unitbooleanfield", "unitcategory", "unitevent", "unitintegerfield", "unitpool", "unitrealfield", 
-        "unitstate", "unitstringfield", "unittype", "unitweaponbooleanfield", "unitweaponintegerfield", "unitweaponrealfield", 
+        "ability", "abilitybooleanfield", "abilitybooleanlevelarrayfield", "abilitybooleanlevelfield", "abilityintegerfield",
+        "abilityintegerlevelarrayfield", "abilityintegerlevelfield", "abilityrealfield", "abilityreallevelarrayfield",
+        "abilityreallevelfield", "abilitystringfield", "abilitystringlevelarrayfield", "abilitystringlevelfield", "agent",
+        "aidifficulty", "alliancetype", "animtype", "armortype", "attacktype", "boolexpr", "buff", "button", "camerafield",
+        "camerasetup", "code", "commandbuttoneffect", "conditionfunc", "damagetype", "defeatcondition", "defensetype",
+        "destructable", "dialog", "dialogevent", "effect", "effecttype", "event", "eventid", "fgamestate", "filterfunc",
+        "fogmodifier", "fogstate", "fogstyle", "force", "frameeventtype", "framehandle", "framepointtype", "gamecache",
+        "gamedifficulty", "gameevent", "gamespeed", "gamestate", "gametype", "group", "handle", "hashtable", "heroattribute",
+        "igamestate", "image", "integer", "item", "itembooleanfield", "itemintegerfield", "itempool", "itemrealfield",
+        "itemstringfield", "itemTag", "itemtype", "leaderboard", "lightning", "limitop", "loadoutslot", "location",
+        "mapcontrol", "mapdensity", "mapflag", "mapsetting", "mapvisibility", "metakeytype", "minimapicon", "mousebuttontype",
+        "movetype", "multiboard", "multiboarditem", "nothing", "originframetype", "oskeytype", "pathingflag", "pathingtype",
+        "placement", "player", "playercolor", "playergameresult", "playerevent", "playerscore", "playerslotstate", "playerstate",
+        "playerunitevent", "quest", "questitem", "race", "racepreference", "raritycontrol", "real", "rect", "regentype", "region",
+        "sound", "soundtype", "startlocprio", "string", "subanimtype", "targetflag", "terraindeformation", "texmapflags",
+        "textaligntype", "texttag", "timerdialog", "timer", "trackable", "trigger", "triggeraction", "triggercondition",
+        "ubersplat", "unit", "unitbooleanfield", "unitcategory", "unitevent", "unitintegerfield", "unitpool", "unitrealfield",
+        "unitstate", "unitstringfield", "unittype", "unitweaponbooleanfield", "unitweaponintegerfield", "unitweaponrealfield",
         "unitweaponstringfield", "version", "volumegroup", "weapontype", "weathereffect", "widget", "widgetevent",
     };
 
@@ -320,7 +320,40 @@ public sealed class Parser(List<Token> tokens)
     private Expr ParseMul() { var l = ParseUnary(); while (true) { if (Accept("*")) l = new BinaryExpr("*", l, ParseUnary()); else if (Accept("/")) l = new BinaryExpr("/", l, ParseUnary()); else break; } return l; }
     private Expr ParseUnary() { if (Accept("!")) return new UnaryExpr("!", ParseUnary()); if (Accept("-")) return new UnaryExpr("-", ParseUnary()); return ParsePost(); }
     private Expr ParsePost() { var e = ParsePrimary(); while (true) { if (Accept(".")) { var id = Eat(TokKind.Id); e = new MemberExpr(e, id.Text, id.Line, id.Col); } else if (Accept("[")) { var idx = ParseExpr(); Expect("]"); e = new IndexExpr(e, idx, e.Line, e.Col); } else if (Accept("(")) { var line = e.Line; var col = e.Col; var args = new List<Expr>(); if (!Check(")")) { do args.Add(ParseExpr()); while (Accept(",")); } Expect(")"); e = new CallExpr(e, args, line, col); } else break; } return e; }
-    private Expr ParsePrimary() { if (CheckId("new")) { var newTok = Eat(TokKind.Id); var type = Eat(TokKind.Id).Text; Expect("("); var args = new List<Expr>(); if (!Check(")")) { do args.Add(ParseExpr()); while (Accept(",")); } Expect(")"); return new NewExpr(type, args, newTok.Line, newTok.Col); } if (CheckId("this")) { var t = Eat(TokKind.Id); return new ThisExpr(t.Line, t.Col); } if (CheckId("true")) { var t = Eat(TokKind.Id); return new BoolExpr(true, t.Line, t.Col); } if (CheckId("false")) { var t = Eat(TokKind.Id); return new BoolExpr(false, t.Line, t.Col); } if (CheckId("null")) { var t = Eat(TokKind.Id); return new NullExpr(t.Line, t.Col); } var tok = tokens[_i++]; return tok.Kind switch { TokKind.Id => new NameExpr(tok.Text, tok.Line, tok.Col), TokKind.Num => new NumExpr(tok.Text, tok.Line, tok.Col), TokKind.Str => new StrExpr(tok.Text, tok.Line, tok.Col), TokKind.Raw => new RawExpr(tok.Text, tok.Line, tok.Col), _ => throw new ParseException($"неожиданный токен {tok.Text}", tok.Line, tok.Col), }; }
+    private Expr? TryParseLambda()
+    {
+        if (!Check("(")) return null;
+        int save = _i;
+        try
+        {
+            Eat(TokKind.Sym); // (
+            var ps = ParseParams();
+            Expect(")");
+            if (!Accept("=>")) { _i = save; return null; }
+            Expect("{");
+            var body = ParseBlock();
+            var tok = tokens[save];
+            return new LambdaExpr(ps, body, tok.Line, tok.Col);
+        }
+        catch
+        {
+            _i = save;
+            return null;
+        }
+    }
+
+    // в ParsePrimary:
+    private Expr ParsePrimary()
+    {
+        var lambda = TryParseLambda();
+        if (lambda is not null) return lambda;
+        if (CheckId("new")) { var newTok = Eat(TokKind.Id); var type = Eat(TokKind.Id).Text; Expect("("); var args = new List<Expr>(); if (!Check(")")) { do args.Add(ParseExpr()); while (Accept(",")); } Expect(")"); return new NewExpr(type, args, newTok.Line, newTok.Col); }
+        if (CheckId("this")) { var t = Eat(TokKind.Id); return new ThisExpr(t.Line, t.Col); }
+        if (CheckId("true")) { var t = Eat(TokKind.Id); return new BoolExpr(true, t.Line, t.Col); }
+        if (CheckId("false")) { var t = Eat(TokKind.Id); return new BoolExpr(false, t.Line, t.Col); }
+        if (CheckId("null")) { var t = Eat(TokKind.Id); return new NullExpr(t.Line, t.Col); }
+        var tok = tokens[_i++]; return tok.Kind switch { TokKind.Id => new NameExpr(tok.Text, tok.Line, tok.Col), TokKind.Num => new NumExpr(tok.Text, tok.Line, tok.Col), TokKind.Str => new StrExpr(tok.Text, tok.Line, tok.Col), TokKind.Raw => new RawExpr(tok.Text, tok.Line, tok.Col), _ => throw new ParseException($"неожиданный токен {tok.Text}", tok.Line, tok.Col), };
+    }
     private void SkipVis() { while (CheckId("public") || CheckId("private")) Eat(TokKind.Id); }
     private bool CheckId(string id) => Peek.Kind == TokKind.Id && Peek.Text == id;
     private bool Check(string sym) => Peek.Kind == TokKind.Sym && Peek.Text == sym;
