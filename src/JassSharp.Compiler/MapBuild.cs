@@ -186,6 +186,7 @@ static class MapBuild
                     generatedScript,
                     onInits,
                     mpqTool,
+                    workRoot,
                     game,
                     extra,
                     launch);
@@ -479,11 +480,17 @@ static class MapBuild
         string generatedScript,
         IReadOnlyList<string> onInits,
         string mpqTool,
+        string workRoot,
         string? game,
         string? extra,
         bool launch)
     {
-        string w3iPath = Path.Combine(mapFolder, "war3map.w3i");
+        // Never modify the user's source map folder. All changes are made in
+        // an isolated staging copy that is removed with workRoot after the build.
+        string stagingMapFolder = Path.Combine(workRoot, "map-folder");
+        CopyDirectory(mapFolder, stagingMapFolder);
+
+        string w3iPath = Path.Combine(stagingMapFolder, "war3map.w3i");
 
         if (!File.Exists(w3iPath))
             return Fail($"map folder does not contain war3map.w3i: {mapFolder}");
@@ -513,7 +520,7 @@ static class MapBuild
                 "in a Warcraft III 1.31+ World Editor before building Lua into it");
         }
 
-        string scriptPath = Path.Combine(mapFolder, scriptName);
+        string scriptPath = Path.Combine(stagingMapFolder, scriptName);
 
         string finalScript;
 
@@ -576,7 +583,7 @@ static class MapBuild
         ProcessResult pack = RunTool(
             mpqTool,
             "new",
-            mapFolder,
+            stagingMapFolder,
             packed);
 
         PrintProcessResult("mpqtool", pack);
@@ -590,6 +597,34 @@ static class MapBuild
         return LaunchIfRequested(packed, game, extra, launch);
     }
 
+    private static void CopyDirectory(string sourceDirectory, string destinationDirectory)
+    {
+        DirectoryInfo source = new(sourceDirectory);
+        if (!source.Exists)
+            throw new DirectoryNotFoundException($"map folder does not exist: {sourceDirectory}");
+
+        Directory.CreateDirectory(destinationDirectory);
+
+        foreach (FileInfo file in source.GetFiles())
+        {
+            if ((file.Attributes & FileAttributes.ReparsePoint) != 0)
+                throw new IOException($"map folder contains a symbolic link or reparse-point file that cannot be staged safely: {file.FullName}");
+
+            string destinationFile = Path.Combine(destinationDirectory, file.Name);
+            file.CopyTo(destinationFile, overwrite: true);
+        }
+
+        foreach (DirectoryInfo directory in source.GetDirectories())
+        {
+            if ((directory.Attributes & FileAttributes.ReparsePoint) != 0)
+                throw new IOException($"map folder contains a symbolic link or reparse-point directory that cannot be staged safely: {directory.FullName}");
+
+            CopyDirectory(
+                directory.FullName,
+                Path.Combine(destinationDirectory, directory.Name));
+        }
+    }
+
     private static int LaunchIfRequested(string packed, string? game, string? extra, bool launch)
     {
         if (!launch)
@@ -600,22 +635,16 @@ static class MapBuild
 
         try
         {
-            foreach (Process process in Process.GetProcessesByName("Warcraft III"))
+            Process[] existingProcesses = Process.GetProcessesByName("Warcraft III");
+            try
             {
-                try
-                {
-                    Console.WriteLine($"closing existing Warcraft III process {process.Id}");
-                    process.Kill(entireProcessTree: true);
-                    process.WaitForExit(10_000);
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"warning: could not close process {process.Id}: {ex.Message}");
-                }
-                finally
-                {
-                    process.Dispose();
-                }
+                if (existingProcesses.Length > 0)
+                    Console.WriteLine("warning: Warcraft III is already running; existing game processes will not be terminated");
+            }
+            finally
+            {
+                foreach (Process existingProcess in existingProcesses)
+                    existingProcess.Dispose();
             }
 
             string documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
