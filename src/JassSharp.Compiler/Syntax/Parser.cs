@@ -46,6 +46,13 @@ public sealed class Parser(List<Token> tokens)
             else
             {
                 var typeTok = Eat(TokKind.Id);
+                string typeName = typeTok.Text;
+                if (typeName == "List" && Accept("<"))
+                {
+                    Eat(TokKind.Id);
+                    Expect(">");
+                    typeName = "List";
+                }
                 var isArray = Accept("[") && Accept("]");
                 var id = Eat(TokKind.Id).Text;
                 if (Accept("("))
@@ -53,12 +60,12 @@ public sealed class Parser(List<Token> tokens)
                     var ps = ParseParams();
                     Expect(")");
                     Expect("{");
-                    ns.Functions.Add(new FnDecl(typeTok.Text, id, ps, ParseBlock(), attrs));
+                    ns.Functions.Add(new FnDecl(typeName, id, ps, ParseBlock(), attrs));
                 }
                 else
                 {
                     Accept(";");
-                    fields.Add(new FieldDecl(typeTok.Text, id, isArray));
+                    fields.Add(new FieldDecl(typeName, id, isArray));
                 }
             }
         }
@@ -108,6 +115,12 @@ public sealed class Parser(List<Token> tokens)
                 continue;
             }
             var type = Eat(TokKind.Id).Text;
+            if (type == "List" && Accept("<"))
+            {
+                Eat(TokKind.Id);
+                Expect(">");
+                type = "List";
+            }
             var isArray = Accept("[") && Accept("]");
             var id = Eat(TokKind.Id).Text;
             if (Accept("("))
@@ -278,12 +291,19 @@ public sealed class Parser(List<Token> tokens)
         if (LooksLikeDecl())
         {
             var typeTok = Eat(TokKind.Id);
+            string typeName = typeTok.Text;
+            if (typeName == "List" && Accept("<"))
+            {
+                Eat(TokKind.Id);
+                Expect(">");
+                typeName = "List";
+            }
             Accept("["); Accept("]");
             var id = Eat(TokKind.Id).Text;
             Expr? init = null;
             if (Accept("=")) init = ParseExpr();
             Accept(";");
-            return new VarStmt(typeTok.Text, id, init, typeTok.Line, typeTok.Col);
+            return new VarStmt(typeName, id, init, typeTok.Line, typeTok.Col);
         }
         var expr = ParseExpr();
         if (Accept("="))
