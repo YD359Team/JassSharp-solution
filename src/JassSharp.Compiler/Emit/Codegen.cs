@@ -56,6 +56,24 @@ public sealed class Codegen
             foreach (var cls in unit.Classes) EmitClassLua(cls);
             foreach (var fn in unit.Functions) EmitFnLua(fn);
             EmitLuaEntry(hasInit);
+
+            Line(@"
+function __list_remove(t, v)
+    for i = 1, #t do
+        if t[i] == v then
+            table.remove(t, i)
+            return true
+        end
+    end
+    return false
+end
+function __list_indexof(t, v)
+    for i = 1, #t do
+        if t[i] == v then return i - 1 end
+    end
+    return -1
+end
+");
         }
         else
         {
@@ -504,8 +522,9 @@ public sealed class Codegen
         BinaryExpr b =>
             $"({EmitExpr(b.Left)} {Op(b.Op)} {EmitExpr(b.Right)})",
 
-        IndexExpr ix =>
-            $"{EmitExpr(ix.Object)}[{EmitExpr(ix.Index)}]",
+        IndexExpr ix => EmitIndex(ix),
+
+        NewExpr n when n.Type == "List" && _lua => "{}",
 
         NewExpr n when NativeTable.Constructors.TryGetValue(n.Type, out var ctor) =>
             $"{ctor}({string.Join(", ", n.Args.Select(EmitExpr))})",
@@ -650,7 +669,6 @@ public sealed class Codegen
         ThisExpr => _className,
         NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
         NewExpr n => n.Type,
-        IndexExpr ix => EmitIndex(ix),
         CallExpr { Callee: MemberExpr mem } call when RecvType(mem.Object) is { } rt &&
             NativeTable.Find(rt, mem.Name) is { Kind: MemberKind.Method } => rt,
         _ => null,
