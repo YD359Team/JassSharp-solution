@@ -677,13 +677,25 @@ end
     private string EmitIndex(IndexExpr ix)
     {
         var obj = EmitExpr(ix.Object);
-        if (ix.Index is FromEndExpr fe)
+        var t = RecvType(ix.Object);
+
+        // строка
+        if (t == "string")
         {
-            // ^k → #t - k + 1
-            var k = EmitExpr(fe.Inner);
+            if (ix.Index is FromEndExpr fe)
+            {
+                var k = EmitExpr(fe.Inner);
+                return $"string.sub({obj}, -{k}, -{k})";
+            }
+            var i = EmitExpr(ix.Index);
+            return $"string.sub({obj}, {i} + 1, {i} + 1)";  // 0-based
+        }
+
+        if (ix.Index is FromEndExpr fe2)
+        {
+            var k = EmitExpr(fe2.Inner);
             return $"{obj}[#{obj} - {k} + 1]";
         }
-        // обычный индекс: user 0-based → lua 1-based
         var i = EmitExpr(ix.Index);
         return $"{obj}[{i} + 1]";
     }
