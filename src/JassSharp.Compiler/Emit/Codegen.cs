@@ -551,6 +551,16 @@ public sealed class Codegen
 
     private string EmitMember(MemberExpr m)
     {
+        if (m.Name == "Length")
+        {
+            var recv = EmitExpr(m.Object);
+            var t = RecvType(m.Object);
+            if (t == "string")
+                return $"string.len({recv})";
+            // array / List
+            return $"#{recv}";
+        }
+
         // Built-in J.Units.XXX / J.Skills.XXX rawcode constants
         if (m.Object is MemberExpr mid && mid.Object is NameExpr j && j.Name == "J")
         {
@@ -580,6 +590,19 @@ public sealed class Codegen
 
     private string EmitCall(CallExpr c)
     {
+        if (c.Callee is MemberExpr mem && RecvType(mem.Object) == "List")
+        {
+            var recv = EmitExpr(mem.Object);
+            var args = c.Args.Select(EmitExpr).ToList();
+            return mem.Name switch
+            {
+                "Add" => $"table.insert({recv}, {args[0]})",
+                "Remove" => $"__list_remove({recv}, {args[0]})",   // хелпер ниже
+                "IndexOf" => $"__list_indexof({recv}, {args[0]})",
+                "Clear" => $"for i = #{recv}, 1, -1 do {recv}[i] = nil end",
+                _ => throw new NotSupportedException($"List.{mem.Name}")
+            };
+        }
         if (c.Callee is MemberExpr mem && mem.Name == "ToString" && c.Args.Count == 0)
         {
             // прямое Colors.Red.ToString() → "Red"
@@ -627,11 +650,25 @@ public sealed class Codegen
         ThisExpr => _className,
         NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
         NewExpr n => n.Type,
-        IndexExpr ix when RecvType(ix.Object) is { } t => t,
+        IndexExpr ix => EmitIndex(ix),
         CallExpr { Callee: MemberExpr mem } call when RecvType(mem.Object) is { } rt &&
             NativeTable.Find(rt, mem.Name) is { Kind: MemberKind.Method } => rt,
         _ => null,
     };
+
+    private string EmitIndex(IndexExpr ix)
+    {
+        var obj = EmitExpr(ix.Object);
+        if (ix.Index is FromEndExpr fe)
+        {
+            // ^k → #t - k + 1
+            var k = EmitExpr(fe.Inner);
+            return $"{obj}[#{obj} - {k} + 1]";
+        }
+        // обычный индекс: user 0-based → lua 1-based
+        var i = EmitExpr(ix.Index);
+        return $"{obj}[{i} + 1]";
+    }
 
     private string CodeArg(string method, int index, Expr arg)
     {

@@ -168,6 +168,8 @@ public sealed class Parser(List<Token> tokens)
     {
         // common types
         "int", "float", "bool", "void", "string",
+        // extended types
+        "List",
         // warctaft 3 types
         "ability", "abilitybooleanfield", "abilitybooleanlevelarrayfield", "abilitybooleanlevelfield", "abilityintegerfield",
         "abilityintegerlevelarrayfield", "abilityintegerlevelfield", "abilityrealfield", "abilityreallevelarrayfield",
@@ -319,7 +321,45 @@ public sealed class Parser(List<Token> tokens)
     private Expr ParseAdd() { var l = ParseMul(); while (true) { if (Accept("+")) l = new BinaryExpr("+", l, ParseMul()); else if (Accept("-")) l = new BinaryExpr("-", l, ParseMul()); else break; } return l; }
     private Expr ParseMul() { var l = ParseUnary(); while (true) { if (Accept("*")) l = new BinaryExpr("*", l, ParseUnary()); else if (Accept("/")) l = new BinaryExpr("/", l, ParseUnary()); else break; } return l; }
     private Expr ParseUnary() { if (Accept("!")) return new UnaryExpr("!", ParseUnary()); if (Accept("-")) return new UnaryExpr("-", ParseUnary()); return ParsePost(); }
-    private Expr ParsePost() { var e = ParsePrimary(); while (true) { if (Accept(".")) { var id = Eat(TokKind.Id); e = new MemberExpr(e, id.Text, id.Line, id.Col); } else if (Accept("[")) { var idx = ParseExpr(); Expect("]"); e = new IndexExpr(e, idx, e.Line, e.Col); } else if (Accept("(")) { var line = e.Line; var col = e.Col; var args = new List<Expr>(); if (!Check(")")) { do args.Add(ParseExpr()); while (Accept(",")); } Expect(")"); e = new CallExpr(e, args, line, col); } else break; } return e; }
+    private Expr ParsePost() 
+    { 
+        var e = ParsePrimary(); 
+        while (true) 
+        { 
+            if (Accept(".")) 
+            { 
+                var id = Eat(TokKind.Id); 
+                e = new MemberExpr(e, id.Text, id.Line, id.Col); 
+            }
+            else if (Accept("["))
+            {
+                Expr idx;
+                if (Accept("^"))
+                    idx = new FromEndExpr(ParseExpr(), Peek.Line, Peek.Col);
+                else
+                    idx = ParseExpr();
+                Expect("]");
+                e = new IndexExpr(e, idx, e.Line, e.Col);
+            }
+            else if (Accept("(")) 
+            { 
+                var line = e.Line; 
+                var col = e.Col; 
+                var args = new List<Expr>(); 
+                if (!Check(")"))
+                { 
+                    do 
+                        args.Add(ParseExpr()); 
+                    while (Accept(",")); 
+                } 
+                Expect(")"); 
+                e = new CallExpr(e, args, line, col); 
+            } 
+            else 
+                break; 
+        } 
+        return e; 
+    }
     private Expr? TryParseLambda()
     {
         if (!Check("(")) return null;
@@ -347,7 +387,26 @@ public sealed class Parser(List<Token> tokens)
     {
         var lambda = TryParseLambda();
         if (lambda is not null) return lambda;
-        if (CheckId("new")) { var newTok = Eat(TokKind.Id); var type = Eat(TokKind.Id).Text; Expect("("); var args = new List<Expr>(); if (!Check(")")) { do args.Add(ParseExpr()); while (Accept(",")); } Expect(")"); return new NewExpr(type, args, newTok.Line, newTok.Col); }
+        if (CheckId("new")) 
+        { 
+            var newTok = Eat(TokKind.Id); 
+            string type = Eat(TokKind.Id).Text;
+            if (type == "List" && Accept("<"))
+            {
+                Eat(TokKind.Id); // T
+                Expect(">");
+                type = "List";
+            }
+            Expect("("); 
+            var args = new List<Expr>(); 
+            if (!Check(")")) 
+            { 
+                do args.Add(ParseExpr()); 
+                while (Accept(",")); 
+            } 
+            Expect(")"); 
+            return new NewExpr(type, args, newTok.Line, newTok.Col); 
+        }
         if (CheckId("this")) { var t = Eat(TokKind.Id); return new ThisExpr(t.Line, t.Col); }
         if (CheckId("true")) { var t = Eat(TokKind.Id); return new BoolExpr(true, t.Line, t.Col); }
         if (CheckId("false")) { var t = Eat(TokKind.Id); return new BoolExpr(false, t.Line, t.Col); }

@@ -39,6 +39,7 @@ public sealed record NullExpr(int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record UnaryExpr(string Op, Expr Inner, int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record MemberExpr(Expr Object, string Name, int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record IndexExpr(Expr Object, Expr Index, int Line = 1, int Col = 1) : Expr(Line, Col);
+public sealed record FromEndExpr(Expr Inner, int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record CallExpr(Expr Callee, List<Expr> Args, int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record NewExpr(string Type, List<Expr> Args, int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record BinaryExpr(string Op, Expr Left, Expr Right, int Line = 1, int Col = 1) : Expr(Line, Col);
