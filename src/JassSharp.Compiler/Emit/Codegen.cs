@@ -572,12 +572,12 @@ end
     {
         if (m.Name == "Length")
         {
-            var recv = EmitExpr(m.Object);
+            var expr = EmitExpr(m.Object);
             var t = RecvType(m.Object);
             if (t == "string")
-                return $"string.len({recv})";
+                return $"string.len({expr})";
             // array / List
-            return $"#{recv}";
+            return $"#{expr}";
         }
 
         // Built-in J.Units.XXX / J.Skills.XXX rawcode constants
@@ -609,40 +609,44 @@ end
 
     private string EmitCall(CallExpr c)
     {
-        if (c.Callee is MemberExpr mem && RecvType(mem.Object) == "List")
+        // List methods
+        if (c.Callee is MemberExpr listMem && RecvType(listMem.Object) == "List")
         {
-            var recv = EmitExpr(mem.Object);
-            var args = c.Args.Select(EmitExpr).ToList();
-            return mem.Name switch
+            var listRecv = EmitExpr(listMem.Object);
+            var listArgs = c.Args.Select(EmitExpr).ToList();
+            return listMem.Name switch
             {
-                "Add" => $"table.insert({recv}, {args[0]})",
-                "Remove" => $"__list_remove({recv}, {args[0]})",   // хелпер ниже
-                "IndexOf" => $"__list_indexof({recv}, {args[0]})",
-                "Clear" => $"for i = #{recv}, 1, -1 do {recv}[i] = nil end",
-                _ => throw new NotSupportedException($"List.{mem.Name}")
+                "Add" => $"table.insert({listRecv}, {listArgs[0]})",
+                "Remove" => $"__list_remove({listRecv}, {listArgs[0]})",
+                "IndexOf" => $"__list_indexof({listRecv}, {listArgs[0]})",
+                "Clear" => $"for __i = #{listRecv}, 1, -1 do {listRecv}[__i] = nil end",
+                _ => throw new NotSupportedException($"List.{listMem.Name}")
             };
         }
-        if (c.Callee is MemberExpr mem && mem.Name == "ToString" && c.Args.Count == 0)
+
+        // ToString
+        if (c.Callee is MemberExpr toStrMem && toStrMem.Name == "ToString" && c.Args.Count == 0)
         {
-            // прямое Colors.Red.ToString() → "Red"
-            if (mem.Object is MemberExpr inner && inner.Object is NameExpr enName &&
+            if (toStrMem.Object is MemberExpr inner && inner.Object is NameExpr enName &&
                 _enums.TryGetValue(enName.Name, out var en) &&
                 en.Members.Any(m => m.Name == inner.Name))
             {
                 return $"\"{inner.Name}\"";
             }
 
-            // переменная enum-типа: c.ToString() → Colors_ToString(c)
-            var t = InferType(mem.Object);
+            var t = InferType(toStrMem.Object);
             if (t is not null && _enums.ContainsKey(t))
-                return $"{t}_ToString({EmitExpr(mem.Object)})";
+                return $"{t}_ToString({EmitExpr(toStrMem.Object)})";
         }
+
+        // Print
         if (c.Callee is NameExpr id && id.Name == "Print")
         {
             var parts = c.Args.Select(ToStringExpr).ToList();
             var msg = parts.Count == 0 ? "\"\"" : string.Join(" .. ", parts);
             return $"BJDebugMsg({msg})";
         }
+
         return EmitNormalCall(c);
     }
 
@@ -679,25 +683,26 @@ end
         var obj = EmitExpr(ix.Object);
         var t = RecvType(ix.Object);
 
-        // строка
+        // string
         if (t == "string")
         {
-            if (ix.Index is FromEndExpr fe)
+            if (ix.Index is FromEndExpr feStr)
             {
-                var k = EmitExpr(fe.Inner);
-                return $"string.sub({obj}, -{k}, -{k})";
+                var kStr = EmitExpr(feStr.Inner);
+                return $"string.sub({obj}, -{kStr}, -{kStr})";
             }
-            var i = EmitExpr(ix.Index);
-            return $"string.sub({obj}, {i} + 1, {i} + 1)";  // 0-based
+            var idxStr = EmitExpr(ix.Index);
+            return $"string.sub({obj}, {idxStr} + 1, {idxStr} + 1)";
         }
 
-        if (ix.Index is FromEndExpr fe2)
+        // array / List
+        if (ix.Index is FromEndExpr fe)
         {
-            var k = EmitExpr(fe2.Inner);
+            var k = EmitExpr(fe.Inner);
             return $"{obj}[#{obj} - {k} + 1]";
         }
-        var i = EmitExpr(ix.Index);
-        return $"{obj}[{i} + 1]";
+        var idx = EmitExpr(ix.Index);
+        return $"{obj}[{idx} + 1]";
     }
 
     private string CodeArg(string method, int index, Expr arg)
