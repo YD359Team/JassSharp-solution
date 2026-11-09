@@ -183,6 +183,28 @@ public sealed class Codegen
             else
                 Line($"constant integer {en.Name}_{m.Name} = {value}");
         }
+
+        // ToString helper
+        if (_lua)
+        {
+            Line($"function {en.Name}_ToString(v)");
+            _indent++;
+            foreach (var m in en.Members)
+                Line($"if v == {en.Name}_{m.Name} then return \"{m.Name}\" end");
+            Line("return \"?\"");
+            _indent--;
+            Line("end");
+        }
+        else
+        {
+            Line($"function {en.Name}_ToString takes integer v returns string");
+            _indent++;
+            foreach (var m in en.Members)
+                Line($"if v == {en.Name}_{m.Name} then return \"{m.Name}\" endif");
+            Line("return \"?\"");
+            _indent--;
+            Line("endfunction");
+        }
         Line("");
     }
 
@@ -520,6 +542,21 @@ public sealed class Codegen
 
     private string EmitCall(CallExpr c)
     {
+        if (c.Callee is MemberExpr mem && mem.Name == "ToString" && c.Args.Count == 0)
+        {
+            // прямое Colors.Red.ToString() → "Red"
+            if (mem.Object is MemberExpr inner && inner.Object is NameExpr enName &&
+                _enums.TryGetValue(enName.Name, out var en) &&
+                en.Members.Any(m => m.Name == inner.Name))
+            {
+                return $"\"{inner.Name}\"";
+            }
+
+            // переменная enum-типа: c.ToString() → Colors_ToString(c)
+            var t = InferType(mem.Object);
+            if (t is not null && _enums.ContainsKey(t))
+                return $"{t}_ToString({EmitExpr(mem.Object)})";
+        }
         if (c.Callee is NameExpr id && id.Name == "Print")
         {
             var parts = c.Args.Select(ToStringExpr).ToList();
