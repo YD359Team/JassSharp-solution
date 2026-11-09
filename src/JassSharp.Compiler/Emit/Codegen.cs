@@ -525,6 +525,18 @@ public sealed class Codegen
 
     private string EmitMember(MemberExpr m)
     {
+        // Built-in J.Units.XXX / J.Skills.XXX rawcode constants
+        if (m.Object is MemberExpr mid && mid.Object is NameExpr j && j.Name == "J")
+        {
+            string? code = null;
+            if (mid.Name == "Units" && StandardRawcodes.Units.TryGetValue(m.Name, out var ucode))
+                code = ucode;
+            else if (mid.Name == "Skills" && StandardRawcodes.Skills.TryGetValue(m.Name, out var acode))
+                code = acode;
+            if (code is not null)
+                return _lua ? Rawcode.Pack(code).ToString() : $"'{code}'";
+        }
+
         // Enum.Member → Enum_Member
         if (m.Object is NameExpr ne && _enums.TryGetValue(ne.Name, out var en))
         {
