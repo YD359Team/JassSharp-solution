@@ -38,7 +38,7 @@ public static class Checker
     private static bool Known(string name, HashSet<string> fns, HashSet<string> consts, HashSet<string> classes, HashSet<string> fields) =>
         fns.Contains(name) || consts.Contains(name) || classes.Contains(name) || fields.Contains(name)
         || NativeCatalog.Natives.Contains(name) || NativeCatalog.Constants.Contains(name)
-        || name.StartsWith("BJ", StringComparison.Ordinal);
+        || name.StartsWith("BJ", StringComparison.Ordinal) || name == "J";
 
     private static string? InferType(Syntax.Expr e, Dictionary<string, string> types)
     {
