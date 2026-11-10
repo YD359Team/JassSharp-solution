@@ -1,4 +1,4 @@
-﻿using JassSharp.Runtime;
+using JassSharp.Runtime;
 using JassSharp.Syntax;
 
 namespace JassSharp.Emit;
@@ -494,11 +494,93 @@ end
         NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
         ThisExpr => _className,
         NewExpr n => n.Type,
-        NumExpr => "int",
+        NumExpr n => IsFloatingLiteral(n.Text) ? "float" : "int",
         StrExpr => "string",
         BoolExpr => "bool",
+        UnaryExpr u when u.Op == "!" => "bool",
+        UnaryExpr u => InferType(u.Inner),
+        BinaryExpr b => InferBinaryType(b),
+        MemberExpr m => InferMemberType(m),
+        CallExpr c => InferCallType(c),
+        IndexExpr ix when InferType(ix.Object) == "string" => "string",
         _ => null
     };
+
+    private static bool IsFloatingLiteral(string text) =>
+        text.Contains('.') || text.Contains('e') || text.Contains('E');
+
+    private string? InferBinaryType(BinaryExpr expression)
+    {
+        if (expression.Op is "==" or "!=" or "<" or ">" or "<=" or ">=" or "&&" or "||")
+            return "bool";
+
+        if (expression.Op == "+" &&
+            (InferType(expression.Left) == "string" || InferType(expression.Right) == "string"))
+            return "string";
+
+        var leftType = InferType(expression.Left);
+        var rightType = InferType(expression.Right);
+
+        if (leftType == "float" || rightType == "float")
+            return "float";
+
+        if (leftType == "int" && rightType == "int")
+            return "int";
+
+        return null;
+    }
+
+    private string? InferMemberType(MemberExpr expression)
+    {
+        var receiverType = RecvType(expression.Object);
+        if (receiverType is null)
+            return null;
+
+        var member = NativeTable.Find(receiverType, expression.Name);
+        return member is null ? null : GetNativeReturnType(member.Read);
+    }
+
+    private string? InferCallType(CallExpr expression)
+    {
+        if (expression.Callee is NameExpr name)
+        {
+            if (_methods.TryGetValue(name.Name, out var function))
+                return function.ReturnType;
+
+            if (NativeSigs.Map.TryGetValue(name.Name, out var native))
+                return native.ReturnType;
+
+            return null;
+        }
+
+        if (expression.Callee is MemberExpr member)
+        {
+            var receiverType = RecvType(member.Object);
+            if (receiverType is null)
+                return null;
+
+            if (_methods.TryGetValue(receiverType + "." + member.Name, out var method))
+                return method.ReturnType;
+
+            var nativeMember = NativeTable.Find(receiverType, member.Name);
+            if (nativeMember?.Kind == MemberKind.Method)
+                return GetNativeReturnType(nativeMember.Read);
+        }
+
+        return null;
+    }
+
+    private static string? GetNativeReturnType(string nativeExpression)
+    {
+        var openParen = nativeExpression.IndexOf('(');
+        var nativeName = openParen >= 0
+            ? nativeExpression[..openParen].Trim()
+            : nativeExpression.Trim();
+
+        return NativeSigs.Map.TryGetValue(nativeName, out var native)
+            ? native.ReturnType
+            : null;
+    }
 
     private string EmitExpr(Expr e) => e switch
     {
@@ -673,8 +755,8 @@ end
         ThisExpr => _className,
         NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
         NewExpr n => n.Type,
-        CallExpr { Callee: MemberExpr mem } call when RecvType(mem.Object) is { } rt &&
-            NativeTable.Find(rt, mem.Name) is { Kind: MemberKind.Method } => rt,
+        MemberExpr m => InferMemberType(m),
+        CallExpr c => InferCallType(c),
         _ => null,
     };
 
