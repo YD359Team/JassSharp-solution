@@ -3,25 +3,75 @@
   "name": "JASS#",
   "scopeName": "source.jasssharp",
   "patterns": [
-    { "include": "#comment" },
-    { "include": "#rawcode" },
-    { "include": "#string" },
-    { "include": "#keyword" },
-    { "include": "#type" },
-    { "include": "#native" },
-    { "include": "#constant" },
-    { "include": "#number" },
-    { "include": "#operator" }
+    {
+      "include": "#preprocessor"
+    },
+    {
+      "include": "#comment"
+    },
+    {
+      "include": "#rawcode"
+    },
+    {
+      "include": "#string"
+    },
+    {
+      "include": "#attribute"
+    },
+    {
+      "include": "#declaration"
+    },
+    {
+      "include": "#keyword"
+    },
+    {
+      "include": "#type"
+    },
+    {
+      "include": "#constant"
+    },
+    {
+      "include": "#function"
+    },
+    {
+      "include": "#number"
+    },
+    {
+      "include": "#operator"
+    },
+    {
+      "include": "#punctuation"
+    }
   ],
   "repository": {
+    "preprocessor": {
+      "patterns": [
+        {
+          "name": "meta.preprocessor.jasssharp",
+          "match": "^\\s*#(if|else|elseif|endif|define|region|endregion)\\b.*$",
+          "captures": {
+            "1": {
+              "name": "keyword.control.directive.jasssharp"
+            }
+          }
+        }
+      ]
+    },
     "comment": {
       "patterns": [
-        { "name": "comment.line.double-slash.jasssharp", "match": "//.*$" },
-        { "name": "comment.block.jasssharp", "begin": "/\\*", "end": "\\*/" }
+        {
+          "name": "comment.line.double-slash.jasssharp",
+          "match": "//.*$"
+        },
+        {
+          "name": "comment.block.jasssharp",
+          "begin": "/\\*",
+          "end": "\\*/"
+        }
       ]
     },
     "rawcode": {
-      "name": "constant.numeric.rawcode.jasssharp",
+      "name": "constant.other.rawcode.jasssharp",
       "match": "'[A-Za-z0-9_]{1,4}'"
     },
     "string": {
@@ -29,32 +79,89 @@
       "begin": "\"",
       "end": "\"",
       "patterns": [
-        { "name": "constant.character.escape.jasssharp", "match": "\\\\." }
+        {
+          "name": "constant.character.escape.jasssharp",
+          "match": "\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4})"
+        }
+      ]
+    },
+    "attribute": {
+      "name": "storage.type.annotation.jasssharp",
+      "match": "\\[[A-Za-z_]\\w*(?:\\([^]]*\\))?\\]"
+    },
+    "declaration": {
+      "patterns": [
+        {
+          "name": "meta.class.jasssharp",
+          "begin": "\\b(class)\\s+([A-Za-z_]\\w*)",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.type.class.jasssharp"
+            },
+            "2": {
+              "name": "entity.name.type.class.jasssharp"
+            }
+          },
+          "end": "(?=\\{)",
+          "patterns": []
+        },
+        {
+          "name": "meta.function.jasssharp",
+          "match": "\\b([A-Za-z_]\\w*)\\s+([A-Za-z_]\\w*)\\s*(?=\\()",
+          "captures": {
+            "1": {
+              "name": "storage.type.return.jasssharp"
+            },
+            "2": {
+              "name": "entity.name.function.jasssharp"
+            }
+          }
+        }
       ]
     },
     "keyword": {
       "name": "keyword.control.jasssharp",
-      "match": "\\b(namespace|using|class|const|public|private|if|else|return|new|while|for|this)\\b"
+      "match": "\\b(namespace|using|class|enum|const|public|private|static|if|else|while|for|return|break|continue|new|this|in|is|as|get|set)\\b"
     },
     "type": {
       "name": "storage.type.jasssharp",
-      "match": "\\b(void|int|float|bool|string|code|unit|player|trigger|timer|group|effect|item|location|rect|region|force|widget|handle|ability|destructable|sound|quest|leaderboard|multiboard|dialog|button|texttag|lightning|image|ubersplat|fogmodifier|hashtable|framehandle|agent)\\b"
-    },
-    "native": {
-      "name": "support.function.jasssharp",
-      "match": "\\b(Get|Set|Blz|Create|Trigger|Add|Remove|Kill|Issue|Display|BJ)[A-Z]\\w*\\b"
+      "match": "\\b(void|int|integer|float|real|bool|boolean|string|code|ability|agent|buff|button|camerafield|camerasetup|destructable|dialog|effect|event|force|group|handle|hashtable|image|item|leaderboard|lightning|location|multiboard|player|quest|race|rect|region|sound|texttag|timer|trigger|unit|widget|framehandle|fogmodifier|ubersplat|weathereffect)\\b"
     },
     "constant": {
-      "name": "constant.language.jasssharp",
-      "match": "\\b(true|false|null|[A-Z][A-Z0-9_]{2,})\\b"
+      "patterns": [
+        {
+          "name": "constant.language.jasssharp",
+          "match": "\\b(true|false|null)\\b"
+        },
+        {
+          "name": "constant.other.jasssharp",
+          "match": "\\b[A-Z][A-Z0-9_]{2,}\\b"
+        }
+      ]
+    },
+    "function": {
+      "patterns": [
+        {
+          "name": "support.function.library.jasssharp",
+          "match": "\\b(Get|Set|Blz|Create|Trigger|Add|Remove|Kill|Issue|Display|BJ)[A-Z]\\w*\\b"
+        },
+        {
+          "name": "support.function.jasssharp",
+          "match": "\\b[A-Za-z_]\\w*(?=\\s*\\()"
+        }
+      ]
     },
     "number": {
       "name": "constant.numeric.jasssharp",
-      "match": "\\b\\d+(\\.\\d+)?\\b"
+      "match": "\\b(?:0[xX][0-9A-Fa-f]+|\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?)\\b"
     },
     "operator": {
       "name": "keyword.operator.jasssharp",
-      "match": "==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|=>|[+\\-*/=<>!]"
+      "match": "\\+\\+|--|==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|%=|=>|[+\\-*/%=<>!&|?:]"
+    },
+    "punctuation": {
+      "name": "punctuation.separator.jasssharp",
+      "match": "[{}()\\[\\].,;]"
     }
   }
 }

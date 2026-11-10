@@ -1,355 +1,327 @@
 import * as vscode from "vscode";
-import { spawn } from "child_process";
+import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
-import { registerCompletions } from "./completion";
-import { registerHover } from "./hover";
-import { registerSignatureHelp } from "./signature";
+import { registerLanguageFeatures } from "./languageFeatures";
 
 let log: vscode.OutputChannel;
+const checkTimers = new Map<string, NodeJS.Timeout>();
 
 export function activate(context: vscode.ExtensionContext) {
-  log = vscode.window.createOutputChannel("JASS#");
-  context.subscriptions.push(log);
+    log = vscode.window.createOutputChannel("JASS#");
+    context.subscriptions.push(log);
 
-  const diags = vscode.languages.createDiagnosticCollection("jasssharp");
-  context.subscriptions.push(diags);
+    const diagnostics = vscode.languages.createDiagnosticCollection("jasssharp");
+    context.subscriptions.push(diagnostics);
 
-  registerCompletions(context);
-  registerHover(context);
-  registerSignatureHelp(context);
+    registerLanguageFeatures(context);
 
-  const runBtn = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
-  runBtn.command = "jasssharp.runMap";
-  runBtn.text = "$(play) Run Map";
-  runBtn.tooltip = "JASS#: собрать и запустить карту";
-  context.subscriptions.push(runBtn);
+    const runButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    runButton.command = "jasssharp.runMap";
+    runButton.text = "$(play) Run Map";
+    runButton.tooltip = "JASS#: собрать и запустить карту";
+    context.subscriptions.push(runButton);
 
-  const editBtn = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
-  editBtn.command = "jasssharp.openEditor";
-  editBtn.text = "$(edit) Editor";
-  editBtn.tooltip = "JASS#: открыть карту в World Editor";
-  context.subscriptions.push(editBtn);
+    const editorButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 99);
+    editorButton.command = "jasssharp.openEditor";
+    editorButton.text = "$(edit) Editor";
+    editorButton.tooltip = "JASS#: открыть карту в World Editor";
+    context.subscriptions.push(editorButton);
 
-  const updateBtns = () => {
-    const ed = vscode.window.activeTextEditor;
-    if (ed?.document.languageId === "jasssharp") {
-      runBtn.show();
-      editBtn.show();
-    } else {
-      runBtn.hide();
-      editBtn.hide();
-    }
-  };
-  updateBtns();
-  context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(updateBtns));
+    const updateButtons = () => {
+        const editor = vscode.window.activeTextEditor;
+        if (editor?.document.languageId === "jasssharp") {
+            runButton.show();
+            editorButton.show();
+        } else {
+            runButton.hide();
+            editorButton.hide();
+        }
+    };
+    updateButtons();
+    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(updateButtons));
 
-  context.subscriptions.push(
-    vscode.commands.registerCommand("jasssharp.build", () => build("")),
-    vscode.commands.registerCommand("jasssharp.buildVjass", () => build("vjass")),
-    vscode.commands.registerCommand("jasssharp.buildLua", () => build("lua")),
-    vscode.commands.registerCommand("jasssharp.buildMap", () => mapBuild(false)),
-    vscode.commands.registerCommand("jasssharp.runMap", () => mapBuild(true)),
-    vscode.commands.registerCommand("jasssharp.openEditor", openEditor),
-    vscode.commands.registerCommand("jasssharp.packMap", packMap)
-  );
-
-  context.subscriptions.push(
-    vscode.workspace.onDidOpenTextDocument((d) => check(d, diags)),
-    vscode.workspace.onDidSaveTextDocument((d) => check(d, diags)),
-    vscode.workspace.onDidChangeTextDocument((e) => {
-      if (e.document.languageId === "jasssharp") debounce(() => check(e.document, diags));
-    })
+    context.subscriptions.push(
+        vscode.commands.registerCommand("jasssharp.build", () => build("")),
+        vscode.commands.registerCommand("jasssharp.buildVjass", () => build("vjass")),
+        vscode.commands.registerCommand("jasssharp.buildLua", () => build("lua")),
+        vscode.commands.registerCommand("jasssharp.buildMap", () => mapBuild(false)),
+        vscode.commands.registerCommand("jasssharp.runMap", () => mapBuild(true)),
+        vscode.commands.registerCommand("jasssharp.openEditor", openEditor),
+        vscode.commands.registerCommand("jasssharp.packMap", packMap)
     );
 
     context.subscriptions.push(
-        vscode.languages.registerOnTypeFormattingEditProvider(
-            "jasssharp",
-            {
-                provideOnTypeFormattingEdits(doc, pos, ch) {
-                    if (ch !== "{") return [];
-                    const line = doc.lineAt(pos.line);
-                    const text = line.text;
-                    const before = text.slice(0, pos.character - 1).trimEnd();
-                    if (before.length === 0) return []; // already alone
-
-                    const indent = text.match(/^(\s*)/)?.[1] ?? "";
-                    const edits: vscode.TextEdit[] = [];
-
-                    // replace "something {" with "something\n{"
-                    const range = new vscode.Range(pos.line, 0, pos.line, text.length);
-                    const newText = indent + before + "\n" + indent + "{";
-                    edits.push(vscode.TextEdit.replace(range, newText));
-                    return edits;
-                },
-            },
-            "{"
-        )
+        vscode.workspace.onDidOpenTextDocument(document => scheduleCheck(document, diagnostics)),
+        vscode.workspace.onDidSaveTextDocument(document => scheduleCheck(document, diagnostics)),
+        vscode.workspace.onDidChangeTextDocument(event => {
+            if (event.document.languageId === "jasssharp" && event.document.isDirty)
+                diagnostics.delete(event.document.uri); // The CLI checks saved source, not an unsaved editor buffer.
+        })
     );
 
-  for (const d of vscode.workspace.textDocuments) check(d, diags);
+    for (const document of vscode.workspace.textDocuments) scheduleCheck(document, diagnostics);
 }
 
-function info(msg: string) {
-  log.appendLine(`[${new Date().toLocaleTimeString()}] ${msg}`);
+function info(message: string): void {
+    log.appendLine(`[${new Date().toLocaleTimeString()}] ${message}`);
 }
 
-function compilerCmd(): string {
-  const cfg = vscode.workspace.getConfiguration("jasssharp");
-  const configured = cfg.get<string>("compilerPath")?.trim() ?? "";
-  return configured || "jasssharp";
+function compilerPath(): string {
+    const configured = vscode.workspace.getConfiguration("jasssharp").get<string>("compilerPath")?.trim().replace(/^"|"$/g, "") ?? "";
+    return configured || "jasssharp";
+}
+
+function compilerInvocation(args: string[]): { command: string; args: string[] } {
+    const executable = compilerPath();
+    if (executable.toLowerCase().endsWith(".dll"))
+        return { command: "dotnet", args: [executable, ...args] };
+    return { command: executable, args };
+}
+
+function spawnCompiler(args: string[], options: { cwd?: string; env?: NodeJS.ProcessEnv } = {}): ChildProcessWithoutNullStreams {
+    const invocation = compilerInvocation(args);
+    return spawn(invocation.command, invocation.args, { cwd: options.cwd, env: options.env, shell: false });
 }
 
 function runCompiler(args: string[], cwd: string): Promise<{ code: number; out: string; err: string }> {
-  return new Promise((resolve) => {
-    const child = spawn(compilerCmd(), args, { cwd, shell: false });
-    let out = "";
-    let err = "";
-    child.stdout.on("data", (d) => (out += d.toString()));
-    child.stderr.on("data", (d) => (err += d.toString()));
-    child.on("error", (e) => resolve({ code: -1, out: "", err: e.message }));
-    child.on("close", (code) => resolve({ code: code ?? 1, out, err }));
-  });
+    return new Promise(resolve => {
+        const child = spawnCompiler(args, { cwd });
+        let stdout = "";
+        let stderr = "";
+        let settled = false;
+        child.stdout.on("data", data => stdout += data.toString());
+        child.stderr.on("data", data => stderr += data.toString());
+        child.on("error", error => {
+            if (settled) return;
+            settled = true;
+            resolve({ code: -1, out: stdout, err: error.message });
+        });
+        child.on("close", code => {
+            if (settled) return;
+            settled = true;
+            resolve({ code: code ?? 1, out: stdout, err: stderr });
+        });
+    });
 }
 
-async function check(doc: vscode.TextDocument, diags: vscode.DiagnosticCollection) {
-  if (doc.languageId !== "jasssharp" || doc.uri.scheme !== "file") return;
-  if (doc.isDirty) await doc.save();
-  const res = await runCompiler(["check", doc.fileName], path.dirname(doc.fileName));
-  if (res.code === -1) {
-    diags.set(doc.uri, [
-      new vscode.Diagnostic(
-        new vscode.Range(0, 0, 0, 1),
-        `Не удалось запустить компилятор (${compilerCmd()}). Укажите jasssharp.compilerPath. ${res.err}`,
-        vscode.DiagnosticSeverity.Error
-      ),
-    ]);
-    return;
-  }
-  const list: vscode.Diagnostic[] = [];
-  try {
-    const raw = JSON.parse(res.out || "[]") as { Line: number; Col: number; Severity: string; Message: string }[];
-    for (const d of raw) {
-      const line = Math.max(0, (d.Line || 1) - 1);
-      const col = Math.max(0, (d.Col || 1) - 1);
-      const sev = d.Severity === "error" ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Warning;
-      list.push(new vscode.Diagnostic(new vscode.Range(line, col, line, col + 1), d.Message, sev));
-    }
-  } catch {
-    if (res.err.trim()) {
-      list.push(new vscode.Diagnostic(new vscode.Range(0, 0, 0, 1), res.err.trim(), vscode.DiagnosticSeverity.Error));
-    }
-  }
-  diags.set(doc.uri, list);
+function scheduleCheck(document: vscode.TextDocument, diagnostics: vscode.DiagnosticCollection): void {
+    if (document.languageId !== "jasssharp" || document.uri.scheme !== "file") return;
+    const key = document.uri.toString();
+    const existing = checkTimers.get(key);
+    if (existing) clearTimeout(existing);
+    const timer = setTimeout(() => {
+        checkTimers.delete(key);
+        void check(document, diagnostics);
+    }, 250);
+    checkTimers.set(key, timer);
 }
 
-async function build(forced: string) {
-  const editor = vscode.window.activeTextEditor;
-  if (!editor || editor.document.languageId !== "jasssharp") {
-    vscode.window.showWarningMessage("Откройте файл .w3js");
-    return;
-  }
-  const doc = editor.document;
-  if (doc.isDirty) await doc.save();
-  const cfg = vscode.workspace.getConfiguration("jasssharp");
-  const target = forced || cfg.get<string>("defaultTarget") || "both";
-  const args = ["build", doc.fileName, "--target", target];
+async function check(document: vscode.TextDocument, diagnostics: vscode.DiagnosticCollection): Promise<void> {
+    if (document.languageId !== "jasssharp" || document.uri.scheme !== "file" || document.isDirty) return;
+    const version = document.version;
+    const result = await runCompiler(["check", document.fileName], path.dirname(document.fileName));
+    if (document.isClosed || document.version !== version || document.isDirty) return;
 
-  await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: `JASS# → ${target}` },
-    async () => {
-      const res = await runCompiler(args, path.dirname(doc.fileName));
-      if (res.code === -1) {
-        vscode.window.showErrorMessage(
-          `Не удалось запустить компилятор (${compilerCmd()}). Укажите jasssharp.compilerPath. ${res.err}`
-        );
+    if (result.code === -1) {
+        diagnostics.set(document.uri, [new vscode.Diagnostic(
+            new vscode.Range(0, 0, 0, 1),
+            `Не удалось запустить компилятор (${compilerPath()}). Укажите jasssharp.compilerPath. ${result.err}`,
+            vscode.DiagnosticSeverity.Error
+        )]);
         return;
-      }
-      if (res.code === 0) {
-        const files = res.out.trim().split(/\r?\n/).filter(Boolean);
-        vscode.window.showInformationMessage(
-          files.length ? `Собрано: ${files.map((f) => path.basename(f)).join(", ")}` : "Собрано"
-        );
-      } else {
-        vscode.window.showErrorMessage(res.err.trim() || `компилятор завершился с кодом ${res.code}`);
-      }
     }
-  );
+
+    const items: vscode.Diagnostic[] = [];
+    try {
+        const raw = JSON.parse(result.out || "[]") as Array<{ Line: number; Col: number; Severity: string; Message: string }>;
+        for (const diagnostic of raw) {
+            const line = Math.min(document.lineCount - 1, Math.max(0, (diagnostic.Line || 1) - 1));
+            const column = Math.min(document.lineAt(line).text.length, Math.max(0, (diagnostic.Col || 1) - 1));
+            const severity = diagnostic.Severity === "error" ? vscode.DiagnosticSeverity.Error : vscode.DiagnosticSeverity.Warning;
+            const end = Math.min(document.lineAt(line).text.length, column + 1);
+            const range = new vscode.Range(line, column, line, Math.max(column, end));
+            items.push(new vscode.Diagnostic(range, diagnostic.Message, severity));
+        }
+    } catch {
+        const message = result.err.trim() || result.out.trim();
+        if (message) items.push(new vscode.Diagnostic(new vscode.Range(0, 0, 0, 1), message, vscode.DiagnosticSeverity.Error));
+    }
+    diagnostics.set(document.uri, items);
+}
+
+async function build(forcedTarget: string): Promise<void> {
+    const editor = vscode.window.activeTextEditor;
+    if (!editor || editor.document.languageId !== "jasssharp") {
+        vscode.window.showWarningMessage("Откройте файл .w3js");
+        return;
+    }
+    const document = editor.document;
+    if (document.isDirty && !(await document.save())) return;
+
+    const config = vscode.workspace.getConfiguration("jasssharp");
+    const target = forcedTarget || config.get<string>("defaultTarget") || "both";
+    await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: `JASS# → ${target}` },
+        async () => {
+            const result = await runCompiler(["build", document.fileName, "--target", target], path.dirname(document.fileName));
+            if (result.code === -1) {
+                vscode.window.showErrorMessage(`Не удалось запустить компилятор (${compilerPath()}). Укажите jasssharp.compilerPath. ${result.err}`);
+            } else if (result.code === 0) {
+                const files = result.out.trim().split(/\r?\n/).filter(Boolean);
+                vscode.window.showInformationMessage(files.length ? `Собрано: ${files.map(file => path.basename(file)).join(", ")}` : "Собрано");
+            } else {
+                vscode.window.showErrorMessage(result.err.trim() || `Компилятор завершился с кодом ${result.code}`);
+            }
+        }
+    );
 }
 
 function projectRoot(): string | undefined {
-  return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 
 function readProject(): { map?: string; game?: string } | undefined {
-  const root = projectRoot();
-  if (!root) return;
-  const cfgName = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile") || "jasssharp.json";
-  const cfgPath = path.join(root, cfgName);
-  if (!fs.existsSync(cfgPath)) return;
-  try {
-    return JSON.parse(fs.readFileSync(cfgPath, "utf8"));
-  } catch {
-    return;
-  }
+    const root = projectRoot();
+    if (!root) return undefined;
+    const fileName = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile") || "jasssharp.json";
+    const filePath = path.join(root, fileName);
+    if (!fs.existsSync(filePath)) return undefined;
+    try { return JSON.parse(fs.readFileSync(filePath, "utf8")) as { map?: string; game?: string }; }
+    catch { return undefined; }
 }
 
 function mapPath(): string | undefined {
-  const root = projectRoot();
-  const proj = readProject();
-  if (!root || !proj?.map) return;
-  return path.isAbsolute(proj.map) ? proj.map : path.join(root, proj.map);
+    const root = projectRoot();
+    const project = readProject();
+    if (!root || !project?.map) return undefined;
+    return path.isAbsolute(project.map) ? project.map : path.join(root, project.map);
 }
 
 function findEditor(): string | undefined {
-  const cfg = vscode.workspace.getConfiguration("jasssharp");
-  const configured = cfg.get<string>("editorPath")?.trim();
-  if (configured && fs.existsSync(configured)) return configured;
+    const config = vscode.workspace.getConfiguration("jasssharp");
+    const configured = config.get<string>("editorPath")?.trim();
+    if (configured && fs.existsSync(configured)) return configured;
 
-  const game = cfg.get<string>("gamePath")?.trim();
-  if (game) {
-    const dir = path.dirname(game);
-    const candidates = [
-      path.join(dir, "World Editor.exe"),
-      path.join(dir, "worldedit.exe"),
-      path.join(path.dirname(dir), "World Editor.exe"),
-    ];
-    for (const c of candidates) if (fs.existsSync(c)) return c;
-  }
-  return;
+    const game = config.get<string>("gamePath")?.trim();
+    if (game) {
+        const directory = path.dirname(game);
+        const candidates = [
+            path.join(directory, "World Editor.exe"),
+            path.join(directory, "worldedit.exe"),
+            path.join(path.dirname(directory), "World Editor.exe")
+        ];
+        for (const candidate of candidates) if (fs.existsSync(candidate)) return candidate;
+    }
+    return undefined;
 }
 
-async function openEditor() {
-  log.show(true);
-  info("=== Open Editor ===");
-  const map = mapPath();
-  info(`map: ${map ?? "(not found)"}`);
-  if (!map) {
-    vscode.window.showErrorMessage("Не найдена карта в jasssharp.json");
-    return;
-  }
-  const editor = findEditor();
-  info(`editor: ${editor ?? "(not found)"}`);
-  if (!editor) {
-    vscode.window.showErrorMessage("Не найден World Editor.exe. Укажите jasssharp.editorPath");
-    return;
-  }
-  const args = ["-launch", "-loadfile", map];
-  info(`cmd: \"${editor}\" ${args.map((a) => `\"${a}\"`).join(" ")}`);
-  const child = spawn(editor, args, { detached: true, stdio: "ignore" });
-  child.on("error", (e) => info(`error: ${e.message}`));
-  child.unref();
-  info("started");
+async function openEditor(): Promise<void> {
+    log.show(true);
+    info("=== Open Editor ===");
+    const map = mapPath();
+    info(`map: ${map ?? "(not found)"}`);
+    if (!map) { vscode.window.showErrorMessage("Не найдена карта в jasssharp.json"); return; }
+    const editor = findEditor();
+    info(`editor: ${editor ?? "(not found)"}`);
+    if (!editor) { vscode.window.showErrorMessage("Не найден World Editor.exe. Укажите jasssharp.editorPath"); return; }
+
+    const args = ["-launch", "-loadfile", map];
+    info(`cmd: \"${editor}\" ${args.map(arg => `\"${arg}\"`).join(" ")}`);
+    const child = spawn(editor, args, { detached: true, stdio: "ignore" });
+    child.on("error", error => info(`error: ${error.message}`));
+    child.unref();
+    info("started");
 }
 
-async function packMap() {
-  log.show(true);
-  info("=== Pack Map ===");
-  const map = mapPath();
-  info(`map: ${map ?? "(none)"}`);
-  if (!map || !fs.existsSync(map) || !fs.statSync(map).isDirectory()) {
-    vscode.window.showErrorMessage("Карта должна быть папкой");
-    return;
-  }
-  const tool = vscode.workspace.getConfiguration("jasssharp").get<string>("mpqToolPath")?.trim();
-  info(`tool: ${tool ?? "(not set)"}`);
-  if (!tool || !fs.existsSync(tool)) {
-    vscode.window.showErrorMessage("Укажите jasssharp.mpqToolPath к mpqtool.exe");
-    return;
-  }
-  const out = map.replace(/[\\/]$/, "") + ".w3x";
-  info(`out: ${out}`);
-  await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: "JASS#: Pack Map" },
-    () =>
-      new Promise<void>((resolve) => {
-        const child = spawn(tool, ["new", map, out], { shell: false });
-        child.stdout.on("data", (d) => info(d.toString().trim()));
-        child.stderr.on("data", (d) => info("err: " + d.toString().trim()));
-        child.on("close", (code) => {
-          info(`code: ${code}`);
-          if (code === 0) vscode.window.showInformationMessage(`Упаковано: ${out}`);
-          else vscode.window.showErrorMessage(`code ${code}`);
-          resolve();
-        });
-        child.on("error", (e) => {
-          info(`error: ${e.message}`);
-          vscode.window.showErrorMessage(e.message);
-          resolve();
-        });
-      })
-  );
+async function packMap(): Promise<void> {
+    log.show(true);
+    info("=== Pack Map ===");
+    const map = mapPath();
+    info(`map: ${map ?? "(none)"}`);
+    if (!map || !fs.existsSync(map) || !fs.statSync(map).isDirectory()) {
+        vscode.window.showErrorMessage("Карта должна быть папкой");
+        return;
+    }
+    const tool = vscode.workspace.getConfiguration("jasssharp").get<string>("mpqToolPath")?.trim();
+    info(`tool: ${tool ?? "(not set)"}`);
+    if (!tool || !fs.existsSync(tool)) { vscode.window.showErrorMessage("Укажите jasssharp.mpqToolPath к mpqtool.exe"); return; }
+
+    const output = map.replace(/[\\/]$/, "") + ".w3x";
+    info(`out: ${output}`);
+    await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: "JASS#: Pack Map" },
+        () => new Promise<void>(resolve => {
+            const child = spawn(tool, ["new", map, output], { shell: false });
+            child.stdout.on("data", data => info(data.toString().trim()));
+            child.stderr.on("data", data => info(`err: ${data.toString().trim()}`));
+            child.on("close", code => {
+                info(`code: ${code}`);
+                if (code === 0) vscode.window.showInformationMessage(`Упаковано: ${output}`);
+                else vscode.window.showErrorMessage(`MPQ tool завершился с кодом ${code}`);
+                resolve();
+            });
+            child.on("error", error => {
+                info(`error: ${error.message}`);
+                vscode.window.showErrorMessage(error.message);
+                resolve();
+            });
+        })
+    );
 }
 
-async function mapBuild(run: boolean) {
-  log.show(true);
-  info(`=== ${run ? "Run Map" : "Build Map"} ===`);
-  const folder = vscode.workspace.workspaceFolders?.[0];
-  if (!folder) {
-    info("no workspace folder");
-    vscode.window.showWarningMessage("Откройте папку проекта с jasssharp.json");
-    return;
-  }
-  const root = folder.uri.fsPath;
-  info(`project: ${root}`);
-  const cfgName = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile") || "jasssharp.json";
-  const cfgPath = path.join(root, cfgName);
-  info(`config: ${cfgPath} exists=${fs.existsSync(cfgPath)}`);
-  if (!fs.existsSync(cfgPath)) {
-    vscode.window.showErrorMessage(`Нет ${cfgName} в корне рабочей папки`);
-    return;
-  }
-  const args = ["map", "--project", root];
-  if (run) args.push("--run");
+async function mapBuild(run: boolean): Promise<void> {
+    log.show(true);
+    info(`=== ${run ? "Run Map" : "Build Map"} ===`);
+    const folder = vscode.workspace.workspaceFolders?.[0];
+    if (!folder) {
+        info("no workspace folder");
+        vscode.window.showWarningMessage("Откройте папку проекта с jasssharp.json");
+        return;
+    }
 
-  const cfg = vscode.workspace.getConfiguration("jasssharp");
-  const game = cfg.get<string>("gamePath")?.trim();
-  const mpq = cfg.get<string>("mpqToolPath")?.trim();
-  const env = { ...process.env };
-  if (game) {
-    env.JASSSHARP_GAME = game;
-    info(`gamePath: ${game} exists=${fs.existsSync(game)}`);
-  } else {
-    info("gamePath: (not set, from jasssharp.json)");
-  }
-  if (mpq) {
-    env.JASSSHARP_MPQ = mpq;
-    info(`mpqTool: ${mpq} exists=${fs.existsSync(mpq)}`);
-  } else {
-    info("mpqTool: (not set)");
-  }
-  info(`cmd: ${compilerCmd()} ${args.join(" ")}`);
-  info(`cwd: ${root}`);
+    const root = folder.uri.fsPath;
+    info(`project: ${root}`);
+    const configName = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile") || "jasssharp.json";
+    const configPath = path.join(root, configName);
+    info(`config: ${configPath} exists=${fs.existsSync(configPath)}`);
+    if (!fs.existsSync(configPath)) { vscode.window.showErrorMessage(`Нет ${configName} в корне рабочей папки`); return; }
 
-  await vscode.window.withProgress(
-    { location: vscode.ProgressLocation.Notification, title: run ? "JASS#: Run Map" : "JASS#: Build Map" },
-    () =>
-      new Promise<void>((resolve) => {
-        const child = spawn(compilerCmd(), args, { cwd: root, shell: false, env });
-        child.stdout.on("data", (d) => info(d.toString().trimEnd()));
-        child.stderr.on("data", (d) => info("err: " + d.toString().trimEnd()));
-        child.on("error", (e) => {
-          info(`error: ${e.message}`);
-          vscode.window.showErrorMessage(`Не удалось запустить компилятор. ${e.message}`);
-          resolve();
-        });
-        child.on("close", (code) => {
-          info(`exit: ${code}`);
-          if (code === 0) {
-            vscode.window.showInformationMessage("Done");
-          } else {
-            vscode.window.showErrorMessage(`code ${code}`);
-          }
-          resolve();
-        });
-      })
-  );
+    const args = ["map", "--project", root];
+    if (run) args.push("--run");
+    const config = vscode.workspace.getConfiguration("jasssharp");
+    const game = config.get<string>("gamePath")?.trim();
+    const mpq = config.get<string>("mpqToolPath")?.trim();
+    const env: NodeJS.ProcessEnv = { ...process.env };
+    if (game) { env.JASSSHARP_GAME = game; info(`gamePath: ${game} exists=${fs.existsSync(game)}`); }
+    else info("gamePath: (not set, from jasssharp.json)");
+    if (mpq) { env.JASSSHARP_MPQ = mpq; info(`mpqTool: ${mpq} exists=${fs.existsSync(mpq)}`); }
+    else info("mpqTool: (not set)");
+    info(`cmd: ${compilerPath()} ${args.join(" ")}`);
+    info(`cwd: ${root}`);
+
+    await vscode.window.withProgress(
+        { location: vscode.ProgressLocation.Notification, title: run ? "JASS#: Run Map" : "JASS#: Build Map" },
+        () => new Promise<void>(resolve => {
+            const child = spawnCompiler(args, { cwd: root, env });
+            child.stdout.on("data", data => info(data.toString().trimEnd()));
+            child.stderr.on("data", data => info(`err: ${data.toString().trimEnd()}`));
+            child.on("error", error => {
+                info(`error: ${error.message}`);
+                vscode.window.showErrorMessage(`Не удалось запустить компилятор. ${error.message}`);
+                resolve();
+            });
+            child.on("close", code => {
+                info(`exit: ${code}`);
+                if (code === 0) vscode.window.showInformationMessage("Done");
+                else vscode.window.showErrorMessage(`Компилятор завершился с кодом ${code}`);
+                resolve();
+            });
+        })
+    );
 }
 
-let timer: NodeJS.Timeout | undefined;
-function debounce(fn: () => void) {
-  if (timer) clearTimeout(timer);
-  timer = setTimeout(fn, 400);
+export function deactivate(): void {
+    for (const timer of checkTimers.values()) clearTimeout(timer);
+    checkTimers.clear();
 }
-
-export function deactivate() {}

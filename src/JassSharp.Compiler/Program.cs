@@ -6,12 +6,13 @@ using JassSharp.Syntax;
 Console.OutputEncoding = Encoding.UTF8;
 Console.InputEncoding = Encoding.UTF8;
 
-if (args.Length < 2 || args[0] is not ("build" or "check" or "map"))
+if (args.Length < 2 || args[0] is not ("build" or "check" or "map" or "symbols"))
 {
     Console.Error.WriteLine("usage:");
     Console.Error.WriteLine("  jasssharp build <file.w3js> [--target vjass|lua|both]");
     Console.Error.WriteLine("  jasssharp check <file.w3js>");
     Console.Error.WriteLine("  jasssharp map [--project dir] [--config file.json] [--run]");
+    Console.Error.WriteLine("  jasssharp symbols <file.w3js> [--project dir]");
     return 1;
 }
 
