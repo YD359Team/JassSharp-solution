@@ -9,158 +9,534 @@ public static class Checker
 {
     public static List<Diagnostic> Check(NsUnit unit, string? file = null, IEnumerable<NsUnit>? imports = null)
     {
-        var diags = new List<Diagnostic>();
-        var classes = unit.Classes.Select(c => c.Name).ToHashSet(StringComparer.Ordinal);
-        var fns = unit.Functions.Select(f => f.Name).ToHashSet(StringComparer.Ordinal);
-        var consts = unit.Consts.Select(c => c.Name).ToHashSet(StringComparer.Ordinal);
-        var fields = unit.Fields.Select(f => f.Name).ToHashSet(StringComparer.Ordinal);
-
-        if (imports is not null)
-        {
-            foreach (var imp in imports)
-            {
-                foreach (var c in imp.Classes) classes.Add(c.Name);
-                foreach (var f in imp.Functions) fns.Add(f.Name);
-                foreach (var c in imp.Consts) consts.Add(c.Name);
-                foreach (var f in imp.Fields) fields.Add(f.Name);
-            }
-        }
-
-        foreach (var cls in unit.Classes)
-        {
-            if (cls.Ctor is not null) Walk(cls.Ctor.Body, cls.Ctor.Params, classes, fns, consts, fields, diags, file);
-            foreach (var m in cls.Methods) Walk(m.Body, m.Params, classes, fns, consts, fields, diags, file);
-        }
-        foreach (var fn in unit.Functions) Walk(fn.Body, fn.Params, classes, fns, consts, fields, diags, file);
-        return diags;
+        var analyzer = new Analyzer(unit, file, imports);
+        analyzer.Run();
+        return analyzer.Diagnostics;
     }
 
-    private static bool Known(string name, HashSet<string> fns, HashSet<string> consts, HashSet<string> classes, HashSet<string> fields) =>
-        fns.Contains(name) || consts.Contains(name) || classes.Contains(name) || fields.Contains(name)
-        || NativeCatalog.Natives.Contains(name) || NativeCatalog.Constants.Contains(name)
-        || name.StartsWith("BJ", StringComparison.Ordinal) || name == "J";
-
-    private static string? InferType(Syntax.Expr e, Dictionary<string, string> types)
+    private sealed class Analyzer
     {
-        return e switch
-        {
-            NameExpr n when types.TryGetValue(n.Name, out var t) => t,
-            CallExpr c when c.Callee is NameExpr id && NativeSigs.Map.TryGetValue(id.Name, out var sig) => sig.ReturnType,
-            NumExpr n => n.Text.Contains('.') || n.Text.Contains('e') || n.Text.Contains('E') ? "float" : "int",
-            BoolExpr => "bool",
-            StrExpr => "string",
-            RawExpr => "int",
-            _ => null
-        };
-    }
+        private readonly NsUnit _unit;
+        private readonly string? _file;
+        private readonly HashSet<string> _classes = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, FnDecl> _functions = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _globals = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, Dictionary<string, FnDecl>> _classMethods = new(StringComparer.Ordinal);
+        private readonly List<Dictionary<string, string>> _scopes = [];
+        private string? _currentClass;
+        private string _expectedReturnType = "void";
 
-    private static void Walk(List<Stmt> body, List<ParamDecl> ps, HashSet<string> classes, HashSet<string> fns, HashSet<string> consts, HashSet<string> fields, List<Diagnostic> diags, string? file)
-    {
-        var locals = ps.Select(p => p.Name).ToHashSet(StringComparer.Ordinal);
-        var types = ps.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
+        public List<Diagnostic> Diagnostics { get; } = [];
 
-        void Stmt(Stmt s)
+        public Analyzer(NsUnit unit, string? file, IEnumerable<NsUnit>? imports)
         {
-            switch (s)
+            _unit = unit;
+            _file = file;
+
+            AddUnit(unit);
+            if (imports is not null)
+                foreach (var imported in imports)
+                    AddUnit(imported);
+        }
+
+        private void AddUnit(NsUnit unit)
+        {
+            foreach (var cls in unit.Classes)
             {
-                case VarStmt v:
-                    locals.Add(v.Name);
-                    if (v.Init is not null)
+                _classes.Add(cls.Name);
+                if (!_classFields.ContainsKey(cls.Name))
+                    _classFields[cls.Name] = new Dictionary<string, string>(StringComparer.Ordinal);
+                if (!_classMethods.ContainsKey(cls.Name))
+                    _classMethods[cls.Name] = new Dictionary<string, FnDecl>(StringComparer.Ordinal);
+
+                foreach (var field in cls.Fields)
+                    _classFields[cls.Name][field.Name] = field.Type;
+                foreach (var method in cls.Methods)
+                    _classMethods[cls.Name][method.Name] = method;
+            }
+
+            foreach (var fn in unit.Functions)
+                _functions[fn.Name] = fn;
+
+            foreach (var field in unit.Fields)
+                _globals[field.Name] = field.Type;
+            foreach (var constant in unit.Consts)
+                _globals[constant.Name] = constant.Type;
+            foreach (var enumeration in unit.Enums)
+            {
+                foreach (var member in enumeration.Members)
+                    _globals[member.Name] = enumeration.Name;
+            }
+        }
+
+        public void Run()
+        {
+            foreach (var cls in _unit.Classes)
+            {
+                _currentClass = cls.Name;
+
+                if (cls.Ctor is not null)
+                    CheckFunction(cls.Ctor, cls.Name);
+                foreach (var method in cls.Methods)
+                    CheckFunction(method, cls.Name);
+            }
+
+            _currentClass = null;
+            foreach (var function in _unit.Functions)
+                CheckFunction(function, null);
+        }
+
+        private void CheckFunction(FnDecl function, string? className)
+        {
+            var previousClass = _currentClass;
+            var previousReturn = _expectedReturnType;
+            _currentClass = className;
+            _expectedReturnType = function.ReturnType;
+
+            PushScope();
+            foreach (var parameter in function.Params)
+                Declare(parameter.Name, parameter.Type, 1, 1, reportDuplicate: false);
+
+            CheckStatements(function.Body);
+            PopScope();
+
+            _currentClass = previousClass;
+            _expectedReturnType = previousReturn;
+        }
+
+        private void CheckStatements(IEnumerable<Stmt> statements)
+        {
+            foreach (var statement in statements)
+                CheckStatement(statement);
+        }
+
+        private void CheckStatement(Stmt statement)
+        {
+            switch (statement)
+            {
+                case VarStmt variable:
+                {
+                    if (variable.Init is not null)
                     {
-                        Expr(v.Init);
-                        var t = InferType(v.Init, types);
-                        if (t is not null) types[v.Name] = t;
+                        CheckExpression(variable.Init);
+                        var actual = InferType(variable.Init);
+                        if (actual is not null && !IsCompatible(actual, variable.Type))
+                            Add(variable.Line, variable.Col, "error",
+                                $"переменная {variable.Name}: ожидался тип {variable.Type}, получен {actual}");
+                    }
+
+                    Declare(variable.Name, variable.Type, variable.Line, variable.Col);
+                    break;
+                }
+
+                case AssignStmt assignment:
+                {
+                    CheckExpression(assignment.Target);
+                    CheckExpression(assignment.Value);
+
+                    var targetType = InferType(assignment.Target);
+                    var valueType = InferType(assignment.Value);
+                    if (targetType is not null && valueType is not null &&
+                        !IsCompatible(valueType, targetType))
+                    {
+                        Add(assignment.Value.Line, assignment.Value.Col, "error",
+                            $"несовместимое присваивание: ожидался тип {targetType}, получен {valueType}");
+                    }
+
+                    if (assignment.Target is not (NameExpr or MemberExpr or IndexExpr))
+                        Add(assignment.Target.Line, assignment.Target.Col, "error", "выражение не может быть целью присваивания");
+                    break;
+                }
+
+                case ExprStmt expression:
+                    CheckExpression(expression.Expr);
+                    break;
+
+                case ReturnStmt result:
+                    if (result.Expr is null)
+                    {
+                        if (_expectedReturnType != "void" && _expectedReturnType != "?")
+                            Add(1, 1, "error", $"ожидалось возвращаемое значение типа {_expectedReturnType}");
+                    }
+                    else
+                    {
+                        CheckExpression(result.Expr);
+                        var actual = InferType(result.Expr);
+                        if (_expectedReturnType == "void")
+                            Add(result.Expr.Line, result.Expr.Col, "error", "функция с типом void не должна возвращать значение");
+                        else if (_expectedReturnType != "?" && actual is not null && !IsCompatible(actual, _expectedReturnType))
+                            Add(result.Expr.Line, result.Expr.Col, "error",
+                                $"return: ожидался тип {_expectedReturnType}, получен {actual}");
                     }
                     break;
-                case AssignStmt a:
-                    Expr(a.Target); Expr(a.Value);
+
+                case IfStmt conditional:
+                    CheckCondition(conditional.Cond);
+                    PushScope();
+                    CheckStatements(conditional.Then);
+                    PopScope();
+                    if (conditional.Else is not null)
+                    {
+                        PushScope();
+                        CheckStatements(conditional.Else);
+                        PopScope();
+                    }
                     break;
-                case ExprStmt e: Expr(e.Expr); break;
-                case ReturnStmt r when r.Expr is not null: Expr(r.Expr); break;
-                case IfStmt i:
-                    Expr(i.Cond);
-                    foreach (var t in i.Then) Stmt(t);
-                    if (i.Else is not null) foreach (var t in i.Else) Stmt(t);
+
+                case WhileStmt loop:
+                    CheckCondition(loop.Cond);
+                    PushScope();
+                    CheckStatements(loop.Body);
+                    PopScope();
                     break;
-                case WhileStmt w:
-                    Expr(w.Cond);
-                    foreach (var t in w.Body) Stmt(t);
+
+                case ForStmt loop:
+                    PushScope();
+                    if (loop.Init is not null)
+                        CheckStatement(loop.Init);
+                    if (loop.Cond is not null)
+                        CheckCondition(loop.Cond);
+                    if (loop.Step is not null)
+                        CheckStatement(loop.Step);
+                    CheckStatements(loop.Body);
+                    PopScope();
                     break;
-                case ForStmt f:
-                    if (f.Init is not null) Stmt(f.Init);
-                    if (f.Cond is not null) Expr(f.Cond);
-                    if (f.Step is not null) Stmt(f.Step);
-                    foreach (var t in f.Body) Stmt(t);
+
+                case CondStmt conditional:
+                    // Compile-time conditional branches have independent lexical scopes.
+                    PushScope();
+                    CheckStatements(conditional.Then);
+                    PopScope();
+                    if (conditional.Else is not null)
+                    {
+                        PushScope();
+                        CheckStatements(conditional.Else);
+                        PopScope();
+                    }
                     break;
             }
         }
 
-        void Expr(Syntax.Expr e)
+        private void CheckCondition(Expr condition)
         {
-            switch (e)
+            CheckExpression(condition);
+            var type = InferType(condition);
+            if (type is not null && type != "bool")
+                Add(condition.Line, condition.Col, "error", $"условие должно иметь тип bool, получен {type}");
+        }
+
+        private void CheckExpression(Expr expression)
+        {
+            switch (expression)
             {
-                case CallExpr c when c.Callee is NameExpr id:
-                    if (!Known(id.Name, fns, consts, classes, fields))
-                        diags.Add(new Diagnostic(id.Line, id.Col, "warning", $"неизвестный вызов {id.Name}", file));
-                    else if (NativeSigs.Map.TryGetValue(id.Name, out var sig))
+                case CallExpr call:
+                    CheckCall(call);
+                    break;
+
+                case LambdaExpr lambda:
+                    PushScope();
+                    foreach (var parameter in lambda.Params)
+                        Declare(parameter.Name, parameter.Type, lambda.Line, lambda.Col, reportDuplicate: false);
+                    var previousReturn = _expectedReturnType;
+                    _expectedReturnType = "?";
+                    CheckStatements(lambda.Body);
+                    _expectedReturnType = previousReturn;
+                    PopScope();
+                    break;
+
+                case NameExpr name:
+                    if (!TryLookup(name.Name, out _) && !IsKnownSymbol(name.Name))
+                        Add(name.Line, name.Col, "warning", $"неизвестное имя {name.Name}");
+                    break;
+
+                case ThisExpr self:
+                    if (_currentClass is null)
+                        Add(self.Line, self.Col, "error", "this доступен только внутри метода или конструктора");
+                    break;
+
+                case NewExpr creation:
+                    if (!_classes.Contains(creation.Type) &&
+                        !NativeTable.Constructors.ContainsKey(creation.Type) &&
+                        !NativeCatalog.Types.Contains(creation.Type))
                     {
-                        if (c.Args.Count != sig.Params.Length)
-                            diags.Add(new Diagnostic(id.Line, id.Col, "error", $"{id.Name}: ожидалось {sig.Params.Length} аргументов, получено {c.Args.Count}", file));
-                        else
-                        {
-                            for (var i = 0; i < c.Args.Count; i++)
-                            {
-                                var arg = c.Args[i];
-                                var expected = sig.Params[i];
-                                var actual = InferType(arg, types);
-                                if (actual is not null && actual != expected && !IsCompatible(actual, expected))
-                                    diags.Add(new Diagnostic(arg.Line, arg.Col, "error", $"{id.Name}: аргумент {i + 1} ожидался {expected}, получен {actual}", file));
-                            }
-                        }
+                        Add(creation.Line, creation.Col, "warning", $"неизвестный тип {creation.Type}");
                     }
-                    foreach (var a in c.Args) Expr(a);
+
+                    foreach (var argument in creation.Args)
+                        CheckExpression(argument);
                     break;
-                case LambdaExpr l:
-                    var savedLocals = locals;
-                    var savedTypes = types;
-                    locals = new HashSet<string>(locals, StringComparer.Ordinal);
-                    types = new Dictionary<string, string>(types, StringComparer.Ordinal);
-                    foreach (var p in l.Params)
+
+                case MemberExpr member:
+                    CheckExpression(member.Object);
+                    if (InferType(member.Object) is { } receiverType &&
+                        !HasMember(receiverType, member.Name))
                     {
-                        locals.Add(p.Name);
-                        types[p.Name] = p.Type;
+                        Add(member.Line, member.Col, "warning",
+                            $"тип {receiverType} не содержит члена {member.Name}");
                     }
-                    foreach (var s in l.Body) Stmt(s);
-                    locals = savedLocals;
-                    types = savedTypes;
                     break;
-                case NameExpr n:
-                    if (!locals.Contains(n.Name) && !Known(n.Name, fns, consts, classes, fields))
-                        diags.Add(new Diagnostic(n.Line, n.Col, "warning", $"неизвестное имя {n.Name}", file));
+
+                case IndexExpr index:
+                    CheckExpression(index.Object);
+                    CheckExpression(index.Index);
+                    var indexType = InferType(index.Index);
+                    if (indexType is not null && indexType != "int")
+                        Add(index.Index.Line, index.Index.Col, "error",
+                            $"индекс должен иметь тип int, получен {indexType}");
                     break;
-                case NewExpr n:
-                    if (!classes.Contains(n.Type) && !NativeTable.Constructors.ContainsKey(n.Type) && !NativeCatalog.Types.Contains(n.Type))
-                        diags.Add(new Diagnostic(n.Line, n.Col, "warning", $"неизвестный тип {n.Type}", file));
-                    foreach (var a in n.Args) Expr(a);
+
+                case FromEndExpr fromEnd:
+                    CheckExpression(fromEnd.Inner);
                     break;
-                case MemberExpr m: Expr(m.Object); break;
-                case IndexExpr ix: Expr(ix.Object); Expr(ix.Index); break;
-                case BinaryExpr b: Expr(b.Left); Expr(b.Right); break;
-                case UnaryExpr u: Expr(u.Inner); break;
-                case CallExpr c:
-                    Expr(c.Callee);
-                    foreach (var a in c.Args) Expr(a);
+
+                case BinaryExpr binary:
+                    CheckExpression(binary.Left);
+                    CheckExpression(binary.Right);
+                    break;
+
+                case UnaryExpr unary:
+                    CheckExpression(unary.Inner);
                     break;
             }
         }
-        foreach (var s in body) Stmt(s);
+
+        private void CheckCall(CallExpr call)
+        {
+            if (call.Callee is NameExpr name)
+            {
+                if (_functions.TryGetValue(name.Name, out var function))
+                    CheckArguments(name, call.Args, function.Params.Select(p => p.Type).ToArray());
+                else if (NativeSigs.Map.TryGetValue(name.Name, out var native))
+                    CheckArguments(name, call.Args, native.Params);
+                else if (!IsKnownSymbol(name.Name))
+                    Add(name.Line, name.Col, "warning", $"неизвестный вызов {name.Name}");
+            }
+            else if (call.Callee is MemberExpr member)
+            {
+                CheckExpression(member.Object);
+                var receiverType = InferType(member.Object);
+                if (receiverType is not null &&
+                    _classMethods.TryGetValue(receiverType, out var methods) &&
+                    methods.TryGetValue(member.Name, out var method))
+                {
+                    CheckArguments(member, call.Args, method.Params.Select(p => p.Type).ToArray());
+                }
+                else if (receiverType is not null &&
+                         NativeTable.Find(receiverType, member.Name) is null)
+                {
+                    Add(member.Line, member.Col, "warning",
+                        $"тип {receiverType} не содержит метода {member.Name}");
+                }
+
+                foreach (var argument in call.Args)
+                    CheckExpression(argument);
+            }
+            else
+            {
+                CheckExpression(call.Callee);
+                foreach (var argument in call.Args)
+                    CheckExpression(argument);
+            }
+        }
+
+        private void CheckArguments(Expr callee, IReadOnlyList<Expr> arguments, IReadOnlyList<string> parameters)
+        {
+            if (arguments.Count != parameters.Count)
+            {
+                Add(callee.Line, callee.Col, "error",
+                    $"ожидалось {parameters.Count} аргументов, получено {arguments.Count}");
+            }
+
+            var count = Math.Min(arguments.Count, parameters.Count);
+            for (var i = 0; i < count; i++)
+            {
+                CheckExpression(arguments[i]);
+                var actual = InferType(arguments[i]);
+                var expected = parameters[i];
+                if (actual is not null && !IsCompatible(actual, expected))
+                    Add(arguments[i].Line, arguments[i].Col, "error",
+                        $"аргумент {i + 1}: ожидался тип {expected}, получен {actual}");
+            }
+
+            for (var i = count; i < arguments.Count; i++)
+                CheckExpression(arguments[i]);
+        }
+
+        private string? InferType(Expr expression)
+        {
+            switch (expression)
+            {
+                case NameExpr name:
+                    if (TryLookup(name.Name, out var localType))
+                        return localType;
+                    return _globals.TryGetValue(name.Name, out var globalType) ? globalType : null;
+
+                case ThisExpr:
+                    return _currentClass;
+
+                case NumExpr number:
+                    return number.Text.Contains('.') || number.Text.Contains('e') || number.Text.Contains('E')
+                        ? "float"
+                        : "int";
+
+                case BoolExpr:
+                    return "bool";
+                case StrExpr:
+                    return "string";
+                case RawExpr:
+                    return "int";
+                case NullExpr:
+                    return "null";
+                case NewExpr creation:
+                    return creation.Type;
+
+                case CallExpr { Callee: NameExpr name }:
+                    if (_functions.TryGetValue(name.Name, out var function))
+                        return function.ReturnType;
+                    return NativeSigs.Map.TryGetValue(name.Name, out var native) ? native.ReturnType : null;
+
+                case CallExpr { Callee: MemberExpr member }:
+                {
+                    var receiverType = InferType(member.Object);
+                    if (receiverType is null)
+                        return null;
+
+                    if (_classMethods.TryGetValue(receiverType, out var methods) &&
+                        methods.TryGetValue(member.Name, out var method))
+                        return method.ReturnType;
+
+                    var nativeMember = NativeTable.Find(receiverType, member.Name);
+                    if (nativeMember?.Kind != MemberKind.Method)
+                        return null;
+
+                    var nativeName = GetNativeName(nativeMember.Read);
+                    return nativeName is not null && NativeSigs.Map.TryGetValue(nativeName, out var native2)
+                        ? native2.ReturnType
+                        : null;
+                }
+
+                case MemberExpr member:
+                {
+                    var receiverType = InferType(member.Object);
+                    if (receiverType is null)
+                        return null;
+
+                    if (_classFields.TryGetValue(receiverType, out var fields) &&
+                        fields.TryGetValue(member.Name, out var fieldType))
+                        return fieldType;
+
+                    var nativeMember = NativeTable.Find(receiverType, member.Name);
+                    if (nativeMember is null || nativeMember.Kind == MemberKind.Method)
+                        return null;
+
+                    var nativeName = GetNativeName(nativeMember.Read);
+                    return nativeName is not null && NativeSigs.Map.TryGetValue(nativeName, out var native2)
+                        ? native2.ReturnType
+                        : null;
+                }
+
+                case IndexExpr index:
+                    return InferType(index.Object) == "string" ? "string" : null;
+
+                case UnaryExpr unary:
+                    return unary.Op switch
+                    {
+                        "!" or "not" => "bool",
+                        _ => InferType(unary.Inner)
+                    };
+
+                case BinaryExpr binary:
+                {
+                    var left = InferType(binary.Left);
+                    var right = InferType(binary.Right);
+                    if (binary.Op is "==" or "!=" or "<" or ">" or "<=" or ">=" or "and" or "or")
+                        return "bool";
+                    if (binary.Op == "+" && (left == "string" || right == "string"))
+                        return "string";
+                    if (left == "float" || right == "float")
+                        return "float";
+                    if (left == "int" && right == "int")
+                        return "int";
+                    return null;
+                }
+
+                default:
+                    return null;
+            }
+        }
+
+        private bool HasMember(string type, string memberName)
+        {
+            return (_classFields.TryGetValue(type, out var fields) && fields.ContainsKey(memberName)) ||
+                   (_classMethods.TryGetValue(type, out var methods) && methods.ContainsKey(memberName)) ||
+                   NativeTable.Find(type, memberName) is not null;
+        }
+
+        private static string? GetNativeName(string? template)
+        {
+            if (string.IsNullOrWhiteSpace(template))
+                return null;
+
+            var end = template.IndexOf('(');
+            return (end >= 0 ? template[..end] : template).Trim();
+        }
+
+        private bool IsKnownSymbol(string name)
+        {
+            return _functions.ContainsKey(name) ||
+                   _globals.ContainsKey(name) ||
+                   _classes.Contains(name) ||
+                   NativeCatalog.Natives.Contains(name) ||
+                   NativeCatalog.Constants.Contains(name) ||
+                   NativeSigs.Map.ContainsKey(name) ||
+                   name == "J";
+        }
+
+        private void PushScope() => _scopes.Add(new Dictionary<string, string>(StringComparer.Ordinal));
+
+        private void PopScope()
+        {
+            if (_scopes.Count > 0)
+                _scopes.RemoveAt(_scopes.Count - 1);
+        }
+
+        private void Declare(string name, string type, int line, int col, bool reportDuplicate = true)
+        {
+            if (_scopes.Count == 0)
+                PushScope();
+
+            var scope = _scopes[^1];
+            if (reportDuplicate && scope.ContainsKey(name))
+                Add(line, col, "error", $"повторное объявление переменной {name}");
+
+            scope[name] = type;
+        }
+
+        private bool TryLookup(string name, out string type)
+        {
+            for (var i = _scopes.Count - 1; i >= 0; i--)
+            {
+                if (_scopes[i].TryGetValue(name, out type!))
+                    return true;
+            }
+
+            type = null!;
+            return false;
+        }
+
+        private void Add(int line, int col, string severity, string message) =>
+            Diagnostics.Add(new Diagnostic(line, col, severity, message, _file));
     }
 
     private static bool IsCompatible(string actual, string expected)
     {
-        if (actual == expected) return true;
-        if (expected == "int" && actual == "float") return true;
-        if (expected == "float" && actual == "int") return true;
+        if (actual == expected || actual == "null")
+            return true;
+        if (expected == "int" && actual == "float")
+            return true;
+        if (expected == "float" && actual == "int")
+            return true;
         return false;
     }
 }
