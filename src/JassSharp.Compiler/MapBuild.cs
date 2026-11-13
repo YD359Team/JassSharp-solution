@@ -6,6 +6,7 @@ using System.Linq;
 using System.Buffers.Binary;
 using System.Text;
 using System.Text.Json;
+using JassSharp;
 using JassSharp.Emit;
 using JassSharp.Syntax;
 
@@ -83,10 +84,15 @@ static class MapBuild
             if (files.Count == 0)
                 return Fail("no .w3js source files found");
 
+            string standardLibraryDirectory = Path.Combine(workRoot, "stdlib");
+            Directory.CreateDirectory(standardLibraryDirectory);
+            foreach (var standardSource in StandardLibrary.LoadSources())
+                File.WriteAllText(Path.Combine(standardLibraryDirectory, standardSource.FileName), standardSource.Source, Utf8NoBom);
+
             List<string> ordered;
             try
             {
-                ordered = ResolveUsings(files, src);
+                ordered = ResolveUsings(files, src, standardLibraryDirectory);
             }
             catch (InvalidDataException ex)
             {
@@ -98,6 +104,15 @@ static class MapBuild
             }
 
             Console.WriteLine("files: " + string.Join(", ", ordered.Select(Path.GetFileName)));
+            Dictionary<string, NsUnit> allUnits;
+            try
+            {
+                allUnits = LoadProject(project);
+            }
+            catch (InvalidDataException ex)
+            {
+                return Fail("source catalog loading failed: " + ex.Message);
+            }
 
             List<string> chunks = new();
             List<string> onInits = new();
@@ -108,7 +123,8 @@ static class MapBuild
                 try
                 {
                     var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
-                    string emitted = new LuaEmitter().Emit(unit);
+                    var imports = ResolveImports(unit, allUnits);
+                    string emitted = new LuaEmitter().Emit(unit, imports);
 
                     if (target == "lua" && unit.Functions.Any(fn => fn.Name == "OnInit"))
                     {
@@ -1431,7 +1447,8 @@ static class MapBuild
 
     private static List<string> ResolveUsings(
         IReadOnlyCollection<string> rootFiles,
-        string sourceDirectory)
+        string sourceDirectory,
+        string standardLibraryDirectory)
     {
         if (rootFiles.Count == 0)
             throw new InvalidDataException("no root source files were provided");
@@ -1443,12 +1460,12 @@ static class MapBuild
         // Entry builds still need the complete source catalog to resolve imports.
         // Only rootFiles determine which namespaces are emitted; imported units are
         // added recursively in dependency-first order.
-        IEnumerable<string> discoveredFiles = Directory.Exists(sourceDirectory)
-            ? Directory.EnumerateFiles(
-                sourceDirectory,
-                "*.w3js",
-                SearchOption.AllDirectories)
-            : Enumerable.Empty<string>();
+        IEnumerable<string> discoveredFiles = (Directory.Exists(sourceDirectory)
+                ? Directory.EnumerateFiles(sourceDirectory, "*.w3js", SearchOption.AllDirectories)
+                : Enumerable.Empty<string>())
+            .Concat(Directory.Exists(standardLibraryDirectory)
+                ? Directory.EnumerateFiles(standardLibraryDirectory, "*.w3js", SearchOption.AllDirectories)
+                : Enumerable.Empty<string>());
 
         List<string> candidates = rootFiles
             .Concat(discoveredFiles)
@@ -1596,6 +1613,13 @@ static class MapBuild
             }
 
             units.Add(parsed.Name, parsed);
+        }
+
+        foreach (NsUnit standardUnit in StandardLibrary.LoadUnits())
+        {
+            if (units.TryGetValue(standardUnit.Name, out _))
+                throw new InvalidDataException($"namespace '{standardUnit.Name}' conflicts with a built-in standard-library namespace");
+            units.Add(standardUnit.Name, standardUnit);
         }
 
         return units;
