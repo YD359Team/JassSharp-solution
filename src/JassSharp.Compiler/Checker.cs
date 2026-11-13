@@ -575,7 +575,7 @@ public static class Checker
                    NativeCatalog.Natives.Contains(name) ||
                    NativeCatalog.Constants.Contains(name) ||
                    NativeSigs.Map.ContainsKey(name) ||
-                   name == "J";
+                   name is "J" or "math" or "string" or "table";
         }
 
         private void PushScope() => _scopes.Add(new Dictionary<string, string>(StringComparer.Ordinal));
