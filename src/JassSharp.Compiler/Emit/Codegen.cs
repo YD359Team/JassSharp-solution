@@ -770,11 +770,11 @@ end
         UnaryExpr u =>
             $"{(u.Op == "!" ? "not " : "-")}{EmitExpr(u.Inner)}",
 
-        BinaryExpr b when b.Op == "+" && _lua && IsStringish(b) =>
-            Concat(b.Left, b.Right),
-
         BinaryExpr b when FindOperator(InferType(b.Left), InferType(b.Right), b.Op, [b.Left, b.Right]) is { } overload =>
             $"{overload.Owner}.{OperatorFunctionName(overload.Method)}({EmitExpr(b.Left)}, {EmitExpr(b.Right)})",
+
+        BinaryExpr b when b.Op == "+" && _lua && IsStringish(b) =>
+            Concat(b.Left, b.Right),
 
         BinaryExpr b =>
             $"({EmitExpr(b.Left)} {Op(b.Op)} {EmitExpr(b.Right)})",
