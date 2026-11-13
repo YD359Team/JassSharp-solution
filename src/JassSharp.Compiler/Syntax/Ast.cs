@@ -15,7 +15,7 @@ public sealed record ParamDecl(string Type, string Name);
 public sealed record ClassDecl(string Name, List<FieldDecl> Fields, FnDecl? Ctor, List<FnDecl> Methods);
 public sealed record EnumMember(string Name, Expr? Value);
 public sealed record EnumDecl(string Name, List<EnumMember> Members);
-public sealed record FnDecl(string ReturnType, string Name, List<ParamDecl> Params, List<Stmt> Body, HashSet<string> Attributes = null!);
+public sealed record FnDecl(string ReturnType, string Name, List<ParamDecl> Params, List<Stmt> Body, HashSet<string> Attributes = null!, bool IsStatic = false, string? Operator = null);
 public sealed record LambdaExpr(List<ParamDecl> Params, List<Stmt> Body, int Line = 1, int Col = 1) : Expr(Line, Col);
 
 public abstract record Stmt;
