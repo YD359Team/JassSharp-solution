@@ -173,7 +173,7 @@ try
 
     var generatedParts = new List<string>();
     foreach (var imported in imports)
-        generatedParts.Add(new LuaEmitter().Emit(imported, imports));
+        generatedParts.Add(new LuaEmitter().Emit(imported, imports.Where(dependency => dependency.Name != imported.Name)));
     generatedParts.Add(new LuaEmitter().Emit(unit, imports));
     File.WriteAllText(outputPath, string.Join("\n", generatedParts), new UTF8Encoding(false));
     Console.WriteLine(outputPath);
