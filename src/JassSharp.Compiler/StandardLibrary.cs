@@ -16,7 +16,8 @@ internal static class StandardLibrary
                 using Stream stream = assembly.GetManifestResourceStream(name)
                     ?? throw new InvalidOperationException($"Не удалось открыть ресурс стандартной библиотеки {name}");
                 using StreamReader reader = new(stream);
-                return (Path.GetFileName(name), reader.ReadToEnd());
+                string fileName = string.Join(".", name.Split('.').TakeLast(2));
+                return (fileName, reader.ReadToEnd());
             })
             .ToArray();
     }
