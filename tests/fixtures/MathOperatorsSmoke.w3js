@@ -1,0 +1,40 @@
+namespace MathOperatorsSmoke
+{
+    using Math;
+
+    public void OnInit()
+    {
+        Vector2 left = new Vector2(3.0, 4.0);
+        Vector2 right = new Vector2(1.0, 2.0);
+
+        Vector2 sum = left + right;
+        Vector2 difference = left - right;
+        Vector2 scaled = 2.0 * sum;
+        Vector2 normalized = scaled.Normalized();
+
+        float length = left.Length();
+        float distance = left.Distance(right);
+        float dot = left.Dot(right);
+        Vector2 interpolated = left.Lerp(right, 0.5);
+
+        bool equal = left == right;
+        bool notEqual = left != right;
+
+        Vector3 axisX = new Vector3(1.0, 0.0, 0.0);
+        Vector3 axisY = new Vector3(0.0, 1.0, 0.0);
+        Vector3 cross = axisX.Cross(axisY);
+        Vector3 normalized3 = cross.Normalized();
+
+        float clamped = Math.Clamp(distance, 0.0, 10.0);
+        float interpolatedScalar = Math.Lerp(0.0, 100.0, 0.25);
+        float rounded = Math.Round(2.5);
+        float floored = Math.Floor(2.9);
+        float ceiled = Math.Ceil(2.1);
+        float power = Math.Pow(2.0, 3.0);
+        float root = Math.Sqrt(16.0);
+        float absolute = Math.Abs(-5.0);
+        float sine = Math.Sin(1.0);
+        float cosine = Math.Cos(1.0);
+        float tangent = Math.Tan(1.0);
+    }
+}
