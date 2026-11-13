@@ -21,9 +21,26 @@ public sealed class Codegen
         _classes = new HashSet<string>(classes, StringComparer.Ordinal);
     }
 
-    public string Emit(NsUnit unit)
+    public string Emit(NsUnit unit, IEnumerable<NsUnit>? imports = null)
     {
         _namespaceName = unit.Name;
+
+        if (imports is not null)
+        {
+            foreach (var imported in imports)
+            {
+                foreach (var cls in imported.Classes)
+                {
+                    _classes.Add(cls.Name);
+                    foreach (var method in cls.Methods)
+                        _methods[cls.Name + "." + method.Name] = method;
+                }
+                foreach (var en in imported.Enums)
+                    _enums[en.Name] = en;
+                foreach (var fn in imported.Functions)
+                    _methods[fn.Name] = fn;
+            }
+        }
 
         foreach (var cls in unit.Classes)
             foreach (var m in cls.Methods)
@@ -164,7 +181,21 @@ end
         foreach (var m in cls.Methods)
         {
             _locals = m.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
-            Line($"function {cls.Name}:{m.Name}({string.Join(", ", m.Params.Select(p => p.Name))})");
+            if (m.Operator is { } op)
+            {
+                string? metamethod = LuaMetamethod(op, m.Params.Count);
+                if (metamethod is null)
+                    throw new InvalidOperationException($"оператор {op} с {m.Params.Count} параметрами не поддерживается Lua backend");
+                Line($"function {cls.Name}.{metamethod}({string.Join(", ", m.Params.Select(p => p.Name))})");
+            }
+            else if (m.IsStatic)
+            {
+                Line($"function {cls.Name}.{m.Name}({string.Join(", ", m.Params.Select(p => p.Name))})");
+            }
+            else
+            {
+                Line($"function {cls.Name}:{m.Name}({string.Join(", ", m.Params.Select(p => p.Name))})");
+            }
             _indent++;
             EmitStmts(m.Body);
             _indent--;
@@ -173,6 +204,20 @@ end
         Line("");
         _className = null;
     }
+
+    private static string? LuaMetamethod(string op, int arity) => (op, arity) switch
+    {
+        ("+", 2) => "__add",
+        ("-", 2) => "__sub",
+        ("-", 1) => "__unm",
+        ("*", 2) => "__mul",
+        ("/", 2) => "__div",
+        ("%", 2) => "__mod",
+        ("==", 2) => "__eq",
+        ("<", 2) => "__lt",
+        ("<=", 2) => "__le",
+        _ => null
+    };
 
     private void EmitEnum(EnumDecl en)
     {
@@ -741,6 +786,8 @@ end
             var recv = EmitExpr(mem.Object);
             var args = c.Args.Select((a, i) => CodeArg(mem.Name, i, a)).ToList();
             if (prop?.Kind == MemberKind.Method) return Apply(prop.Read, recv, args);
+            if (mem.Object is NameExpr staticOwner && !_locals.ContainsKey(staticOwner.Name))
+                return $"{recv}.{mem.Name}({string.Join(", ", args)})";
             if (_lua)
                 return $"{recv}:{mem.Name}({string.Join(", ", args)})";
             return $"{recv}.{mem.Name}({string.Join(", ", args)})";
