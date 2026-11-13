@@ -26,8 +26,12 @@ namespace Math
 
         public static float Round(float value)
         {
-            if (value < 0.0) { return math.ceil(value - 0.5); }
-            return math.floor(value + 0.5);
+            float lower = math.floor(value);
+            float fraction = value - lower;
+            if (fraction < 0.5) { return lower; }
+            if (fraction > 0.5) { return lower + 1.0; }
+            if (lower % 2.0 == 0.0) { return lower; }
+            return lower + 1.0;
         }
 
         public static float Floor(float value)
@@ -136,6 +140,21 @@ namespace Math
         {
             return new Vector2(value.X / scalar, value.Y / scalar);
         }
+
+        public static Vector2 operator *(float scalar, Vector2 value)
+        {
+            return new Vector2(value.X * scalar, value.Y * scalar);
+        }
+
+        public static bool operator ==(Vector2 a, Vector2 b)
+        {
+            return a.X == b.X && a.Y == b.Y;
+        }
+
+        public static bool operator !=(Vector2 a, Vector2 b)
+        {
+            return a.X != b.X || a.Y != b.Y;
+        }
     }
 
     public class Vector3
@@ -211,6 +230,21 @@ namespace Math
         public static Vector3 operator /(Vector3 value, float scalar)
         {
             return new Vector3(value.X / scalar, value.Y / scalar, value.Z / scalar);
+        }
+
+        public static Vector3 operator *(float scalar, Vector3 value)
+        {
+            return new Vector3(value.X * scalar, value.Y * scalar, value.Z * scalar);
+        }
+
+        public static bool operator ==(Vector3 a, Vector3 b)
+        {
+            return a.X == b.X && a.Y == b.Y && a.Z == b.Z;
+        }
+
+        public static bool operator !=(Vector3 a, Vector3 b)
+        {
+            return a.X != b.X || a.Y != b.Y || a.Z != b.Z;
         }
     }
 }
