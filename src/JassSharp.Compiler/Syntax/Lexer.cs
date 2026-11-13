@@ -63,7 +63,7 @@ public sealed class Lexer(string source)
                 continue;
             }
             var two = _i + 1 < source.Length ? source.Substring(_i, 2) : "";
-            if (two is "==" or "!=" or "<=" or ">=" or "&&" or "||" or "+=" or "-=" or "*=" or "/=" or "++" or "--" or "=>")
+            if (two is "==" or "!=" or "<=" or ">=" or "&&" or "||" or "+=" or "-=" or "*=" or "/=" or "%=" or "++" or "--" or "=>")
             {
                 list.Add(new Token(TokKind.Sym, two, line, col));
                 Advance(); Advance();
