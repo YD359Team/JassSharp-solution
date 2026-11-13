@@ -104,7 +104,13 @@ public sealed class Parser(List<Token> tokens)
             if (Peek.Kind == TokKind.Eof) throw new ParseException($"незакрытый class {name}", Peek.Line, Peek.Col);
             var attrs = ParseAttributes();
             SkipVis();
-            if (CheckId(name) && tokens[_i + 1].Text == "(")
+            bool isStatic = false;
+            if (CheckId("static"))
+            {
+                Eat(TokKind.Id);
+                isStatic = true;
+            }
+            if (CheckId(name) && _i + 1 < tokens.Count && tokens[_i + 1].Text == "(")
             {
                 Eat(TokKind.Id);
                 Expect("(");
@@ -122,13 +128,26 @@ public sealed class Parser(List<Token> tokens)
                 type = "List";
             }
             var isArray = Accept("[") && Accept("]");
+            if (CheckId("operator"))
+            {
+                Eat(TokKind.Id);
+                var opToken = Eat(TokKind.Sym);
+                if (opToken.Text is not ("+" or "-" or "*" or "/" or "%" or "==" or "!=" or "<" or ">" or "<=" or ">="))
+                    throw new ParseException($"оператор {opToken.Text} нельзя перегрузить", opToken.Line, opToken.Col);
+                Expect("(");
+                var operatorParams = ParseParams();
+                Expect(")");
+                Expect("{");
+                methods.Add(new FnDecl(type, "__operator_" + OperatorIdentifier(opToken.Text), operatorParams, ParseBlock(), attrs, isStatic, opToken.Text));
+                continue;
+            }
             var id = Eat(TokKind.Id).Text;
             if (Accept("("))
             {
                 var ps = ParseParams();
                 Expect(")");
                 Expect("{");
-                methods.Add(new FnDecl(type, id, ps, ParseBlock(), attrs));
+                methods.Add(new FnDecl(type, id, ps, ParseBlock(), attrs, isStatic));
             }
             else
             {
@@ -138,6 +157,14 @@ public sealed class Parser(List<Token> tokens)
         }
         return new ClassDecl(name, fields, ctor, methods);
     }
+
+    private static string OperatorIdentifier(string op) => op switch
+    {
+        "+" => "Add", "-" => "Subtract", "*" => "Multiply", "/" => "Divide", "%" => "Modulo",
+        "==" => "Equal", "!=" => "NotEqual", "<" => "LessThan", ">" => "GreaterThan",
+        "<=" => "LessThanOrEqual", ">=" => "GreaterThanOrEqual",
+        _ => throw new ArgumentOutOfRangeException(nameof(op))
+    };
 
     private EnumDecl ParseEnum()
     {
@@ -324,6 +351,24 @@ public sealed class Parser(List<Token> tokens)
             Accept(";");
             return new AssignStmt(expr, new BinaryExpr("-", expr, v));
         }
+        if (Accept("*="))
+        {
+            var v = ParseExpr();
+            Accept(";");
+            return new AssignStmt(expr, new BinaryExpr("*", expr, v));
+        }
+        if (Accept("/="))
+        {
+            var v = ParseExpr();
+            Accept(";");
+            return new AssignStmt(expr, new BinaryExpr("/", expr, v));
+        }
+        if (Accept("%="))
+        {
+            var v = ParseExpr();
+            Accept(";");
+            return new AssignStmt(expr, new BinaryExpr("%", expr, v));
+        }
         if (Accept("++"))
             return new AssignStmt(expr, new BinaryExpr("+", expr, new NumExpr("1")));
         if (Accept("--"))
@@ -339,7 +384,7 @@ public sealed class Parser(List<Token> tokens)
     private Expr ParseEq() { var l = ParseRel(); while (true) { if (Accept("==")) l = new BinaryExpr("==", l, ParseRel()); else if (Accept("!=")) l = new BinaryExpr("!=", l, ParseRel()); else break; } return l; }
     private Expr ParseRel() { var l = ParseAdd(); while (Check("<") || Check(">") || Check("<=") || Check(">=")) { var op = Eat(TokKind.Sym).Text; l = new BinaryExpr(op, l, ParseAdd()); } return l; }
     private Expr ParseAdd() { var l = ParseMul(); while (true) { if (Accept("+")) l = new BinaryExpr("+", l, ParseMul()); else if (Accept("-")) l = new BinaryExpr("-", l, ParseMul()); else break; } return l; }
-    private Expr ParseMul() { var l = ParseUnary(); while (true) { if (Accept("*")) l = new BinaryExpr("*", l, ParseUnary()); else if (Accept("/")) l = new BinaryExpr("/", l, ParseUnary()); else break; } return l; }
+    private Expr ParseMul() { var l = ParseUnary(); while (true) { if (Accept("*")) l = new BinaryExpr("*", l, ParseUnary()); else if (Accept("/")) l = new BinaryExpr("/", l, ParseUnary()); else if (Accept("%")) l = new BinaryExpr("%", l, ParseUnary()); else break; } return l; }
     private Expr ParseUnary() { if (Accept("!")) return new UnaryExpr("!", ParseUnary()); if (Accept("-")) return new UnaryExpr("-", ParseUnary()); return ParsePost(); }
     private Expr ParsePost() 
     { 
