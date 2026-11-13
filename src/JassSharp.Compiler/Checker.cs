@@ -114,7 +114,7 @@ public static class Checker
                     Add(1, 1, "error", $"оператор {op} должен принимать {expectedArity} параметр(а)");
                 if (!method.Params.Any(parameter => parameter.Type == cls.Name))
                     Add(1, 1, "error", $"оператор {op} должен принимать параметр типа {cls.Name}");
-                if (op is "==" or "!=" or "<" or ">" or "<=" or ">=" && method.ReturnType != "bool")
+                if ((op is "==" or "!=" or "<" or ">" or "<=" or ">=") && method.ReturnType != "bool")
                     Add(1, 1, "error", $"оператор сравнения {op} должен возвращать bool");
             }
 
