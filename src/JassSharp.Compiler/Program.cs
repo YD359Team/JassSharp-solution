@@ -160,6 +160,9 @@ if (target != "lua")
 try
 {
     var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
+    var projectDirectory = FindProjectDirectory(file);
+    var allUnits = MapBuild.LoadProject(projectDirectory);
+    var imports = MapBuild.ResolveImports(unit, allUnits);
     var sourceDirectory = Path.GetDirectoryName(file) ?? Directory.GetCurrentDirectory();
     var outputDirectory = Path.Combine(sourceDirectory, "bin");
     Directory.CreateDirectory(outputDirectory);
@@ -168,7 +171,14 @@ try
         outputDirectory,
         Path.GetFileNameWithoutExtension(file) + ".lua");
 
-    File.WriteAllText(outputPath, new LuaEmitter().Emit(unit), new UTF8Encoding(false));
+    var generatedParts = new List<string>();
+    foreach (var imported in imports)
+    {
+        var importedDependencies = MapBuild.ResolveImports(imported, allUnits);
+        generatedParts.Add(new LuaEmitter().Emit(imported, importedDependencies));
+    }
+    generatedParts.Add(new LuaEmitter().Emit(unit, imports));
+    File.WriteAllText(outputPath, string.Join("\n", generatedParts), new UTF8Encoding(false));
     Console.WriteLine(outputPath);
 }
 catch (ParseException ex)
