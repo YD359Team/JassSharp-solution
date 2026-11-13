@@ -572,7 +572,7 @@ public static class Checker
                     {
                         var actual = InferType(arguments[i]);
                         var expected = overload.Params[i].Type;
-                        if (actual is null || actual == expected)
+                        if (actual is null || actual == "null" || actual == expected)
                             continue;
                         if (actual == "int" && expected == "float")
                         {
