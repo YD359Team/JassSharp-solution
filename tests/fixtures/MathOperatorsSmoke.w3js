@@ -2,8 +2,27 @@ namespace MathOperatorsSmoke
 {
     using Math;
 
+    public class Score
+    {
+        public float Value;
+
+        public Score(float value)
+        {
+            this.Value = value;
+        }
+
+        public static Score operator +(Score left, Score right)
+        {
+            return new Score(left.Value + right.Value);
+        }
+    }
+
     public void OnInit()
     {
+        Score firstScore = new Score(10.0);
+        Score secondScore = new Score(5.0);
+        Score totalScore = firstScore + secondScore;
+
         Vector2 left = new Vector2(3.0, 4.0);
         Vector2 right = new Vector2(1.0, 2.0);
 
