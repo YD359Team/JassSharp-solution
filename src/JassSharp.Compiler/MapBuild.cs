@@ -1579,13 +1579,12 @@ static class MapBuild
     {
         string sourceDirectory = Path.Combine(projectDir, "src");
         Dictionary<string, NsUnit> units = new(StringComparer.Ordinal);
-        if (!Directory.Exists(sourceDirectory))
-            return units;
 
-        IEnumerable<string> files = Directory
-            .EnumerateFiles(sourceDirectory, "*.w3js", SearchOption.AllDirectories)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(path => path, StringComparer.Ordinal);
+        IEnumerable<string> files = Directory.Exists(sourceDirectory)
+            ? Directory.EnumerateFiles(sourceDirectory, "*.w3js", SearchOption.AllDirectories)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(path => path, StringComparer.Ordinal)
+            : Enumerable.Empty<string>();
 
         foreach (string file in files)
         {
