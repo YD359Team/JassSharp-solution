@@ -14,6 +14,7 @@ public sealed class Codegen
     private readonly Dictionary<string, FnDecl> _inlineMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FnDecl> _methods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EnumDecl> _enums = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
 
     public Codegen(bool lua, IEnumerable<string> classes)
     {
@@ -32,6 +33,7 @@ public sealed class Codegen
                 foreach (var cls in imported.Classes)
                 {
                     _classes.Add(cls.Name);
+                    _classFields[cls.Name] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
                     foreach (var method in cls.Methods)
                         _methods[cls.Name + "." + method.Name] = method;
                 }
@@ -43,8 +45,11 @@ public sealed class Codegen
         }
 
         foreach (var cls in unit.Classes)
+        {
+            _classFields[cls.Name] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
             foreach (var m in cls.Methods)
                 _methods[cls.Name + "." + m.Name] = m;
+        }
         foreach (var en in unit.Enums)
             _enums[en.Name] = en;
         foreach (var fn in unit.Functions)
@@ -591,6 +596,10 @@ end
         if (receiverType is null)
             return null;
 
+        if (_classFields.TryGetValue(receiverType, out var fields) &&
+            fields.TryGetValue(expression.Name, out var fieldType))
+            return fieldType;
+
         var member = NativeTable.Find(receiverType, expression.Name);
         return member is null ? null : GetNativeReturnType(member.Read);
     }
@@ -632,6 +641,11 @@ end
 
         if (expression.Callee is MemberExpr member)
         {
+            if (member.Object is NameExpr className &&
+                _methods.TryGetValue(className.Name + "." + member.Name, out var staticMethod) &&
+                staticMethod.IsStatic)
+                return staticMethod.ReturnType;
+
             var receiverType = RecvType(member.Object);
             if (receiverType is null)
                 return null;
