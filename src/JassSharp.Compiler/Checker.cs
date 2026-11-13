@@ -23,6 +23,7 @@ public static class Checker
         private readonly Dictionary<string, string> _globals = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Dictionary<string, FnDecl>> _classMethods = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, List<FnDecl>> _operators = new(StringComparer.Ordinal);
         private readonly List<Dictionary<string, string>> _scopes = [];
         private string? _currentClass;
         private string _expectedReturnType = "void";
@@ -53,7 +54,19 @@ public static class Checker
                 foreach (var field in cls.Fields)
                     _classFields[cls.Name][field.Name] = field.Type;
                 foreach (var method in cls.Methods)
-                    _classMethods[cls.Name][method.Name] = method;
+                {
+                    if (method.Operator is { } op)
+                    {
+                        string key = cls.Name + "|" + op;
+                        if (!_operators.TryGetValue(key, out var overloads))
+                            _operators[key] = overloads = [];
+                        overloads.Add(method);
+                    }
+                    else
+                    {
+                        _classMethods[cls.Name][method.Name] = method;
+                    }
+                }
             }
 
             foreach (var fn in unit.Functions)
@@ -293,10 +306,20 @@ public static class Checker
                 case BinaryExpr binary:
                     CheckExpression(binary.Left);
                     CheckExpression(binary.Right);
+                    var binaryOverload = FindOperator(InferType(binary.Left), InferType(binary.Right), binary.Op, [binary.Left, binary.Right]);
+                    if (binaryOverload is not null)
+                        CheckArguments(binary, [binary.Left, binary.Right], binaryOverload.Params.Select(p => p.Type).ToArray());
+                    else if (IsUserType(InferType(binary.Left)) || IsUserType(InferType(binary.Right)))
+                        Add(binary.Line, binary.Col, "error", $"оператор {binary.Op} не определён для типов {InferType(binary.Left) ?? "?"} и {InferType(binary.Right) ?? "?"}");
                     break;
 
                 case UnaryExpr unary:
                     CheckExpression(unary.Inner);
+                    var unaryOverload = FindOperator(InferType(unary.Inner), null, unary.Op, [unary.Inner]);
+                    if (unaryOverload is not null)
+                        CheckArguments(unary, [unary.Inner], unaryOverload.Params.Select(p => p.Type).ToArray());
+                    else if (IsUserType(InferType(unary.Inner)))
+                        Add(unary.Line, unary.Col, "error", $"унарный оператор {unary.Op} не определён для типа {InferType(unary.Inner)}");
                     break;
             }
         }
@@ -321,6 +344,14 @@ public static class Checker
                     methods.TryGetValue(member.Name, out var method))
                 {
                     CheckArguments(member, call.Args, method.Params.Select(p => p.Type).ToArray());
+                }
+                else if (member.Object is NameExpr className &&
+                         _classMethods.TryGetValue(className.Name, out var staticMethods) &&
+                         staticMethods.TryGetValue(member.Name, out var staticMethod) &&
+                         staticMethod.IsStatic)
+                {
+                    CheckArguments(member, call.Args, staticMethod.Params.Select(p => p.Type).ToArray());
+                    return;
                 }
                 else if (receiverType is not null &&
                          NativeTable.Find(receiverType, member.Name) is null)
@@ -398,6 +429,12 @@ public static class Checker
 
                 case CallExpr { Callee: MemberExpr member }:
                 {
+                    if (member.Object is NameExpr className &&
+                        _classMethods.TryGetValue(className.Name, out var staticMethods) &&
+                        staticMethods.TryGetValue(member.Name, out var staticMethod) &&
+                        staticMethod.IsStatic)
+                        return staticMethod.ReturnType;
+
                     var receiverType = InferType(member.Object);
                     if (receiverType is null)
                         return null;
@@ -440,17 +477,26 @@ public static class Checker
                     return InferType(index.Object) == "string" ? "string" : null;
 
                 case UnaryExpr unary:
+                {
+                    var overload = FindOperator(InferType(unary.Inner), null, unary.Op, [unary.Inner]);
+                    if (overload is not null)
+                        return overload.ReturnType;
                     return unary.Op switch
                     {
                         "!" or "not" => "bool",
                         _ => InferType(unary.Inner)
                     };
+                }
 
                 case BinaryExpr binary:
                 {
+                    var overload = FindOperator(InferType(binary.Left), InferType(binary.Right), binary.Op, [binary.Left, binary.Right]);
+                    if (overload is not null)
+                        return overload.ReturnType;
+
                     var left = InferType(binary.Left);
                     var right = InferType(binary.Right);
-                    if (binary.Op is "==" or "!=" or "<" or ">" or "<=" or ">=" or "and" or "or")
+                    if (binary.Op is "==" or "!=" or "<" or ">" or "<=" or ">=" or "and" or "or" or "&&" or "||")
                         return "bool";
                     if (binary.Op == "+" && (left == "string" || right == "string"))
                         return "string";
@@ -464,6 +510,45 @@ public static class Checker
                 default:
                     return null;
             }
+        }
+
+        private bool IsUserType(string? type) =>
+            type is not null && _classes.Contains(type);
+
+        private FnDecl? FindOperator(string? leftType, string? rightType, string op, IReadOnlyList<Expr> arguments)
+        {
+            IEnumerable<string> owners = new[] { leftType, rightType }
+                .Where(t => !string.IsNullOrWhiteSpace(t))
+                .Cast<string>()
+                .Distinct(StringComparer.Ordinal);
+
+            foreach (string owner in owners)
+            {
+                if (!_operators.TryGetValue(owner + "|" + op, out var overloads))
+                    continue;
+
+                foreach (var overload in overloads)
+                {
+                    if (overload.Params.Count != arguments.Count)
+                        continue;
+
+                    bool compatible = true;
+                    for (int i = 0; i < arguments.Count; i++)
+                    {
+                        var actual = InferType(arguments[i]);
+                        if (actual is not null && !IsCompatible(actual, overload.Params[i].Type))
+                        {
+                            compatible = false;
+                            break;
+                        }
+                    }
+
+                    if (compatible)
+                        return overload;
+                }
+            }
+
+            return null;
         }
 
         private bool HasMember(string type, string memberName)
