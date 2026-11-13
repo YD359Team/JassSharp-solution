@@ -118,6 +118,11 @@ public static class Checker
                     Add(1, 1, "error", $"оператор сравнения {op} должен возвращать bool");
             }
 
+            foreach (var duplicate in declared.GroupBy(method =>
+                         method.Operator + "|" + string.Join(",", method.Params.Select(parameter => parameter.Type)))
+                     .Where(group => group.Count() > 1))
+                Add(1, 1, "error", $"повторное объявление перегрузки оператора {duplicate.First().Operator} с той же сигнатурой");
+
             var operators = declared.Select(method => method.Operator!).ToHashSet(StringComparer.Ordinal);
             foreach (var pair in new[] { ("==", "!="), ("<", ">"), ("<=", ">=") })
             {
@@ -543,6 +548,9 @@ public static class Checker
 
         private FnDecl? FindOperator(string? leftType, string? rightType, string op, IReadOnlyList<Expr> arguments)
         {
+            FnDecl? best = null;
+            int bestScore = int.MaxValue;
+
             IEnumerable<string> owners = new[] { leftType, rightType }
                 .Where(t => !string.IsNullOrWhiteSpace(t))
                 .Cast<string>()
@@ -555,26 +563,36 @@ public static class Checker
 
                 foreach (var overload in overloads)
                 {
-                    if (overload.Params.Count != arguments.Count)
+                    if (!overload.IsStatic || overload.Params.Count != arguments.Count)
                         continue;
 
+                    int score = 0;
                     bool compatible = true;
                     for (int i = 0; i < arguments.Count; i++)
                     {
                         var actual = InferType(arguments[i]);
-                        if (actual is not null && !IsCompatible(actual, overload.Params[i].Type))
+                        var expected = overload.Params[i].Type;
+                        if (actual is null || actual == expected)
+                            continue;
+                        if (actual == "int" && expected == "float")
                         {
-                            compatible = false;
-                            break;
+                            score++;
+                            continue;
                         }
+
+                        compatible = false;
+                        break;
                     }
 
-                    if (compatible)
-                        return overload;
+                    if (compatible && score < bestScore)
+                    {
+                        best = overload;
+                        bestScore = score;
+                    }
                 }
             }
 
-            return null;
+            return best;
         }
 
         private bool HasMember(string type, string memberName)
