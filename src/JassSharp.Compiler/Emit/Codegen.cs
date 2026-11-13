@@ -752,7 +752,7 @@ end
         NameExpr n => n.Name,
 
         UnaryExpr u when FindOperator(InferType(u.Inner), null, u.Op, [u.Inner]) is { } overload =>
-            $"{overload.Owner}.{overload.Method.Name}({EmitExpr(u.Inner)})",
+            $"{overload.Owner}.{OperatorFunctionName(overload.Method)}({EmitExpr(u.Inner)})",
 
         UnaryExpr u when u.Op == "!" && !_lua =>
             $"not ({EmitExpr(u.Inner)})",
@@ -764,7 +764,7 @@ end
             Concat(b.Left, b.Right),
 
         BinaryExpr b when FindOperator(InferType(b.Left), InferType(b.Right), b.Op, [b.Left, b.Right]) is { } overload =>
-            $"{overload.Owner}.{overload.Method.Name}({EmitExpr(b.Left)}, {EmitExpr(b.Right)})",
+            $"{overload.Owner}.{OperatorFunctionName(overload.Method)}({EmitExpr(b.Left)}, {EmitExpr(b.Right)})",
 
         BinaryExpr b =>
             $"({EmitExpr(b.Left)} {Op(b.Op)} {EmitExpr(b.Right)})",
@@ -923,7 +923,7 @@ end
         NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
         NewExpr n => n.Type,
         BinaryExpr b => InferBinaryType(b),
-        UnaryExpr u => FindOperator(InferType(u.Inner), null, u.Op, 1)?.Method.ReturnType ?? InferType(u.Inner),
+        UnaryExpr u => FindOperator(InferType(u.Inner), null, u.Op, [u.Inner])?.Method.ReturnType ?? InferType(u.Inner),
         MemberExpr m => InferMemberType(m),
         CallExpr c => InferCallType(c),
         _ => null,
