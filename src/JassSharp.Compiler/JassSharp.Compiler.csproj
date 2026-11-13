@@ -1,6 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <ItemGroup>
-    <EmbeddedResource Include="StandardLibrary/*.w3js" />
+    <EmbeddedResource Include="../../standard-library/*.w3js" />
   </ItemGroup>
   <PropertyGroup>
     <OutputType>Exe</OutputType>
