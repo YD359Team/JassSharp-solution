@@ -183,10 +183,7 @@ end
             _locals = m.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
             if (m.Operator is { } op)
             {
-                string? metamethod = LuaMetamethod(op, m.Params.Count);
-                if (metamethod is null)
-                    throw new InvalidOperationException($"оператор {op} с {m.Params.Count} параметрами не поддерживается Lua backend");
-                Line($"function {cls.Name}.{metamethod}({string.Join(", ", m.Params.Select(p => p.Name))})");
+                Line($"function {cls.Name}.{m.Name}({string.Join(", ", m.Params.Select(p => p.Name))})");
             }
             else if (m.IsStatic)
             {
@@ -200,6 +197,15 @@ end
             EmitStmts(m.Body);
             _indent--;
             Line("end");
+            if (m.Operator is { } operatorToken && LuaMetamethod(operatorToken, m.Params.Count) is { } metamethod)
+            {
+                string parameters = string.Join(", ", m.Params.Select(p => p.Name));
+                Line($"function {cls.Name}.{metamethod}({parameters})");
+                _indent++;
+                Line($"return {cls.Name}.{m.Name}({parameters})");
+                _indent--;
+                Line("end");
+            }
         }
         Line("");
         _className = null;
@@ -556,6 +562,10 @@ end
 
     private string? InferBinaryType(BinaryExpr expression)
     {
+        var overload = FindOperator(InferType(expression.Left), InferType(expression.Right), expression.Op, 2);
+        if (overload is { } resolved)
+            return resolved.Method.ReturnType;
+
         if (expression.Op is "==" or "!=" or "<" or ">" or "<=" or ">=" or "&&" or "||")
             return "bool";
 
@@ -583,6 +593,28 @@ end
 
         var member = NativeTable.Find(receiverType, expression.Name);
         return member is null ? null : GetNativeReturnType(member.Read);
+    }
+
+    private (string Owner, FnDecl Method)? FindOperator(string? leftType, string? rightType, string op, int arity)
+    {
+        string identifier = op switch
+        {
+            "+" => "Add", "-" => "Subtract", "*" => "Multiply", "/" => "Divide", "%" => "Modulo",
+            "==" => "Equal", "!=" => "NotEqual", "<" => "LessThan", ">" => "GreaterThan",
+            "<=" => "LessThanOrEqual", ">=" => "GreaterThanOrEqual",
+            _ => string.Empty
+        };
+        if (identifier.Length == 0)
+            return null;
+
+        foreach (string owner in new[] { leftType, rightType }.Where(t => !string.IsNullOrWhiteSpace(t)).Cast<string>().Distinct(StringComparer.Ordinal))
+        {
+            if (_methods.TryGetValue(owner + ".__operator_" + identifier, out var method) &&
+                method.Operator == op && method.Params.Count == arity)
+                return (owner, method);
+        }
+
+        return null;
     }
 
     private string? InferCallType(CallExpr expression)
@@ -637,6 +669,9 @@ end
         ThisExpr => _lua ? "self" : "this",
         NameExpr n => n.Name,
 
+        UnaryExpr u when FindOperator(InferType(u.Inner), null, u.Op, 1) is { } overload =>
+            $"{overload.Owner}.{overload.Method.Name}({EmitExpr(u.Inner)})",
+
         UnaryExpr u when u.Op == "!" && !_lua =>
             $"not ({EmitExpr(u.Inner)})",
 
@@ -645,6 +680,9 @@ end
 
         BinaryExpr b when b.Op == "+" && _lua && IsStringish(b) =>
             Concat(b.Left, b.Right),
+
+        BinaryExpr b when FindOperator(InferType(b.Left), InferType(b.Right), b.Op, 2) is { } overload =>
+            $"{overload.Owner}.{overload.Method.Name}({EmitExpr(b.Left)}, {EmitExpr(b.Right)})",
 
         BinaryExpr b =>
             $"({EmitExpr(b.Left)} {Op(b.Op)} {EmitExpr(b.Right)})",
@@ -802,6 +840,8 @@ end
         ThisExpr => _className,
         NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
         NewExpr n => n.Type,
+        BinaryExpr b => InferBinaryType(b),
+        UnaryExpr u => FindOperator(InferType(u.Inner), null, u.Op, 1)?.Method.ReturnType ?? InferType(u.Inner),
         MemberExpr m => InferMemberType(m),
         CallExpr c => InferCallType(c),
         _ => null,
