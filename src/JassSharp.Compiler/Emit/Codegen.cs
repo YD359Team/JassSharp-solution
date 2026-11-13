@@ -13,6 +13,7 @@ public sealed class Codegen
     private string? _className;
     private readonly Dictionary<string, FnDecl> _inlineMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FnDecl> _methods = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<FnDecl>> _operatorMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EnumDecl> _enums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
 
@@ -35,7 +36,12 @@ public sealed class Codegen
                     _classes.Add(cls.Name);
                     _classFields[cls.Name] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
                     foreach (var method in cls.Methods)
-                        _methods[cls.Name + "." + method.Name] = method;
+                    {
+                        if (method.Operator is { } op)
+                            RegisterOperator(cls.Name, op, method);
+                        else
+                            _methods[cls.Name + "." + method.Name] = method;
+                    }
                 }
                 foreach (var en in imported.Enums)
                     _enums[en.Name] = en;
@@ -48,7 +54,12 @@ public sealed class Codegen
         {
             _classFields[cls.Name] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
             foreach (var m in cls.Methods)
-                _methods[cls.Name + "." + m.Name] = m;
+            {
+                if (m.Operator is { } op)
+                    RegisterOperator(cls.Name, op, m);
+                else
+                    _methods[cls.Name + "." + m.Name] = m;
+            }
         }
         foreach (var en in unit.Enums)
             _enums[en.Name] = en;
@@ -188,7 +199,7 @@ end
             _locals = m.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
             if (m.Operator is { } op)
             {
-                Line($"function {cls.Name}.{m.Name}({string.Join(", ", m.Params.Select(p => p.Name))})");
+                Line($"function {cls.Name}.{OperatorFunctionName(m)}({string.Join(", ", m.Params.Select(p => p.Name))})");
             }
             else if (m.IsStatic)
             {
@@ -202,19 +213,64 @@ end
             EmitStmts(m.Body);
             _indent--;
             Line("end");
-            if (m.Operator is { } operatorToken && LuaMetamethod(operatorToken, m.Params.Count) is { } metamethod)
-            {
-                string parameters = string.Join(", ", m.Params.Select(p => p.Name));
-                Line($"function {cls.Name}.{metamethod}({parameters})");
-                _indent++;
-                Line($"return {cls.Name}.{m.Name}({parameters})");
-                _indent--;
-                Line("end");
-            }
         }
+        EmitOperatorMetamethods(cls);
         Line("");
         _className = null;
     }
+
+    private void RegisterOperator(string owner, string op, FnDecl method)
+    {
+        string key = owner + "|" + op;
+        if (!_operatorMethods.TryGetValue(key, out var overloads))
+            _operatorMethods[key] = overloads = [];
+        overloads.Add(method);
+    }
+
+    private static string OperatorFunctionName(FnDecl method)
+    {
+        string opName = method.Operator switch
+        {
+            "+" => "Add", "-" => "Subtract", "*" => "Multiply", "/" => "Divide", "%" => "Modulo",
+            "==" => "Equal", "!=" => "NotEqual", "<" => "LessThan", ">" => "GreaterThan",
+            "<=" => "LessThanOrEqual", ">=" => "GreaterThanOrEqual",
+            _ => throw new InvalidOperationException($"unknown operator {method.Operator}")
+        };
+        string signature = string.Join("_", method.Params.Select(p =>
+            new string(p.Type.Select(ch => char.IsLetterOrDigit(ch) || ch == '_' ? ch : '_').ToArray())));
+        return "__operator_" + opName + (signature.Length == 0 ? "" : "_" + signature);
+    }
+
+    private void EmitOperatorMetamethods(ClassDecl cls)
+    {
+        var groups = cls.Methods
+            .Where(method => method.Operator is not null && LuaMetamethod(method.Operator, method.Params.Count) is not null)
+            .GroupBy(method => (Name: LuaMetamethod(method.Operator!, method.Params.Count)!, Arity: method.Params.Count));
+
+        foreach (var group in groups)
+        {
+            string[] args = Enumerable.Range(0, group.Key.Arity).Select(index => "arg" + index).ToArray();
+            Line($"function {cls.Name}.{group.Key.Name}({string.Join(", ", args)})");
+            _indent++;
+            foreach (var method in group)
+            {
+                string condition = string.Join(" and ", method.Params.Select((parameter, index) =>
+                    LuaTypeCheck(parameter.Type, args[index])));
+                Line($"if {condition} then return {cls.Name}.{OperatorFunctionName(method)}({string.Join(", ", args)}) end");
+            }
+            Line("return nil");
+            _indent--;
+            Line("end");
+        }
+    }
+
+    private static string LuaTypeCheck(string type, string expression) => type switch
+    {
+        "int" or "float" => $"type({expression}) == \"number\"",
+        "bool" => $"type({expression}) == \"boolean\"",
+        "string" => $"type({expression}) == \"string\"",
+        _ => $"getmetatable({expression}) == {type}"
+    };
 
     private static string? LuaMetamethod(string op, int arity) => (op, arity) switch
     {
@@ -567,7 +623,7 @@ end
 
     private string? InferBinaryType(BinaryExpr expression)
     {
-        var overload = FindOperator(InferType(expression.Left), InferType(expression.Right), expression.Op, 2);
+        var overload = FindOperator(InferType(expression.Left), InferType(expression.Right), expression.Op, [expression.Left, expression.Right]);
         if (overload is { } resolved)
             return resolved.Method.ReturnType;
 
@@ -604,23 +660,35 @@ end
         return member is null ? null : GetNativeReturnType(member.Read);
     }
 
-    private (string Owner, FnDecl Method)? FindOperator(string? leftType, string? rightType, string op, int arity)
+    private (string Owner, FnDecl Method)? FindOperator(string? leftType, string? rightType, string op, IReadOnlyList<Expr> arguments)
     {
-        string identifier = op switch
-        {
-            "+" => "Add", "-" => "Subtract", "*" => "Multiply", "/" => "Divide", "%" => "Modulo",
-            "==" => "Equal", "!=" => "NotEqual", "<" => "LessThan", ">" => "GreaterThan",
-            "<=" => "LessThanOrEqual", ">=" => "GreaterThanOrEqual",
-            _ => string.Empty
-        };
-        if (identifier.Length == 0)
-            return null;
-
         foreach (string owner in new[] { leftType, rightType }.Where(t => !string.IsNullOrWhiteSpace(t)).Cast<string>().Distinct(StringComparer.Ordinal))
         {
-            if (_methods.TryGetValue(owner + ".__operator_" + identifier, out var method) &&
-                method.Operator == op && method.Params.Count == arity)
-                return (owner, method);
+            if (!_operatorMethods.TryGetValue(owner + "|" + op, out var overloads))
+                continue;
+
+            foreach (var method in overloads)
+            {
+                if (method.Params.Count != arguments.Count)
+                    continue;
+
+                bool compatible = true;
+                for (int index = 0; index < arguments.Count; index++)
+                {
+                    string? actual = InferType(arguments[index]);
+                    string expected = method.Params[index].Type;
+                    if (actual is not null && actual != expected &&
+                        !(actual == "int" && expected == "float") &&
+                        !(actual == "float" && expected == "int"))
+                    {
+                        compatible = false;
+                        break;
+                    }
+                }
+
+                if (compatible)
+                    return (owner, method);
+            }
         }
 
         return null;
@@ -683,7 +751,7 @@ end
         ThisExpr => _lua ? "self" : "this",
         NameExpr n => n.Name,
 
-        UnaryExpr u when FindOperator(InferType(u.Inner), null, u.Op, 1) is { } overload =>
+        UnaryExpr u when FindOperator(InferType(u.Inner), null, u.Op, [u.Inner]) is { } overload =>
             $"{overload.Owner}.{overload.Method.Name}({EmitExpr(u.Inner)})",
 
         UnaryExpr u when u.Op == "!" && !_lua =>
@@ -695,7 +763,7 @@ end
         BinaryExpr b when b.Op == "+" && _lua && IsStringish(b) =>
             Concat(b.Left, b.Right),
 
-        BinaryExpr b when FindOperator(InferType(b.Left), InferType(b.Right), b.Op, 2) is { } overload =>
+        BinaryExpr b when FindOperator(InferType(b.Left), InferType(b.Right), b.Op, [b.Left, b.Right]) is { } overload =>
             $"{overload.Owner}.{overload.Method.Name}({EmitExpr(b.Left)}, {EmitExpr(b.Right)})",
 
         BinaryExpr b =>
