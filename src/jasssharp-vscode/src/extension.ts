@@ -43,7 +43,6 @@ export function activate(context: vscode.ExtensionContext) {
 
     context.subscriptions.push(
         vscode.commands.registerCommand("jasssharp.build", () => build("")),
-        vscode.commands.registerCommand("jasssharp.buildVjass", () => build("vjass")),
         vscode.commands.registerCommand("jasssharp.buildLua", () => build("lua")),
         vscode.commands.registerCommand("jasssharp.buildMap", () => mapBuild(false)),
         vscode.commands.registerCommand("jasssharp.runMap", () => mapBuild(true)),
@@ -159,8 +158,7 @@ async function build(forcedTarget: string): Promise<void> {
     const document = editor.document;
     if (document.isDirty && !(await document.save())) return;
 
-    const config = vscode.workspace.getConfiguration("jasssharp");
-    const target = forcedTarget || config.get<string>("defaultTarget") || "both";
+    const target = forcedTarget || "lua";
     await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: `JASS# → ${target}` },
         async () => {
@@ -185,7 +183,7 @@ function readProject(): { map?: string; game?: string } | undefined {
     const root = projectRoot();
     if (!root) return undefined;
     const fileName = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile") || "jasssharp.json";
-    const filePath = path.join(root, fileName);
+    const filePath = path.isAbsolute(fileName) ? fileName : path.join(root, fileName);
     if (!fs.existsSync(filePath)) return undefined;
     try { return JSON.parse(fs.readFileSync(filePath, "utf8")) as { map?: string; game?: string }; }
     catch { return undefined; }
@@ -283,11 +281,11 @@ async function mapBuild(run: boolean): Promise<void> {
     const root = folder.uri.fsPath;
     info(`project: ${root}`);
     const configName = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile") || "jasssharp.json";
-    const configPath = path.join(root, configName);
+    const configPath = path.isAbsolute(configName) ? configName : path.join(root, configName);
     info(`config: ${configPath} exists=${fs.existsSync(configPath)}`);
     if (!fs.existsSync(configPath)) { vscode.window.showErrorMessage(`Нет ${configName} в корне рабочей папки`); return; }
 
-    const args = ["map", "--project", root];
+    const args = ["map", "--project", root, "--config", configName];
     if (run) args.push("--run");
     const config = vscode.workspace.getConfiguration("jasssharp");
     const game = config.get<string>("gamePath")?.trim();

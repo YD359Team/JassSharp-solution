@@ -1,7 +1,7 @@
 {
   "name": "jasssharp",
   "displayName": "JASS#",
-  "description": "Подсветка и сборка JASS# (.w3js) в vJASS и Lua",
+  "description": "Подсветка и сборка JASS# (.w3js) в Lua",
   "version": "0.1.0",
   "publisher": "jasssharp",
   "repository": {
@@ -62,12 +62,10 @@
         "jasssharp.defaultTarget": {
           "type": "string",
           "enum": [
-            "both",
-            "vjass",
             "lua"
           ],
-          "default": "both",
-          "description": "Цель по умолчанию для команды Build."
+          "default": "lua",
+          "description": "Цель сборки. В настоящее время поддерживается только Lua."
         },
         "jasssharp.gamePath": {
           "type": "string",
@@ -96,10 +94,6 @@
         "command": "jasssharp.build",
         "title": "JASS#: Build",
         "icon": "$(tools)"
-      },
-      {
-        "command": "jasssharp.buildVjass",
-        "title": "JASS#: Build vJASS"
       },
       {
         "command": "jasssharp.buildLua",

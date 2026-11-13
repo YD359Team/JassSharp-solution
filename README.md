@@ -1,114 +1,53 @@
-# JASS# (JassSharp)
+# JASS# Lua-only CLI and project-check update
 
-Язык для Warcraft III Reforged (1.30+) с синтаксисом, близким к C#. Транслируется в **vJASS** и **Lua**. Без смешивания чужого vJASS/Lua в одном файле.
+This archive contains complete replacement files for the repository paths listed below.
 
-Файлы — `.w3js`.
+## Files
 
-## Пример
+- `src/JassSharp.Compiler/Program.cs`
+- `src/JassSharp.Compiler/MapBuild.cs`
+- `src/jasssharp-vscode/package.json`
+- `src/jasssharp-vscode/src/extension.ts`
 
-```csharp
-namespace MyMap.Spells
-{
-    const int FireballId = 'A000';
+Copy the archive contents over the repository root, replacing the corresponding files.
 
-    class Fireball
-    {
-        unit Caster;
-        float Damage;
+## Changes
 
-        public Fireball(unit caster)
-        {
-            this.Caster = caster;
-            this.Damage = 100.0 + caster.Level * 25.0;
-        }
+### Compiler CLI
 
-        public void Cast(float targetX, float targetY)
-        {
-            effect sfx = new effect("Abilities\\Spells\\Other\\Fireball.mdx", targetX, targetY);
-            sfx.Destroy();
-        }
-    }
+- Lua is now the only accepted `build --target` value.
+- The default build target is Lua; the CLI no longer emits `.j` vJASS files.
+- `map` can be invoked without a dummy second argument.
+- `check` resolves the current source file's project, loads imported namespaces, and passes them to `Checker.Check`.
+- `symbols` reports loading/parsing failures instead of silently terminating with an unhandled exception.
+- Unknown or incomplete CLI options are rejected with an error.
 
-    void OnInit()
-    {
-        trigger t = new trigger();
-        t.RegisterAnyUnitEvent(EVENT_PLAYER_UNIT_SPELL_EFFECT);
-        t.AddAction(OnSpellEffect);
+### Map build
 
-        unit hero = new unit(Player(0), 'Hpal', 0.0, 0.0, 270.0);
-        hero.Name = "Arthas";
-        hero.Life = 500.0;
-        hero.SetPosition(100.0, 200.0).Kill();
+- Map build configuration accepts only `target: "lua"`.
+- The build always injects `war3map.lua` and uses `LuaEmitter`.
+- The project source catalog used for checks no longer silently skips malformed `.w3js` files.
+- Project loading reports duplicate namespace names.
+- Import resolution reports missing namespaces and cyclic imports, and keeps dependency-first order.
 
-        Print("Hero: ", hero, " at ", hero.X);
-    }
-}
-```
+### VS Code extension
 
-- `new unit(...)` → `CreateUnit(...)`
-- `u.Name = "..."` → `BlzSetUnitName(u, "...")`
-- `u.Life` / `u.Mana` — через `GetUnitState` / `SetUnitState`
-- `'XXXX'` в Lua становится знаковым int32 (big-endian), в vJASS остаётся как есть
-- `OnInit` — точка входа (в vJASS — `initializer`, в Lua — вызов в конце)
-- Цепочки: `hero.SetPosition(x, y).Kill()`
-- Триггеры: явный `new trigger()`, методы `Register...` / `AddAction`
-- `Print(...)` — любое количество аргументов любых типов → `BJDebugMsg` с автоматическим `ToString`
-- `ToString` для unit/player/item и базовых типов
-- `#if LUA { ... } else { ... }` и `#if VJASS` — условная компиляция
-- `[Trace]` на функции — вставка отладочных сообщений
+- Removed the vJASS build command from the contributed command list and command registration.
+- The Build command defaults to Lua regardless of stale user settings.
+- The extension now forwards the configured `jasssharp.projectFile` path to `jasssharp map --config`, including custom config filenames.
+- Compiler DLL invocation through `dotnet` and per-document diagnostics debounce are retained.
 
-Каталог нативов — полный `common.j` (jassdoc). Свойства генерируются из пар Get/Set (119) плюс ручные `Life`/`Mana`/`Name`.
+## Compatibility notes
 
-## Компилятор
+Projects whose `jasssharp.json` still declares `"target": "vjass"` or `"target": "both"` now fail explicitly. Change the value to `"lua"`.
 
-```
-dotnet run --project src/JassSharp.Compiler -- build file.w3js --target both
-dotnet run --project src/JassSharp.Compiler -- check file.w3js
-dotnet run --project src/JassSharp.Compiler -- map --project . --run
-```
+The former VS Code `jasssharp.buildVjass` command has been removed. The `jasssharp.buildLua` command remains as an explicit Lua build alias.
 
-| Команда | Что делает |
-|---|---|
-| `build` | Пишет `.j` и/или `.lua` рядом с исходником |
-| `check` | JSON-диагностики (ошибки парсера + неизвестные имена), с номером строки |
-| `map` | Собирает все `.w3js` (или `entry`) и кладёт скрипт в папку карты |
+## Validation performed
 
-### jasssharp.json
+- `package.json` parsed as valid JSON.
+- Source-level checks confirmed the vJASS command is absent from extension registration and that custom project config is forwarded.
+- TypeScript parsing was checked with the globally installed TypeScript compiler. The check could not resolve `vscode`, Node.js typings, or the sibling `languageFeatures` module because this isolated archive does not include `node_modules` or the rest of the extension source tree.
+- A full .NET build was not run: the execution environment has no .NET SDK/compiler installed.
 
-```json
-{
-  "map": "map",
-  "target": "lua",
-  "entry": "src/main.w3js",
-  "game": "C:\\\\Program Files\\\\Warcraft III\\\\Warcraft III.exe"
-}
-```
-
-- `map` — **распакованная папка** карты (не `.w3x`). Скрипт пишется в `war3map.lua` или `war3map.j`.
-- `--run` запускает игру с `-loadfile`. Путь к игре: поле `game`, либо переменная `JASSSHARP_GAME`.
-
-## Расширение VS Code
-
-`src/jasssharp-vscode`
-
-- Подсветка `.w3js`, сниппеты
-- Диагностика: на сохранении зовёт `jasssharp check` и подчёркивает ошибки
-- Команды: **Build**, **Build vJASS**, **Build Lua**, **Build Map**, **Run Map**
-
-Настройки: `jasssharp.compilerPath`, `jasssharp.defaultTarget`, `jasssharp.gamePath`.
-
-Сборка расширения: `npm install && npm run compile` в `src/jasssharp-vscode`, затем `vsce package` или запуск из VS Code как расширение.
-
-## Структура
-
-```
-src/JassSharp.Compiler/     компилятор (C#)
-src/jasssharp-vscode/       расширение VS Code
-samples/                    примеры
-```
-
-## Сборка
-
-```
-dotnet build src/JassSharp.Compiler
-```
+Run `dotnet build` and `npm.cmd run compile` in the full repository after replacing the files.

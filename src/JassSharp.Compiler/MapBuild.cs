@@ -48,8 +48,8 @@ static class MapBuild
             string? cfgMpqCli = GetString(root, "mpqcli");
 
             target = target.Trim().ToLowerInvariant();
-            if (target is not ("lua" or "vjass"))
-                return Fail($"unsupported target '{target}'. Supported targets: lua, vjass.");
+            if (target != "lua")
+                return Fail($"unsupported target '{target}'. JASS# map builds support only the Lua target.");
 
             game = string.IsNullOrWhiteSpace(game)
                 ? Environment.GetEnvironmentVariable("JASSSHARP_GAME")
@@ -108,9 +108,7 @@ static class MapBuild
                 try
                 {
                     var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
-                    string emitted = target == "vjass"
-                        ? new VjassEmitter().Emit(unit)
-                        : new LuaEmitter().Emit(unit);
+                    string emitted = new LuaEmitter().Emit(unit);
 
                     if (target == "lua" && unit.Functions.Any(fn => fn.Name == "OnInit"))
                     {
@@ -132,7 +130,7 @@ static class MapBuild
             }
 
             string generatedScript = string.Join("\n", chunks);
-            string scriptName = target == "vjass" ? "war3map.j" : "war3map.lua";
+            const string scriptName = "war3map.lua";
 
             string outDir = Path.Combine(project, "bin");
             Directory.CreateDirectory(outDir);
@@ -159,11 +157,6 @@ static class MapBuild
             Console.WriteLine("mpqtool: " + (mpqTool ?? "not found"));
             if (sourceW3x is not null)
                 Console.WriteLine($"base: {sourceW3x} ({new FileInfo(sourceW3x).Length} bytes)");
-
-            if (target == "vjass")
-            {
-                Console.WriteLine("warning: vJASS is source code; Warcraft III needs it preprocessed/compiled by JassHelper before it can execute it.");
-            }
 
             Directory.CreateDirectory(workRoot);
 
@@ -1567,35 +1560,95 @@ static class MapBuild
 
     public static Dictionary<string, NsUnit> LoadProject(string projectDir)
     {
-        var units = new Dictionary<string, NsUnit>(StringComparer.Ordinal);
-        var src = Path.Combine(projectDir, "src");
-        if (!Directory.Exists(src)) return units;
+        string sourceDirectory = Path.Combine(projectDir, "src");
+        Dictionary<string, NsUnit> units = new(StringComparer.Ordinal);
+        if (!Directory.Exists(sourceDirectory))
+            return units;
 
-        foreach (var file in Directory.GetFiles(src, "*.w3js", SearchOption.AllDirectories))
+        IEnumerable<string> files = Directory
+            .EnumerateFiles(sourceDirectory, "*.w3js", SearchOption.AllDirectories)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(path => path, StringComparer.Ordinal);
+
+        foreach (string file in files)
         {
+            NsUnit parsed;
             try
             {
-                var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
-                units[unit.Name] = unit;
+                parsed = new Parser(new Lexer(File.ReadAllText(file)).Lex())
+                    .ParseNamespace();
             }
-            catch { /* пропускаем битые файлы */ }
+            catch (ParseException ex)
+            {
+                throw new InvalidDataException(
+                    $"{file}:{ex.Line}:{ex.Col}: {ex.Message}", ex);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidDataException(
+                    $"failed to parse source file '{file}': {ex.Message}", ex);
+            }
+
+            if (units.TryGetValue(parsed.Name, out _))
+            {
+                throw new InvalidDataException(
+                    $"duplicate namespace '{parsed.Name}' while loading project source file '{file}'");
+            }
+
+            units.Add(parsed.Name, parsed);
         }
+
         return units;
     }
 
     public static List<NsUnit> ResolveImports(NsUnit unit, Dictionary<string, NsUnit> all)
     {
-        var result = new List<NsUnit>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        ArgumentNullException.ThrowIfNull(unit);
+        ArgumentNullException.ThrowIfNull(all);
 
-        void Visit(string name)
+        List<NsUnit> result = new();
+        Dictionary<string, byte> states = new(StringComparer.Ordinal);
+        List<string> importStack = new();
+
+        void Visit(string name, string importedBy)
         {
-            if (!seen.Add(name) || !all.TryGetValue(name, out var u)) return;
-            foreach (var dep in u.Usings) Visit(dep);
-            result.Add(u);
+            if (!all.TryGetValue(name, out NsUnit imported))
+            {
+                throw new InvalidDataException(
+                    $"namespace '{importedBy}' imports '{name}', but no matching .w3js file was found");
+            }
+
+            if (states.TryGetValue(name, out byte state))
+            {
+                if (state == 2)
+                    return;
+
+                if (state == 1)
+                {
+                    int cycleStart = importStack.IndexOf(name);
+                    IEnumerable<string> cycle = cycleStart >= 0
+                        ? importStack.Skip(cycleStart).Append(name)
+                        : importStack.Append(name);
+
+                    throw new InvalidDataException(
+                        "cyclic namespace imports: " + string.Join(" -> ", cycle));
+                }
+            }
+
+            states[name] = 1;
+            importStack.Add(name);
+
+            foreach (string dependency in imported.Usings)
+                Visit(dependency, imported.Name);
+
+            importStack.RemoveAt(importStack.Count - 1);
+            states[name] = 2;
+            result.Add(imported);
         }
 
-        foreach (var u in unit.Usings) Visit(u);
+        foreach (string dependency in unit.Usings)
+            Visit(dependency, unit.Name);
+
         return result;
     }
 
