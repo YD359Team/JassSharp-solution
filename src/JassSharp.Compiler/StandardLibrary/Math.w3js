@@ -102,12 +102,14 @@ namespace Math
 
         public float Distance(Vector2 other)
         {
-            return (this - other).Length();
+            Vector2 delta = this - other;
+            return delta.Length();
         }
 
         public Vector2 Lerp(Vector2 other, float t)
         {
-            return this + (other - this) * t;
+            Vector2 delta = other - this;
+            return this + delta * t;
         }
 
         public static Vector2 operator +(Vector2 a, Vector2 b)
@@ -176,12 +178,14 @@ namespace Math
 
         public float Distance(Vector3 other)
         {
-            return (this - other).Length();
+            Vector3 delta = this - other;
+            return delta.Length();
         }
 
         public Vector3 Lerp(Vector3 other, float t)
         {
-            return this + (other - this) * t;
+            Vector3 delta = other - this;
+            return this + delta * t;
         }
 
         public static Vector3 operator +(Vector3 a, Vector3 b)
