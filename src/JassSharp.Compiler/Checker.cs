@@ -87,6 +87,7 @@ public static class Checker
         {
             foreach (var cls in _unit.Classes)
             {
+                ValidateOperators(cls);
                 _currentClass = cls.Name;
 
                 if (cls.Ctor is not null)
@@ -98,6 +99,31 @@ public static class Checker
             _currentClass = null;
             foreach (var function in _unit.Functions)
                 CheckFunction(function, null);
+        }
+
+        private void ValidateOperators(ClassDecl cls)
+        {
+            var declared = cls.Methods.Where(method => method.Operator is not null).ToList();
+            foreach (var method in declared)
+            {
+                string op = method.Operator!;
+                int expectedArity = op == "-" && method.Params.Count == 1 ? 1 : 2;
+                if (!method.IsStatic)
+                    Add(1, 1, "error", $"перегруженный оператор {op} должен быть static");
+                if (method.Params.Count != expectedArity)
+                    Add(1, 1, "error", $"оператор {op} должен принимать {expectedArity} параметр(а)");
+                if (!method.Params.Any(parameter => parameter.Type == cls.Name))
+                    Add(1, 1, "error", $"оператор {op} должен принимать параметр типа {cls.Name}");
+                if (op is "==" or "!=" or "<" or ">" or "<=" or ">=" && method.ReturnType != "bool")
+                    Add(1, 1, "error", $"оператор сравнения {op} должен возвращать bool");
+            }
+
+            var operators = declared.Select(method => method.Operator!).ToHashSet(StringComparer.Ordinal);
+            foreach (var pair in new[] { ("==", "!="), ("<", ">"), ("<=", ">=") })
+            {
+                if (operators.Contains(pair.Item1) != operators.Contains(pair.Item2))
+                    Add(1, 1, "error", $"операторы {pair.Item1} и {pair.Item2} должны объявляться парой");
+            }
         }
 
         private void CheckFunction(FnDecl function, string? className)
