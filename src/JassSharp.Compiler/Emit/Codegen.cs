@@ -662,6 +662,9 @@ end
 
     private (string Owner, FnDecl Method)? FindOperator(string? leftType, string? rightType, string op, IReadOnlyList<Expr> arguments)
     {
+        (string Owner, FnDecl Method)? best = null;
+        int bestScore = int.MaxValue;
+
         foreach (string owner in new[] { leftType, rightType }.Where(t => !string.IsNullOrWhiteSpace(t)).Cast<string>().Distinct(StringComparer.Ordinal))
         {
             if (!_operatorMethods.TryGetValue(owner + "|" + op, out var overloads))
@@ -669,29 +672,36 @@ end
 
             foreach (var method in overloads)
             {
-                if (method.Params.Count != arguments.Count)
+                if (!method.IsStatic || method.Params.Count != arguments.Count)
                     continue;
 
+                int score = 0;
                 bool compatible = true;
                 for (int index = 0; index < arguments.Count; index++)
                 {
                     string? actual = InferType(arguments[index]);
                     string expected = method.Params[index].Type;
-                    if (actual is not null && actual != expected &&
-                        !(actual == "int" && expected == "float") &&
-                        !(actual == "float" && expected == "int"))
+                    if (actual is null || actual == expected)
+                        continue;
+                    if (actual == "int" && expected == "float")
                     {
-                        compatible = false;
-                        break;
+                        score++;
+                        continue;
                     }
+
+                    compatible = false;
+                    break;
                 }
 
-                if (compatible)
-                    return (owner, method);
+                if (compatible && score < bestScore)
+                {
+                    best = (owner, method);
+                    bestScore = score;
+                }
             }
         }
 
-        return null;
+        return best;
     }
 
     private string? InferCallType(CallExpr expression)
