@@ -83,7 +83,20 @@ static class MapBuild
             if (files.Count == 0)
                 return Fail("no .w3js source files found");
 
-            List<string> ordered = ResolveUsings(files, src, project);
+            List<string> ordered;
+            try
+            {
+                ordered = ResolveUsings(files, src);
+            }
+            catch (InvalidDataException ex)
+            {
+                return Fail("source dependency resolution failed: " + ex.Message);
+            }
+            catch (Exception ex)
+            {
+                return Fail("could not resolve source dependencies: " + ex.Message);
+            }
+
             Console.WriteLine("files: " + string.Join(", ", ordered.Select(Path.GetFileName)));
 
             List<string> chunks = new();
@@ -1423,33 +1436,133 @@ static class MapBuild
         return 1;
     }
 
-    static List<string> ResolveUsings(List<string> files, string src, string project)
+    private static List<string> ResolveUsings(
+        IReadOnlyCollection<string> rootFiles,
+        string sourceDirectory)
     {
-        var units = new Dictionary<string, NsUnit>(StringComparer.Ordinal);
-        var fileByNs = new Dictionary<string, string>(StringComparer.Ordinal);
-        foreach (var f in files)
+        if (rootFiles.Count == 0)
+            throw new InvalidDataException("no root source files were provided");
+
+        StringComparer pathComparer = OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+
+        // Entry builds still need the complete source catalog to resolve imports.
+        // Only rootFiles determine which namespaces are emitted; imported units are
+        // added recursively in dependency-first order.
+        IEnumerable<string> discoveredFiles = Directory.Exists(sourceDirectory)
+            ? Directory.EnumerateFiles(
+                sourceDirectory,
+                "*.w3js",
+                SearchOption.AllDirectories)
+            : Enumerable.Empty<string>();
+
+        List<string> candidates = rootFiles
+            .Concat(discoveredFiles)
+            .Select(Path.GetFullPath)
+            .Distinct(pathComparer)
+            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(path => path, StringComparer.Ordinal)
+            .ToList();
+
+        Dictionary<string, NsUnit> unitsByName = new(StringComparer.Ordinal);
+        Dictionary<string, string> fileByName = new(StringComparer.Ordinal);
+        Dictionary<string, NsUnit> unitsByFile = new(pathComparer);
+
+        foreach (string file in candidates)
         {
+            NsUnit unit;
+
             try
             {
-                var unit = new Parser(new Lexer(File.ReadAllText(f)).Lex()).ParseNamespace();
-                units[unit.Name] = unit;
-                fileByNs[unit.Name] = f;
+                unit = new Parser(new Lexer(File.ReadAllText(file)).Lex())
+                    .ParseNamespace();
             }
-            catch { }
+            catch (ParseException ex)
+            {
+                throw new InvalidDataException(
+                    $"{file}:{ex.Line}:{ex.Col}: {ex.Message}",
+                    ex);
+            }
+            catch (Exception ex)
+            {
+                throw new InvalidDataException(
+                    $"failed to parse source file '{file}': {ex.Message}",
+                    ex);
+            }
+
+            if (unitsByName.TryGetValue(unit.Name, out _))
+            {
+                string previousFile = fileByName[unit.Name];
+                throw new InvalidDataException(
+                    $"duplicate namespace '{unit.Name}' in '{previousFile}' and '{file}'");
+            }
+
+            unitsByName.Add(unit.Name, unit);
+            fileByName.Add(unit.Name, file);
+            unitsByFile.Add(file, unit);
         }
 
-        var ordered = new List<string>();
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        List<string> ordered = new();
+        Dictionary<string, byte> visitState = new(StringComparer.Ordinal);
+        List<string> importStack = new();
 
-        void Visit(string ns)
+        void Visit(string namespaceName, string? importedBy)
         {
-            if (!seen.Add(ns) || !units.TryGetValue(ns, out var u)) return;
-            foreach (var dep in u.Usings) Visit(dep);
-            if (fileByNs.TryGetValue(ns, out var f)) ordered.Add(f);
+            if (!unitsByName.TryGetValue(namespaceName, out NsUnit unit))
+            {
+                string source = importedBy is null
+                    ? "root source"
+                    : $"namespace '{importedBy}'";
+
+                throw new InvalidDataException(
+                    $"{source} imports namespace '{namespaceName}', but no matching .w3js file was found");
+            }
+
+            if (visitState.TryGetValue(namespaceName, out byte state))
+            {
+                if (state == 2)
+                    return;
+
+                if (state == 1)
+                {
+                    int cycleStart = importStack.IndexOf(namespaceName);
+                    IEnumerable<string> cycle = cycleStart >= 0
+                        ? importStack.Skip(cycleStart).Append(namespaceName)
+                        : importStack.Append(namespaceName);
+
+                    throw new InvalidDataException(
+                        "cyclic namespace imports: " + string.Join(" -> ", cycle));
+                }
+            }
+
+            visitState[namespaceName] = 1;
+            importStack.Add(namespaceName);
+
+            foreach (string dependency in unit.Usings)
+                Visit(dependency, namespaceName);
+
+            importStack.RemoveAt(importStack.Count - 1);
+            visitState[namespaceName] = 2;
+            ordered.Add(fileByName[namespaceName]);
         }
 
-        foreach (var ns in units.Keys) Visit(ns);
-        return ordered.Count > 0 ? ordered : files;
+        foreach (string fullPath in rootFiles
+                     .Select(Path.GetFullPath)
+                     .Distinct(pathComparer)
+                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                     .ThenBy(path => path, StringComparer.Ordinal))
+        {
+            if (!unitsByFile.TryGetValue(fullPath, out NsUnit rootUnit))
+            {
+                throw new InvalidDataException(
+                    $"root source file was not included in the source catalog: {fullPath}");
+            }
+
+            Visit(rootUnit.Name, importedBy: null);
+        }
+
+        return ordered;
     }
 
     public static Dictionary<string, NsUnit> LoadProject(string projectDir)
