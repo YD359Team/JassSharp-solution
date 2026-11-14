@@ -1855,7 +1855,8 @@ export function registerCompletions(context: vscode.ExtensionContext) {
                     `\\b(List|Queue|Stack|Dictionary)\\s*<([^>]+)>\\s+${recv}\\b`,
                     "g"
                 );
-                const declarations = [...doc.getText().matchAll(declarationPattern)];
+                const textBeforeCursor = doc.getText(new vscode.Range(new vscode.Position(0, 0), pos));
+                const declarations = [...textBeforeCursor.matchAll(declarationPattern)];
                 const collectionDeclaration = declarations.length > 0 ? declarations[declarations.length - 1] : null;
                 if (collectionDeclaration) {
                     const collectionType = collectionDeclaration[1];
