@@ -298,6 +298,9 @@ function readVariables(text: string, classes = readClasses(text), functions = re
     }
 
     const parameterOffsets = new Set(parameterVariables.map(variable => variable.offset));
+    for (let i = result.length - 1; i >= 0; i--) {
+        if (parameterOffsets.has(result[i].offset)) result.splice(i, 1);
+    }
     for (const variable of result) {
         if (parameterOffsets.has(variable.offset)) continue;
         const ownerFunction = functions.find(fn => fn.bodyStart !== undefined &&
@@ -414,11 +417,28 @@ function getCurrentClass(text: string, offset: number): ClassInfo | undefined {
     return readClasses(text).filter(c => c.start < offset && offset <= c.bodyEnd).sort((a, b) => b.start - a.start)[0];
 }
 
+function visibleVariables(text: string, offset: number): VariableInfo[] {
+    const classes = readClasses(text);
+    const functions = readFunctions(text, classes);
+    const currentFunction = functions
+        .filter(fn => fn.bodyStart !== undefined && fn.bodyEnd !== undefined &&
+            fn.bodyStart <= offset && offset <= fn.bodyEnd)
+        .sort((a, b) => b.offset - a.offset)[0];
+    const currentClass = classes
+        .filter(cls => cls.bodyStart <= offset && offset <= cls.bodyEnd)
+        .sort((a, b) => b.start - a.start)[0];
+
+    return readVariables(text, classes, functions).filter(variable => {
+        if (variable.offset >= offset) return false;
+        if (variable.scopeStart === undefined) return true;
+        if (currentFunction && variable.scopeStart === currentFunction.bodyStart) return true;
+        return !!currentClass && variable.scopeStart === currentClass.bodyStart &&
+            variable.scopeEnd === currentClass.bodyEnd;
+    });
+}
+
 function latestVariableType(name: string, text: string, offset: number): string | undefined {
-    const before = text.slice(0, offset);
-    const classes = readClasses(before);
-    const functions = readFunctions(before, classes);
-    const variables = readVariables(before, classes, functions).filter(v => v.name === name && v.offset < offset);
+    const variables = visibleVariables(text, offset).filter(variable => variable.name === name);
     return variables.length ? variables[variables.length - 1].type : undefined;
 }
 
@@ -591,7 +611,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
 
             const classes = readClasses(fullText);
             const functions = readFunctions(fullText, classes);
-            const variables = readVariables(fullText.slice(0, offset), readClasses(fullText.slice(0, offset)));
+            const variables = visibleVariables(fullText, offset);
             for (const fn of functions) {
                 const info = `${fn.signature} : ${fn.returnType}`;
                 addCompletion(items, seen, fn.name,
@@ -691,7 +711,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             const member = MEMBERS.find(m => m.name === word);
             const documentText = document.getText();
             const cls = readClasses(documentText).find(c => c.name === word);
-            const variables = readVariables(documentText.slice(0, document.offsetAt(position)));
+            const variables = visibleVariables(documentText, document.offsetAt(position));
             const variable = variables.filter(v => v.name === word).slice(-1)[0];
 
             let code: string | undefined;
