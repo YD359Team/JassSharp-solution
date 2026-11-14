@@ -63,3 +63,34 @@ string report = $"""
 Raw multiline interpolation uses the same indentation trimming as a non-interpolated raw string. Backslashes in its literal portions are preserved.
 
 Alignment and format specifiers (for example `{value,10}` and `{value:N2}`) are not currently supported. Interpolation currently accepts a single expression per brace pair.
+
+## Стандартный модуль `Strings`
+
+Подключите модуль:
+
+```csharp
+using Strings;
+```
+
+Все операции доступны через статический класс `Strings`:
+
+```csharp
+string part = Strings.Substring("Warcraft", 4, 4);
+string replaced = Strings.Replace("a-b-a", "a", "x");
+int first = Strings.IndexOf("one two one", "one");
+int last = Strings.LastIndexOf("one two one", "one");
+bool found = Strings.Contains("Warcraft III", "craft");
+string clean = Strings.Trim("  text  ");
+string leftClean = Strings.TrimStart("  text");
+string rightClean = Strings.TrimEnd("text  ");
+string lower = Strings.ToLower("HELLO");
+string upper = Strings.ToUpper("hello");
+string[] parts = Strings.Split("a,,b,", ",");
+string joined = Strings.Join("|", parts);
+```
+
+Индексы `Substring`, `IndexOf` и `LastIndexOf` отсчитываются от нуля и измеряются в Unicode code points, а не в UTF-8 байтах. `Substring` принимает начальный индекс и длину; длина, выходящая за конец строки, обрезается. Поиск возвращает `-1`, если подстрока не найдена. Для пустой искомой строки `IndexOf` возвращает начальный индекс, а `LastIndexOf` — длину исходной строки.
+
+`Replace` заменяет все неперекрывающиеся вхождения буквальной подстроки; пустая искомая строка оставляет исходное значение без изменений. `Split` сохраняет пустые элементы, в том числе между соседними разделителями и в конце строки; пустой разделитель недопустим. `Join` объединяет элементы массива указанным разделителем.
+
+`Trim`, `TrimStart` и `TrimEnd` удаляют ASCII whitespace. `ToLower` и `ToUpper` выполняют ASCII-преобразование регистра. Эти операции не обещают полноценное Unicode-преобразование регистра или Unicode-классификацию пробельных символов.
