@@ -26,6 +26,7 @@ public static class Checker
         private readonly Dictionary<string, List<FnDecl>> _operators = new(StringComparer.Ordinal);
         private readonly List<Dictionary<string, string>> _scopes = [];
         private string? _currentClass;
+        private bool _currentMethodIsStatic;
         private string _expectedReturnType = "void";
 
         public List<Diagnostic> Diagnostics { get; } = [];
@@ -134,8 +135,10 @@ public static class Checker
         private void CheckFunction(FnDecl function, string? className)
         {
             var previousClass = _currentClass;
+            var previousIsStatic = _currentMethodIsStatic;
             var previousReturn = _expectedReturnType;
             _currentClass = className;
+            _currentMethodIsStatic = className is not null && function.IsStatic;
             _expectedReturnType = function.ReturnType;
 
             PushScope();
@@ -146,6 +149,7 @@ public static class Checker
             PopScope();
 
             _currentClass = previousClass;
+            _currentMethodIsStatic = previousIsStatic;
             _expectedReturnType = previousReturn;
         }
 
@@ -297,6 +301,8 @@ public static class Checker
                 case ThisExpr self:
                     if (_currentClass is null)
                         Add(self.Line, self.Col, "error", "this доступен только внутри метода или конструктора");
+                    else if (_currentMethodIsStatic)
+                        Add(self.Line, self.Col, "error", "this недоступен внутри static-метода");
                     break;
 
                 case NewExpr creation:
@@ -365,41 +371,52 @@ public static class Checker
                     CheckArguments(name, call.Args, native.Params);
                 else if (!IsKnownSymbol(name.Name))
                     Add(name.Line, name.Col, "warning", $"неизвестный вызов {name.Name}");
-            }
-            else if (call.Callee is MemberExpr member)
-            {
-                CheckExpression(member.Object);
-                var receiverType = InferType(member.Object);
-                if (receiverType is not null &&
-                    _classMethods.TryGetValue(receiverType, out var methods) &&
-                    methods.TryGetValue(member.Name, out var method))
-                {
-                    CheckArguments(member, call.Args, method.Params.Select(p => p.Type).ToArray());
-                }
-                else if (member.Object is NameExpr className &&
-                         _classMethods.TryGetValue(className.Name, out var staticMethods) &&
-                         staticMethods.TryGetValue(member.Name, out var staticMethod) &&
-                         staticMethod.IsStatic)
-                {
-                    CheckArguments(member, call.Args, staticMethod.Params.Select(p => p.Type).ToArray());
-                    return;
-                }
-                else if (receiverType is not null &&
-                         NativeTable.Find(receiverType, member.Name) is null)
-                {
-                    Add(member.Line, member.Col, "warning",
-                        $"тип {receiverType} не содержит метода {member.Name}");
-                }
 
-                foreach (var argument in call.Args)
-                    CheckExpression(argument);
+                return;
             }
-            else
+
+            if (call.Callee is not MemberExpr member)
             {
                 CheckExpression(call.Callee);
                 foreach (var argument in call.Args)
                     CheckExpression(argument);
+                return;
             }
+
+            CheckExpression(member.Object);
+            var receiverType = InferType(member.Object);
+
+            if (receiverType is not null &&
+                _classMethods.TryGetValue(receiverType, out var methods) &&
+                methods.TryGetValue(member.Name, out var instanceMethod))
+            {
+                CheckArguments(member, call.Args, instanceMethod.Params.Select(p => p.Type).ToArray());
+                if (instanceMethod.IsStatic)
+                    Add(member.Line, member.Col, "error",
+                        $"статический метод {receiverType}.{member.Name} необходимо вызывать через имя класса");
+                return;
+            }
+
+            if (member.Object is NameExpr className &&
+                !_scopes.Any(scope => scope.ContainsKey(className.Name)) &&
+                _classMethods.TryGetValue(className.Name, out var staticMethods) &&
+                staticMethods.TryGetValue(member.Name, out var classMethod))
+            {
+                CheckArguments(member, call.Args, classMethod.Params.Select(p => p.Type).ToArray());
+                if (!classMethod.IsStatic)
+                    Add(member.Line, member.Col, "error",
+                        $"нестатический метод {className.Name}.{member.Name} нельзя вызывать через имя класса");
+                return;
+            }
+
+            if (receiverType is not null && NativeTable.Find(receiverType, member.Name) is null)
+            {
+                Add(member.Line, member.Col, "warning",
+                    $"тип {receiverType} не содержит метода {member.Name}");
+            }
+
+            foreach (var argument in call.Args)
+                CheckExpression(argument);
         }
 
         private void CheckArguments(Expr callee, IReadOnlyList<Expr> arguments, IReadOnlyList<string> parameters)
