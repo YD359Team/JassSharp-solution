@@ -1,0 +1,20 @@
+namespace ForeachSmoke
+{
+    using Warcraft3;
+
+    public void ArrayLoop(int[][] matrix)
+    {
+        foreach (var row in matrix)
+        {
+            Print(row[0]);
+        }
+    }
+
+    public void GroupLoop(group units)
+    {
+        foreach (var unit in units)
+        {
+            unit.Kill();
+        }
+    }
+}
