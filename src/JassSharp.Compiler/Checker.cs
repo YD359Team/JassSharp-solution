@@ -450,10 +450,13 @@ public static class Checker
                     CheckExpression(index.Object);
                     CheckExpression(index.Index);
                     var indexType = InferType(index.Index);
-                    if (indexType is not null && indexType != "int")
+                    var indexedType = InferType(index.Object);
+                    bool dictionaryIndexer = indexedType is not null &&
+                        TryGetGenericArguments(indexedType, out var dictionaryCollectionName, out _) &&
+                        dictionaryCollectionName == "Dictionary";
+                    if (!dictionaryIndexer && indexType is not null && indexType != "int")
                         Add(index.Index.Line, index.Index.Col, "error",
                             $"индекс должен иметь тип int, получен {indexType}");
-                    var indexedType = InferType(index.Object);
                     bool supportsIndex = indexedType == "string" ||
                         indexedType is not null && indexedType.EndsWith("[]", StringComparison.Ordinal);
                     if (indexedType is not null && TryGetGenericArguments(indexedType, out var indexedName, out _))
