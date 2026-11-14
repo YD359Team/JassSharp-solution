@@ -97,7 +97,28 @@ public static class Checker
             foreach (var field in _unit.Fields)
                 ValidateDeclaredType(field.Type, 1, 1, allowVoid: false);
             foreach (var constant in _unit.Consts)
+            {
                 ValidateDeclaredType(constant.Type, constant.Value.Line, constant.Value.Col, allowVoid: false);
+                CheckExpression(constant.Value);
+                var actual = InferType(constant.Value);
+                if (actual is not null && !IsCompatible(actual, constant.Type))
+                    Add(constant.Value.Line, constant.Value.Col, "error",
+                        $"константа {constant.Name}: ожидался тип {constant.Type}, получен {actual}");
+            }
+            foreach (var enumeration in _unit.Enums)
+            {
+                foreach (var member in enumeration.Members)
+                {
+                    if (member.Value is null)
+                        continue;
+
+                    CheckExpression(member.Value);
+                    var actual = InferType(member.Value);
+                    if (actual is not null && actual != "int")
+                        Add(member.Value.Line, member.Value.Col, "error",
+                            $"значение элемента enum {enumeration.Name}.{member.Name} должно иметь тип int, получен {actual}");
+                }
+            }
 
             foreach (var cls in _unit.Classes)
             {
