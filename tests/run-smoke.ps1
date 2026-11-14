@@ -471,6 +471,7 @@ foreach ($fragment in @(
     "function Color:ToArgb()",
     "BlzFrameSetTextColor(target, self:ToArgb())",
     "SetUnitVertexColor(target, self:RedByte(), self:GreenByte(), self:BlueByte(), self:AlphaByte())",
+    "SetDestructableColor(target, color)",
     "SetLightningColor(target, self.R, self.G, self.B, self.A)",
     "function FloatingTextTag.new(text, x, y, z, size, lifespan, fadepoint)",
     "SetTextTagPosUnit(self._handle, target, zOffset)",
