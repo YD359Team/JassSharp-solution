@@ -231,7 +231,7 @@ try {
     $ErrorActionPreference = "Continue"
     $stringsDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $stringsInvalidFixture 2>&1
     $stringsExitCode = $LASTEXITCODE
-    $stringsText = $stringsDiagnostics -join "\`n"
+    $stringsText = $stringsDiagnostics -join [Environment]::NewLine
 }
 finally {
     $ErrorActionPreference = $previousErrorActionPreference
