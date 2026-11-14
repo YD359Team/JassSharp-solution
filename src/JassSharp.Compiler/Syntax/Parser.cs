@@ -319,26 +319,6 @@ public sealed class Parser(List<Token> tokens)
 
     private Stmt ParseStmt()
     {
-        if (Check("#"))
-        {
-            Eat(TokKind.Sym);
-            if (CheckId("if"))
-            {
-                Eat(TokKind.Id);
-                var target = Eat(TokKind.Id).Text;
-                Expect("{");
-                var then = ParseBlock();
-                List<Stmt>? els = null;
-                if (CheckId("else"))
-                {
-                    Eat(TokKind.Id);
-                    Expect("{");
-                    els = ParseBlock();
-                }
-                return new CondStmt(target, then, els);
-            }
-            throw new ParseException("неизвестная директива", Peek.Line, Peek.Col);
-        }
         if (CheckId("if"))
         {
             Eat(TokKind.Id);
@@ -350,6 +330,18 @@ public sealed class Parser(List<Token> tokens)
             List<Stmt>? els = null;
             if (CheckId("else")) { Eat(TokKind.Id); Expect("{"); els = ParseBlock(); }
             return new IfStmt(c, then, els);
+        }
+        if (CheckId("do"))
+        {
+            var token = Eat(TokKind.Id);
+            Expect("{");
+            var body = ParseBlock();
+            EatId("while");
+            Expect("(");
+            var condition = ParseExpr();
+            Expect(")");
+            Accept(";");
+            return new DoWhileStmt(body, condition, token.Line, token.Col);
         }
         if (CheckId("while"))
         {
@@ -407,6 +399,17 @@ public sealed class Parser(List<Token> tokens)
             return new VarStmt(typeName, id, init, typeTok.Line, typeTok.Col);
         }
         var expr = ParseExpr();
+        if (expr is CallExpr
+            {
+                Callee: MemberExpr { Object: NameExpr { Name: "Lua" }, Name: "Raw" },
+                Args.Count: 1
+            } rawCall)
+        {
+            if (rawCall.Args[0] is not StrExpr rawCode)
+                throw new ParseException("Lua.Raw ожидает строковый или многострочный raw-литерал", rawCall.Line, rawCall.Col);
+            Accept(";");
+            return new RawLuaStmt(rawCode.Text, rawCall.Line, rawCall.Col);
+        }
         if (Accept("="))
         {
             var v = ParseExpr();
