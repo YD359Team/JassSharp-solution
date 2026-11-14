@@ -36,6 +36,13 @@ static class MapBuild
             using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(cfgPath));
             JsonElement root = doc.RootElement;
 
+            string mode = GetString(root, "mode")?.Trim().ToLowerInvariant() ?? "wc3";
+            if (mode is not ("wc3" or "headless"))
+                return Fail($"unsupported mode '{mode}'. Supported modes are 'wc3' and 'headless'.");
+
+            if (mode == "headless")
+                return BuildHeadless(project, root, workRoot);
+
             string mapValue = root.GetProperty("map").GetString() ?? "map";
             string target = root.TryGetProperty("target", out JsonElement targetElement)
                 ? targetElement.GetString() ?? "lua"
@@ -238,6 +245,93 @@ static class MapBuild
         {
             TryDeleteDirectory(workRoot);
         }
+    }
+
+    private static int BuildHeadless(string project, JsonElement root, string workRoot)
+    {
+        string? entry = GetString(root, "entry");
+        string? output = GetString(root, "output");
+        string sourceDirectory = Path.Combine(project, "src");
+        List<string> rootFiles = new();
+
+        if (!string.IsNullOrWhiteSpace(entry))
+        {
+            string entryPath = NormalizePath(project, entry);
+            if (!File.Exists(entryPath))
+                return Fail($"entry file does not exist: {entryPath}");
+            rootFiles.Add(entryPath);
+        }
+        else if (Directory.Exists(sourceDirectory))
+        {
+            rootFiles.AddRange(Directory.GetFiles(sourceDirectory, "*.w3js", SearchOption.AllDirectories));
+        }
+
+        if (rootFiles.Count == 0)
+            return Fail("headless mode: no .w3js source files found");
+
+        string standardLibraryDirectory = Path.Combine(workRoot, "stdlib");
+        Directory.CreateDirectory(standardLibraryDirectory);
+        foreach (var standardSource in StandardLibrary.LoadSources())
+            File.WriteAllText(Path.Combine(standardLibraryDirectory, standardSource.FileName),
+                standardSource.Source, Utf8NoBom);
+
+        List<string> ordered;
+        try
+        {
+            ordered = ResolveUsings(rootFiles, sourceDirectory, standardLibraryDirectory);
+        }
+        catch (Exception ex)
+        {
+            return Fail("headless source dependency resolution failed: " + ex.Message);
+        }
+
+        Dictionary<string, NsUnit> allUnits;
+        try
+        {
+            allUnits = LoadProject(project);
+        }
+        catch (Exception ex)
+        {
+            return Fail("headless source catalog loading failed: " + ex.Message);
+        }
+
+        List<string> chunks = new();
+        foreach (string file in ordered)
+        {
+            try
+            {
+                var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
+                var imports = ResolveImports(unit, allUnits);
+                var diagnostics = Checker.Check(unit, file, imports);
+                foreach (var diagnostic in diagnostics)
+                    Console.Error.WriteLine(
+                        $"{file}:{diagnostic.Line}:{diagnostic.Col}: {diagnostic.Severity}: {diagnostic.Message}");
+
+                if (diagnostics.Any(diagnostic => diagnostic.Severity == "error"))
+                    return Fail($"headless semantic analysis failed for '{file}'");
+
+                chunks.Add(new LuaEmitter().Emit(unit, imports, headless: true));
+            }
+            catch (ParseException ex)
+            {
+                return Fail($"{file}:{ex.Line}:{ex.Col}: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return Fail($"headless compilation failed for '{file}': {ex.Message}");
+            }
+        }
+
+        string outputPath = string.IsNullOrWhiteSpace(output)
+            ? Path.Combine(project, "bin", Path.GetFileName(project.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) + ".lua")
+            : NormalizePath(project, output);
+        string? outputDirectory = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrWhiteSpace(outputDirectory))
+            Directory.CreateDirectory(outputDirectory);
+
+        File.WriteAllText(outputPath, string.Join("\n", chunks), Utf8NoBom);
+        Console.WriteLine(outputPath);
+        return 0;
     }
 
     private static int BuildFromArchive(

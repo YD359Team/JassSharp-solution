@@ -162,6 +162,9 @@ try
 {
     var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
     var projectDirectory = FindProjectDirectory(file);
+    var mode = ReadProjectMode(projectDirectory);
+    if (mode is not ("wc3" or "headless"))
+        throw new InvalidDataException($"unsupported project mode '{mode}'. Supported modes are 'wc3' and 'headless'.");
     var allUnits = MapBuild.LoadProject(projectDirectory);
     var imports = MapBuild.ResolveImports(unit, allUnits);
     foreach (var sourceUnit in imports.Append(unit))
@@ -188,7 +191,7 @@ try
     var generatedParts = new List<string>();
     foreach (var imported in imports)
         generatedParts.Add(new LuaEmitter().Emit(imported, imports.Where(dependency => dependency.Name != imported.Name)));
-    generatedParts.Add(new LuaEmitter().Emit(unit, imports));
+    generatedParts.Add(new LuaEmitter().Emit(unit, imports, headless: mode == "headless"));
     File.WriteAllText(outputPath, string.Join("\n", generatedParts), new UTF8Encoding(false));
     Console.WriteLine(outputPath);
 }
@@ -204,6 +207,23 @@ catch (Exception ex)
 }
 
 return 0;
+
+
+static string ReadProjectMode(string projectDirectory)
+{
+    string configPath = Path.Combine(projectDirectory, "jasssharp.json");
+    if (!File.Exists(configPath))
+        return "wc3";
+
+    using var document = JsonDocument.Parse(File.ReadAllText(configPath));
+    var root = document.RootElement;
+    if (!root.TryGetProperty("mode", out var modeElement) || modeElement.ValueKind == JsonValueKind.Null)
+        return "wc3";
+    if (modeElement.ValueKind != JsonValueKind.String)
+        throw new InvalidDataException("project configuration property 'mode' must be a string");
+
+    return modeElement.GetString()?.Trim().ToLowerInvariant() ?? "wc3";
+}
 
 static string FindProjectDirectory(string sourceFile)
 {

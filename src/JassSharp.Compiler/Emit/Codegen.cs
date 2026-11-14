@@ -6,6 +6,7 @@ namespace JassSharp.Emit;
 public sealed class Codegen
 {
     private readonly bool _lua;
+    private readonly bool _headless;
     private readonly HashSet<string> _classes;
     private List<string> _lines = [];
     private int _indent;
@@ -18,9 +19,10 @@ public sealed class Codegen
     private readonly Dictionary<string, EnumDecl> _enums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
 
-    public Codegen(bool lua, IEnumerable<string> classes)
+    public Codegen(bool lua, IEnumerable<string> classes, bool headless = false)
     {
         _lua = lua;
+        _headless = headless;
         _classes = new HashSet<string>(classes, StringComparer.Ordinal);
     }
 
@@ -78,7 +80,8 @@ public sealed class Codegen
             Line($"-- {unit.Name}  (JASS# → Lua)");
             if (unit.Usings.Count > 0)
                 Line("-- usings: " + string.Join(", ", unit.Usings));
-            Line("if not BJDebugMsg then function BJDebugMsg(s) print(s) end end");
+            if (!_headless)
+                Line("if not BJDebugMsg then function BJDebugMsg(s) print(s) end end");
             Line("");
             foreach (var f in unit.Fields)
                 Line(f.IsArray ? $"{f.Name} = {{}}" : $"{f.Name} = nil");
@@ -89,7 +92,8 @@ public sealed class Codegen
             if (unit.Consts.Count > 0) Line("");
             foreach (var cls in unit.Classes) EmitClassLua(cls);
             foreach (var fn in unit.Functions) EmitFnLua(fn);
-            EmitLuaEntry(hasInit);
+            if (!_headless)
+                EmitLuaEntry(hasInit);
 
             Line(@"
 function __list_remove(t, v)
@@ -925,7 +929,7 @@ end
         {
             var parts = c.Args.Select(ToStringExpr).ToList();
             var msg = parts.Count == 0 ? "\"\"" : string.Join(" .. ", parts);
-            return $"BJDebugMsg({msg})";
+            return $"{(_headless ? "print" : "BJDebugMsg")}({msg})";
         }
 
         return EmitNormalCall(c);
