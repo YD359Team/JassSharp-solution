@@ -1,0 +1,21 @@
+namespace StringsApiSmoke
+{
+    using Strings;
+
+    void Run()
+    {
+        string source = "AéBC";
+        string middle = Strings.Substring(source, 1, 2);
+        int first = Strings.IndexOf(source, "é");
+        int last = Strings.LastIndexOf("one two one", "one");
+        bool contains = Strings.Contains(source, "BC");
+        string replaced = Strings.Replace("a-b-a", "a", "x");
+        string trimmed = Strings.Trim("  value  ");
+        string trimStart = Strings.TrimStart("  value");
+        string trimEnd = Strings.TrimEnd("value  ");
+        string lower = Strings.ToLower("ABC");
+        string upper = Strings.ToUpper("abc");
+        string[] pieces = Strings.Split("a,,b,", ",");
+        string joined = Strings.Join("|", pieces);
+    }
+}
