@@ -171,7 +171,7 @@ if ($timerLua.Contains("function GameTimer.__gc") -or $timerLua.Contains("newpro
     throw "Timer disposal must remain explicit and must not use Lua garbage collection."
 }
 
-Write-Host "[9/17] Generating Math/vector Lua..."
+Write-Host "[8/17] Generating Math/vector Lua..."
 dotnet run --configuration Release --no-build --project $project -- build $fixture
 if ($LASTEXITCODE -ne 0) {
     throw "Fixture build failed with exit code $LASTEXITCODE"

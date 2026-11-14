@@ -31,7 +31,7 @@ Each `GameTimer` owns exactly one native `timer` created by `CreateTimer()`.
 - `IsDisposed()` — reports whether the native handle has been destroyed.
 - `Dispose()` — explicitly destroys the native handle. It is generated from `~GameTimer()`.
 
-Callbacks are zero-argument JASS# lambdas. They are emitted as Lua callback functions and passed directly to `TimerStart`. A callback may capture local variables and the owning timer according to the compiler's current lambda-capture behavior.
+Callbacks are zero-argument JASS# lambdas. They are emitted as Lua callback functions and passed directly to `TimerStart`. Lua closures capture referenced outer locals, so callbacks can use local state and the owning timer.
 
 Calling either start method on a disposed timer is a no-op. Starting an active timer replaces its previous schedule. Negative timeouts are clamped to zero; zero is passed to Warcraft III unchanged. Pausing and resuming a disposed timer are no-ops. Query methods return 0 after disposal.
 

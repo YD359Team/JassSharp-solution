@@ -10,6 +10,7 @@ namespace TimerSmoke
         timer.StartOnce(2.0, () =>
         {
             Print("one-shot timer");
+            timer.Pause();
         });
 
         float elapsed = timer.Elapsed();
