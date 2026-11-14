@@ -11,6 +11,7 @@ public sealed class Codegen
     private int _indent;
     private Dictionary<string, string> _locals = new(StringComparer.Ordinal);
     private string? _className;
+    private bool _currentMethodIsStatic;
     private readonly Dictionary<string, FnDecl> _inlineMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FnDecl> _methods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<FnDecl>> _operatorMethods = new(StringComparer.Ordinal);
@@ -162,6 +163,7 @@ end
         foreach (var f in cls.Fields) Line($"{MapType(f.Type)} {f.Name}");
         if (cls.Ctor is not null)
         {
+            _currentMethodIsStatic = false;
             _locals = cls.Ctor.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
             Line($"static method create takes {Params(cls.Ctor)} returns {cls.Name}");
             _indent++;
@@ -196,6 +198,7 @@ end
         }
         foreach (var m in cls.Methods)
         {
+            _currentMethodIsStatic = m.IsStatic;
             _locals = m.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
             if (m.Operator is { } op)
             {
@@ -216,6 +219,7 @@ end
         }
         EmitOperatorMetamethods(cls);
         Line("");
+        _currentMethodIsStatic = false;
         _className = null;
     }
 
@@ -604,6 +608,7 @@ end
     private string? InferType(Expr e) => e switch
     {
         NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
+        NameExpr n when CurrentFieldType(n.Name) is { } fieldType => fieldType,
         ThisExpr => _className,
         NewExpr n => n.Type,
         NumExpr n => IsFloatingLiteral(n.Text) ? "float" : "int",
@@ -617,6 +622,20 @@ end
         IndexExpr ix when InferType(ix.Object) == "string" => "string",
         _ => null
     };
+
+    private string? CurrentFieldType(string name)
+    {
+        if (_currentMethodIsStatic || _className is null || _locals.ContainsKey(name))
+            return null;
+
+        return _classFields.TryGetValue(_className, out var fields) &&
+               fields.TryGetValue(name, out var type)
+            ? type
+            : null;
+    }
+
+    private bool ShouldEmitCurrentField(string name) =>
+        _lua && CurrentFieldType(name) is not null;
 
     private static bool IsFloatingLiteral(string text) =>
         text.Contains('.') || text.Contains('e') || text.Contains('E');
@@ -759,6 +778,7 @@ end
         BoolExpr b => b.Value ? "true" : "false",
         NullExpr => _lua ? "nil" : "null",
         ThisExpr => _lua ? "self" : "this",
+        NameExpr n when ShouldEmitCurrentField(n.Name) => $"self.{n.Name}",
         NameExpr n => n.Name,
 
         UnaryExpr u when FindOperator(InferType(u.Inner), null, u.Op, [u.Inner]) is { } overload =>
