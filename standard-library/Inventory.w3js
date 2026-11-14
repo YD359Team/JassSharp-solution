@@ -148,7 +148,7 @@ namespace Inventory
         // applyStatBonuses lets the engine include supported RPG stat bonuses in healing.
         public static float Heal(unit target, unit source, float amount, bool isItem, bool applyStatBonuses)
         {
-            if (target == null || amount <= 0.0) { return 0.0; }
+            if (target == null) { return 0.0; }
             return BlzUnitHeal(target, source, amount, isItem, applyStatBonuses);
         }
     }
