@@ -1,6 +1,8 @@
 namespace Samples.Features
 {
-    class Hero
+        using Warcraft3;
+
+class Hero
     {
         unit U;
         public Hero(unit u) { this.U = u; }
