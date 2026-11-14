@@ -34,10 +34,10 @@ The constructor accepts the owning `unit` and an integer ability rawcode. Use Wa
 | `IncreaseLevel()` / `DecreaseLevel()` | Uses the native level adjustment functions |
 | `SetPermanent(permanent)` | Controls whether the ability is permanent |
 | `SetEnabled(enabled, hideUI)` | Enables/disables the ability; `hideUI` is forwarded to Warcraft III |
-| `Cooldown(level)` | Reads the cooldown duration for a 1-based ability level |
+| `Cooldown(level)` | Reads the cooldown duration for a zero-based ability level |
 | `RemainingCooldown()` | Reads the current remaining cooldown |
 | `StartCooldown(seconds)` / `EndCooldown()` | Starts or ends this ability's cooldown |
-| `ManaCost(level)` | Reads mana cost for a 1-based ability level |
+| `ManaCost(level)` | Reads mana cost for a zero-based ability level |
 | `BooleanField(field)` / `SetBooleanField(field, value)` | Reads or writes a boolean ability field using `abilitybooleanfield` |
 | `IntegerField(field)` / `SetIntegerField(field, value)` | Reads or writes an integer ability field using `abilityintegerfield` |
 | `RealField(field)` / `SetRealField(field, value)` | Reads or writes a real ability field using `abilityrealfield` |
