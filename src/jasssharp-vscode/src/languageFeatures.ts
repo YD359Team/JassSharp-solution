@@ -89,6 +89,7 @@ const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; ret: string
         { name: "Transparent", ret: "Color", kind: "Method", parameters: [] },
         { name: "ApplyPlayerColorToUnit", ret: "void", kind: "Method", parameters: ["unit target", "playercolor color"] },
         { name: "ApplyPlayerColorToItem", ret: "void", kind: "Method", parameters: ["item target", "playercolor color"] },
+        { name: "ApplyPlayerColorToDestructable", ret: "void", kind: "Method", parameters: ["destructable target", "playercolor color"] },
         { name: "ApplyPlayerColorToEffect", ret: "void", kind: "Method", parameters: ["effect target", "player owner"] },
         { name: "WithAlpha", ret: "Color", kind: "Method", parameters: ["float alpha"] },
         { name: "Lerp", ret: "Color", kind: "Method", parameters: ["Color other", "float amount"] },
