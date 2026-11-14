@@ -281,6 +281,41 @@ public static class Checker
                     PopScope();
                     break;
 
+                case ForeachStmt loop:
+                {
+                    CheckExpression(loop.Collection);
+                    string? elementType = GetForeachElementType(InferType(loop.Collection));
+
+                    string itemType = loop.Type;
+                    if (itemType == "var")
+                    {
+                        if (elementType is null)
+                        {
+                            Add(loop.Line, loop.Col, "error",
+                                $"не удалось вывести тип элемента foreach для коллекции {InferType(loop.Collection) ?? "?"}");
+                            itemType = "?";
+                        }
+                        else
+                        {
+                            itemType = elementType;
+                        }
+                    }
+                    else
+                    {
+                        if (!IsKnownType(itemType, allowVoid: false))
+                            Add(loop.Line, loop.Col, "error", $"неизвестный тип элемента foreach: {itemType}");
+                        if (elementType is not null && !IsCompatible(elementType, itemType))
+                            Add(loop.Line, loop.Col, "error",
+                                $"foreach: ожидался элемент типа {itemType}, коллекция содержит {elementType}");
+                    }
+
+                    PushScope();
+                    Declare(loop.Name, itemType, loop.Line, loop.Col);
+                    CheckStatements(loop.Body);
+                    PopScope();
+                    break;
+                }
+
                 case ForStmt loop:
                     PushScope();
                     if (loop.Init is not null)
@@ -306,6 +341,17 @@ public static class Checker
                     }
                     break;
             }
+        }
+
+        private string? GetForeachElementType(string? collectionType)
+        {
+            if (collectionType is null)
+                return null;
+            if (collectionType.EndsWith("[]", StringComparison.Ordinal))
+                return collectionType[..^2];
+            if (collectionType == "group")
+                return _hasWarcraft3 ? "unit" : null;
+            return null;
         }
 
         private void CheckCondition(Expr condition)
