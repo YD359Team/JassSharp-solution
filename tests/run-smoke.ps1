@@ -17,15 +17,15 @@ $misuseDiagnostics = dotnet run --configuration Release --no-build --project $pr
 $misuseExitCode = $LASTEXITCODE
 $misuseText = $misuseDiagnostics -join "`n"
 try {
-    $parsedDiagnostics = $misuseText | ConvertFrom-Json
+    $parsedDiagnostics = ConvertFrom-Json -InputObject $misuseText
 }
 catch {
     throw "Could not parse checker diagnostics as JSON. Output: $misuseText"
 }
 
-$errorMessages = @($parsedDiagnostics | Where-Object { $_.Severity -eq "error" } | ForEach-Object { $_.Message })
-$hasStaticCallError = @($errorMessages | Where-Object { $_ -like "*статический метод*" }).Count -gt 0
-$hasInstanceCallError = @($errorMessages | Where-Object { $_ -like "*нестатический метод*" }).Count -gt 0
+$errorDiagnostics = @($parsedDiagnostics | Where-Object { $_.Severity -eq "error" })
+$hasStaticCallError = @($errorDiagnostics | Where-Object { $_.Message -match "Factory\.Create" }).Count -gt 0
+$hasInstanceCallError = @($errorDiagnostics | Where-Object { $_.Message -match "Factory\.Get" }).Count -gt 0
 
 if ($misuseExitCode -eq 0 -or -not $hasStaticCallError -or -not $hasInstanceCallError) {
     throw "Static method misuse was not rejected with both expected diagnostics. Output: $misuseText"
