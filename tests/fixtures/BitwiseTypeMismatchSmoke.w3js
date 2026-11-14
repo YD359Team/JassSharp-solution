@@ -1,0 +1,9 @@
+namespace BitwiseTypeMismatchSmoke
+{
+    public void OnInit()
+    {
+        float floating = 1.5;
+        int invalidBitwise = floating & 1;
+        int invalidHex = 0x100000000;
+    }
+}
