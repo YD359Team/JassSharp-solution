@@ -627,10 +627,13 @@ function collectLiveAssignmentDiagnostics(document: vscode.TextDocument): vscode
     const functions = readFunctions(text, classes);
     const variables = readVariables(text, classes, functions);
     const diagnostics: vscode.Diagnostic[] = [];
-    const assignmentPattern = /\b([A-Za-z_]\w*)\s*(\+=|-=|\*=|\/=|%=|(?<![=!<>])=(?!=))\s*([^;\r\n{}]+)/g;
+    const assignmentPattern = /\\b([A-Za-z_]\\w*(?:\\s*\\[[^\\]]+\\])*)\\s*(\\+=|-=|\\*=|\\/=|%=|(?<![=!<>])=(?![=>=]))\\s*([^;\\r\\n{}]+)/g;
 
     for (const match of source.matchAll(assignmentPattern)) {
-        const targetName = match[1];
+        const targetExpression = match[1].trim();
+        const targetName = /^([A-Za-z_]\\w*)/.exec(targetExpression)?.[1];
+        if (!targetName) continue;
+
         const operator = match[2];
         const expression = match[3].trim();
         const targetOffset = (match.index ?? 0) + match[0].indexOf(targetName);
@@ -640,27 +643,39 @@ function collectLiveAssignmentDiagnostics(document: vscode.TextDocument): vscode
             .sort((a, b) => b.offset - a.offset)[0];
 
         if (!target) continue;
-        // Explicit and inferred declarations are not assignments to an existing variable.
         if (variables.some(variable => variable.offset === targetOffset)) continue;
 
-        const expressionOffset = targetOffset + match[0].indexOf(match[3]);
+        let expectedType: string | undefined = target.type;
+        const indexCount = (targetExpression.match(/\\[/g) ?? []).length;
+        for (let i = 0; i < indexCount && expectedType; i++) {
+            if (expectedType === "string") continue;
+            if (expectedType.endsWith("[]")) expectedType = expectedType.slice(0, -2);
+            else expectedType = undefined;
+        }
+        if (!expectedType) continue;
+
+        const expressionOffset = (match.index ?? 0) + match[0].indexOf(match[3]);
         const actualType = inferExpressionType(expression, text, expressionOffset);
         if (!actualType || actualType === "null") continue;
 
         let incompatible = false;
         if (operator === "=") {
-            incompatible = !areEditorTypesCompatible(actualType, target.type);
-        } else if (target.type === "int" || target.type === "float") {
+            incompatible = !areEditorTypesCompatible(actualType, expectedType);
+        } else if (expectedType === "int" || expectedType === "float") {
             incompatible = !["int", "float"].includes(actualType) ||
-                (target.type === "int" && actualType === "float");
+                (expectedType === "int" && actualType === "float");
+        } else if (expectedType === "string" && operator === "+=") {
+            incompatible = actualType !== "string";
+        } else if (expectedType === "bool" || expectedType === "string") {
+            incompatible = true;
         }
 
         if (!incompatible) continue;
-        const start = document.positionAt(expressionOffset);
-        const end = document.positionAt(Math.min(text.length, expressionOffset + Math.max(1, match[3].trim().length)));
+        const startPosition = document.positionAt(expressionOffset);
+        const endPosition = document.positionAt(Math.min(text.length, expressionOffset + Math.max(1, match[3].trim().length)));
         const diagnostic = new vscode.Diagnostic(
-            new vscode.Range(start, end),
-            `Несовместимое присваивание: переменная ${targetName} имеет тип ${target.type}, выражение имеет тип ${actualType}`,
+            new vscode.Range(startPosition, endPosition),
+            `Несовместимое присваивание: выражение типа ${actualType} нельзя присвоить ${targetExpression} типа ${expectedType}`,
             vscode.DiagnosticSeverity.Error
         );
         diagnostic.source = "JASS#";
