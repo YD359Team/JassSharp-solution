@@ -302,6 +302,16 @@ public static class Checker
                     PopScope();
                     break;
 
+                case DoWhileStmt loop:
+                    PushScope();
+                    CheckStatements(loop.Body);
+                    PopScope();
+                    CheckCondition(loop.Cond);
+                    break;
+
+                case RawLuaStmt:
+                    break;
+
                 case ForeachStmt loop:
                 {
                     CheckExpression(loop.Collection);
@@ -350,18 +360,6 @@ public static class Checker
                     PopScope();
                     break;
 
-                case CondStmt conditional:
-                    // Compile-time conditional branches have independent lexical scopes.
-                    PushScope();
-                    CheckStatements(conditional.Then);
-                    PopScope();
-                    if (conditional.Else is not null)
-                    {
-                        PushScope();
-                        CheckStatements(conditional.Else);
-                        PopScope();
-                    }
-                    break;
             }
         }
 
