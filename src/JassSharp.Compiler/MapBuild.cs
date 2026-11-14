@@ -1623,6 +1623,9 @@ static class MapBuild
 
         void Visit(string namespaceName, string? importedBy)
         {
+            if (namespaceName == "Warcraft3")
+                return;
+
             if (!unitsByName.TryGetValue(namespaceName, out NsUnit unit))
             {
                 string source = importedBy is null
@@ -1724,6 +1727,10 @@ static class MapBuild
                 throw new InvalidDataException($"namespace '{standardUnit.Name}' conflicts with a built-in standard-library namespace");
             units.Add(standardUnit.Name, standardUnit);
         }
+
+        if (units.ContainsKey("Warcraft3"))
+            throw new InvalidDataException("namespace 'Warcraft3' is reserved for the built-in Warcraft III module");
+        units.Add("Warcraft3", new NsUnit("Warcraft3", [], [], [], [], [], []));
 
         return units;
     }

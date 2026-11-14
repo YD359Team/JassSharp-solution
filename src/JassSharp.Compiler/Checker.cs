@@ -7,9 +7,13 @@ public sealed record Diagnostic(int Line, int Col, string Severity, string Messa
 
 public static class Checker
 {
-    public static List<Diagnostic> Check(NsUnit unit, string? file = null, IEnumerable<NsUnit>? imports = null)
+    public static List<Diagnostic> Check(
+        NsUnit unit,
+        string? file = null,
+        IEnumerable<NsUnit>? imports = null,
+        bool implicitWarcraft3 = true)
     {
-        var analyzer = new Analyzer(unit, file, imports);
+        var analyzer = new Analyzer(unit, file, imports, implicitWarcraft3);
         analyzer.Run();
         return analyzer.Diagnostics;
     }
@@ -18,6 +22,7 @@ public static class Checker
     {
         private readonly NsUnit _unit;
         private readonly string? _file;
+        private readonly bool _hasWarcraft3;
         private readonly HashSet<string> _classes = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FnDecl> _functions = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _globals = new(StringComparer.Ordinal);
@@ -31,15 +36,18 @@ public static class Checker
 
         public List<Diagnostic> Diagnostics { get; } = [];
 
-        public Analyzer(NsUnit unit, string? file, IEnumerable<NsUnit>? imports)
+        public Analyzer(NsUnit unit, string? file, IEnumerable<NsUnit>? imports, bool implicitWarcraft3)
         {
             _unit = unit;
             _file = file;
+            var importedUnits = imports?.ToList() ?? [];
+            _hasWarcraft3 = implicitWarcraft3 ||
+                unit.Usings.Contains("Warcraft3", StringComparer.Ordinal) ||
+                importedUnits.Any(imported => imported.Name == "Warcraft3");
 
             AddUnit(unit);
-            if (imports is not null)
-                foreach (var imported in imports)
-                    AddUnit(imported);
+            foreach (var imported in importedUnits)
+                AddUnit(imported);
         }
 
         private void AddUnit(NsUnit unit)
@@ -86,9 +94,16 @@ public static class Checker
 
         public void Run()
         {
+            foreach (var field in _unit.Fields)
+                ValidateDeclaredType(field.Type, 1, 1, allowVoid: false);
+            foreach (var constant in _unit.Consts)
+                ValidateDeclaredType(constant.Type, constant.Value.Line, constant.Value.Col, allowVoid: false);
+
             foreach (var cls in _unit.Classes)
             {
                 ValidateOperators(cls);
+                foreach (var field in cls.Fields)
+                    ValidateDeclaredType(field.Type, 1, 1, allowVoid: false);
                 _currentClass = cls.Name;
 
                 if (cls.Ctor is not null)
@@ -131,6 +146,10 @@ public static class Checker
 
         private void CheckFunction(FnDecl function, string? className)
         {
+            ValidateDeclaredType(function.ReturnType, 1, 1, allowVoid: true);
+            foreach (var parameter in function.Params)
+                ValidateDeclaredType(parameter.Type, 1, 1, allowVoid: false);
+
             var previousClass = _currentClass;
             var previousIsStatic = _currentMethodIsStatic;
             var previousReturn = _expectedReturnType;
@@ -192,6 +211,10 @@ public static class Checker
                             $"переменная var {variable.Name} должна иметь выражение инициализации");
                         declaredType = "?";
                     }
+
+                    if (declaredType != "?" && !IsKnownType(declaredType, allowVoid: false))
+                        Add(variable.Line, variable.Col, "error",
+                            $"неизвестный тип {declaredType}; для типов Warcraft III добавьте using Warcraft3");
 
                     Declare(variable.Name, declaredType, variable.Line, variable.Col);
                     break;
@@ -333,8 +356,9 @@ public static class Checker
 
                 case NewExpr creation:
                     if (!_classes.Contains(creation.Type) &&
-                        !NativeTable.Constructors.ContainsKey(creation.Type) &&
-                        !NativeCatalog.Types.Contains(creation.Type))
+                        !(_hasWarcraft3 &&
+                            (NativeTable.Constructors.ContainsKey(creation.Type) ||
+                             NativeCatalog.Types.Contains(creation.Type))))
                     {
                         Add(creation.Line, creation.Col, "warning", $"неизвестный тип {creation.Type}");
                     }
@@ -409,13 +433,15 @@ public static class Checker
                 {
                     CheckArguments(name, call.Args, function.Params.Select(p => p.Type).ToArray());
                 }
-                else if (NativeSigs.Map.TryGetValue(name.Name, out var native))
+                else if (_hasWarcraft3 && NativeSigs.Map.TryGetValue(name.Name, out var native))
                 {
                     CheckArguments(name, call.Args, native.Params);
                 }
                 else
                 {
-                    if (!IsKnownSymbol(name.Name))
+                    if (IsWarcraftSymbol(name.Name) && !_hasWarcraft3)
+                        Add(name.Line, name.Col, "error", $"{name.Name} доступна только после using Warcraft3");
+                    else if (!IsKnownSymbol(name.Name))
                         Add(name.Line, name.Col, "warning", $"неизвестный вызов {name.Name}");
 
                     foreach (var argument in call.Args)
@@ -461,11 +487,11 @@ public static class Checker
 
             if (receiverType is not null)
             {
-                var nativeMember = NativeTable.Find(receiverType, member.Name);
+                var nativeMember = _hasWarcraft3 ? NativeTable.Find(receiverType, member.Name) : null;
                 if (nativeMember?.Kind == MemberKind.Method)
                 {
                     var nativeName = GetNativeName(nativeMember.Read);
-                    if (nativeName is not null && NativeSigs.Map.TryGetValue(nativeName, out var nativeMethod))
+                    if (nativeName is not null && _hasWarcraft3 && NativeSigs.Map.TryGetValue(nativeName, out var nativeMethod))
                     {
                         CheckArguments(member, call.Args, nativeMethod.Params);
                         return;
@@ -538,7 +564,7 @@ public static class Checker
                 case CallExpr { Callee: NameExpr name }:
                     if (_functions.TryGetValue(name.Name, out var function))
                         return function.ReturnType;
-                    return NativeSigs.Map.TryGetValue(name.Name, out var native) ? native.ReturnType : null;
+                    return _hasWarcraft3 && NativeSigs.Map.TryGetValue(name.Name, out var native) ? native.ReturnType : null;
 
                 case CallExpr { Callee: MemberExpr member }:
                 {
@@ -556,12 +582,12 @@ public static class Checker
                         methods.TryGetValue(member.Name, out var method))
                         return method.ReturnType;
 
-                    var nativeMember = NativeTable.Find(receiverType, member.Name);
+                    var nativeMember = _hasWarcraft3 ? NativeTable.Find(receiverType, member.Name) : null;
                     if (nativeMember?.Kind != MemberKind.Method)
                         return null;
 
                     var nativeName = GetNativeName(nativeMember.Read);
-                    return nativeName is not null && NativeSigs.Map.TryGetValue(nativeName, out var native2)
+                    return nativeName is not null && _hasWarcraft3 && NativeSigs.Map.TryGetValue(nativeName, out var native2)
                         ? native2.ReturnType
                         : null;
                 }
@@ -576,12 +602,12 @@ public static class Checker
                         fields.TryGetValue(member.Name, out var fieldType2))
                         return fieldType2;
 
-                    var nativeMember = NativeTable.Find(receiverType, member.Name);
+                    var nativeMember = _hasWarcraft3 ? NativeTable.Find(receiverType, member.Name) : null;
                     if (nativeMember is null || nativeMember.Kind == MemberKind.Method)
                         return null;
 
                     var nativeName = GetNativeName(nativeMember.Read);
-                    return nativeName is not null && NativeSigs.Map.TryGetValue(nativeName, out var native2)
+                    return nativeName is not null && _hasWarcraft3 && NativeSigs.Map.TryGetValue(nativeName, out var native2)
                         ? native2.ReturnType
                         : null;
                 }
@@ -681,7 +707,7 @@ public static class Checker
         {
             return (_classFields.TryGetValue(type, out var fields) && fields.ContainsKey(memberName)) ||
                    (_classMethods.TryGetValue(type, out var methods) && methods.ContainsKey(memberName)) ||
-                   NativeTable.Find(type, memberName) is not null;
+                   (_hasWarcraft3 && NativeTable.Find(type, memberName) is not null);
         }
 
         private static string? GetNativeName(string? template)
@@ -704,14 +730,38 @@ public static class Checker
             return false;
         }
 
+        private bool IsKnownType(string type, bool allowVoid)
+        {
+            if (type is "int" or "float" or "bool" or "string" or "List")
+                return true;
+            if (allowVoid && type == "void")
+                return true;
+            if (_classes.Contains(type))
+                return true;
+            return _hasWarcraft3 &&
+                (NativeCatalog.Types.Contains(type) || type is "integer" or "real" or "nothing" or "code");
+        }
+
+        private static bool IsWarcraftSymbol(string name) =>
+            NativeCatalog.Natives.Contains(name) ||
+            NativeCatalog.Constants.Contains(name) ||
+            NativeSigs.Map.ContainsKey(name);
+
+        private void ValidateDeclaredType(string type, int line, int col, bool allowVoid)
+        {
+            if (!IsKnownType(type, allowVoid))
+                Add(line, col, "error",
+                    $"неизвестный тип {type}; для типов Warcraft III добавьте using Warcraft3");
+        }
+
         private bool IsKnownSymbol(string name)
         {
             return _functions.ContainsKey(name) ||
                    _globals.ContainsKey(name) ||
                    _classes.Contains(name) ||
-                   NativeCatalog.Natives.Contains(name) ||
-                   NativeCatalog.Constants.Contains(name) ||
-                   NativeSigs.Map.ContainsKey(name) ||
+                   (_hasWarcraft3 && NativeCatalog.Natives.Contains(name)) ||
+                   (_hasWarcraft3 && NativeCatalog.Constants.Contains(name)) ||
+                   (_hasWarcraft3 && NativeSigs.Map.ContainsKey(name)) ||
                    name is "J" or "math" or "string" or "table";
         }
 

@@ -36,10 +36,13 @@ if (cmd == "check")
     {
         var unit = new Parser(new Lexer(File.ReadAllText(path)).Lex()).ParseNamespace();
         var projectDirectory = FindProjectDirectory(path);
+        var mode = ReadProjectMode(projectDirectory);
+        if (mode is not ("wc3" or "headless"))
+            throw new InvalidDataException($"unsupported project mode '{mode}'.");
         var allUnits = MapBuild.LoadProject(projectDirectory);
         var imports = MapBuild.ResolveImports(unit, allUnits);
 
-        diagnostics.AddRange(JassSharp.Checker.Check(unit, path, imports));
+        diagnostics.AddRange(JassSharp.Checker.Check(unit, path, imports, implicitWarcraft3: mode == "wc3"));
     }
     catch (ParseException ex)
     {
@@ -173,7 +176,8 @@ try
         var diagnostics = Checker.Check(
             sourceUnit,
             sourceUnit.Name == unit.Name ? file : null,
-            sourceImports);
+            sourceImports,
+            implicitWarcraft3: mode == "wc3");
         foreach (var diagnostic in diagnostics)
             Console.Error.WriteLine($"{sourceUnit.Name}:{diagnostic.Line}:{diagnostic.Col}: {diagnostic.Severity}: {diagnostic.Message}");
         if (diagnostics.Any(diagnostic => diagnostic.Severity == "error"))
