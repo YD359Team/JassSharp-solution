@@ -57,6 +57,7 @@
     <File Path="tests/fixtures/CollectionsSmoke.w3js" />
     <File Path="tests/fixtures/CollectionsTypeMismatchSmoke.w3js" />
     <File Path="tests/fixtures/StringsSmoke.w3js" />
+    <File Path="tests/fixtures/StringsTypeMismatchSmoke.w3js" />
     <File Path="tests/fixtures/MathOperatorsSmoke.w3js" />
     <File Path="tests/fixtures/StaticMethodMisuse.w3js" />
     <File Path="tests/fixtures/TypeSafetySmoke.w3js" />
