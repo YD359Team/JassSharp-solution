@@ -194,10 +194,28 @@ public sealed class Parser(List<Token> tokens)
     private string ParseTypeName()
     {
         string typeName = Eat(TokKind.Id).Text;
-        if (typeName == "List" && Accept("<"))
+        if (Accept("<"))
         {
-            Eat(TokKind.Id);
+            var arguments = new List<string>();
+            do
+            {
+                arguments.Add(ParseTypeName());
+            }
+            while (Accept(","));
             Expect(">");
+
+            int expectedArity = typeName switch
+            {
+                "List" or "Queue" or "Stack" => 1,
+                "Dictionary" => 2,
+                _ => -1
+            };
+            if (expectedArity < 0)
+                throw new ParseException($"тип {typeName} не поддерживает параметры типа", Peek.Line, Peek.Col);
+            if (arguments.Count != expectedArity)
+                throw new ParseException($"{typeName} ожидает {expectedArity} параметр(а) типа, получено {arguments.Count}", Peek.Line, Peek.Col);
+
+            typeName += "<" + string.Join(",", arguments) + ">";
         }
 
         while (Accept("["))
@@ -240,7 +258,7 @@ public sealed class Parser(List<Token> tokens)
         // common types
         "int", "float", "bool", "void", "string", "var",
         // extended types
-        "List",
+        "List", "Queue", "Stack", "Dictionary",
         // warctaft 3 types
         "ability", "abilitybooleanfield", "abilitybooleanlevelarrayfield", "abilitybooleanlevelfield", "abilityintegerfield",
         "abilityintegerlevelarrayfield", "abilityintegerlevelfield", "abilityrealfield", "abilityreallevelarrayfield",
@@ -268,6 +286,20 @@ public sealed class Parser(List<Token> tokens)
         if (Peek.Kind != TokKind.Id || _i + 1 >= tokens.Count) return false;
 
         int nameIndex = _i + 1;
+        if (nameIndex < tokens.Count && tokens[nameIndex].Text == "<")
+        {
+            int depth = 0;
+            do
+            {
+                if (tokens[nameIndex].Text == "<") depth++;
+                else if (tokens[nameIndex].Text == ">") depth--;
+                nameIndex++;
+                if (nameIndex >= tokens.Count && depth > 0)
+                    return false;
+            }
+            while (depth > 0);
+        }
+
         while (nameIndex + 1 < tokens.Count &&
                tokens[nameIndex].Kind == TokKind.Sym && tokens[nameIndex].Text == "[" &&
                tokens[nameIndex + 1].Kind == TokKind.Sym && tokens[nameIndex + 1].Text == "]")
