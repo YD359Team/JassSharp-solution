@@ -32,6 +32,7 @@ if (-not (Test-Path $bitwiseLuaPath)) {
 }
 $bitwiseLua = Get-Content -LiteralPath $bitwiseLuaPath -Raw
 foreach ($fragment in @(
+    "local abc = (2748)",
     "local combined = (flags | mask)",
     "local intersection = (flags & mask)",
     "local toggled = (flags ~ mask)",
@@ -76,7 +77,7 @@ catch {
 }
 $bitwiseErrors = @($parsedBitwiseDiagnostics | Where-Object { $_.Severity -eq "error" })
 $bitwiseErrorLines = @($bitwiseErrors | ForEach-Object { [int]$_.Line } | Sort-Object) -join ","
-if ($bitwiseExitCode -eq 0 -or $bitwiseErrors.Count -ne 2 -or $bitwiseErrorLines -ne "6,7,8,9,10") {
+if ($bitwiseExitCode -eq 0 -or $bitwiseErrors.Count -ne 5 -or $bitwiseErrorLines -ne "6,7,8,9,10") {
     throw "Bitwise type checking or 32-bit literal overflow validation failed. Exit code: $bitwiseExitCode. Error lines: $bitwiseErrorLines. Output: $bitwiseText"
 }
 
