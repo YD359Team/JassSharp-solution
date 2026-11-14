@@ -1,0 +1,83 @@
+namespace FrameSmoke
+{
+    using Frames;
+    using Warcraft3;
+
+    public void OnInit()
+    {
+        bool tocLoaded = Frame.LoadTOC("war3mapImported\\UI.toc");
+
+        Frame root = Frame.FromOrigin(ORIGIN_FRAME_GAME_UI, 0);
+        Frame panel = Frame.Create("Frame", root.Handle(), 0, 0);
+        Frame simple = Frame.CreateSimple("SimpleFrame", root.Handle(), 0);
+        Frame typed = Frame.CreateByType("BACKDROP", "JassSharpBackdrop", root.Handle(), "", 0);
+        Frame named = Frame.FindByName("ConsoleUI", 0);
+
+        panel.SetPoint(FRAMEPOINT_CENTER, root.Handle(), FRAMEPOINT_CENTER, 0.0, 0.0);
+        panel.SetSize(0.30, 0.20);
+        panel.SetVisible(true);
+        panel.SetAlpha(300);
+        panel.SetText("JASS#");
+        panel.AddText(" Frame API");
+        panel.SetTextSizeLimit(256);
+        panel.SetTextColor(0xFFFFFFFF);
+        panel.SetTextAlignment(TEXT_JUSTIFY_MIDDLE, TEXT_JUSTIFY_CENTER);
+        panel.SetFont("Fonts\\FRIZQT__.TTF", 0.012, 0);
+        panel.SetTexture("UI\\Widgets\\EscMenu\\Human\\blank-background.blp", 0, true);
+        panel.SetModel("Abilities\\Weapons\\PhoenixMissile\\Phoenix_Missile.mdl", 0);
+        panel.SetScale(1.0);
+        panel.SetEnabled(true);
+        panel.SetFocus(false);
+        panel.SetTooltip(named.Handle());
+        panel.CageMouse(false);
+        panel.SetValue(0.5);
+        panel.SetMinMaxValue(0.0, 1.0);
+        panel.SetStepSize(0.1);
+        panel.SetAutoScroll(true);
+        panel.SetSpriteAnimation(0, 0);
+        panel.SetVertexColor(0xFFFFFFFF);
+        panel.SetLevel(1);
+        panel.SetParent(root.Handle());
+
+        float width = panel.Width();
+        float height = panel.Height();
+        int alpha = panel.Alpha();
+        bool visible = panel.IsVisible();
+        bool enabled = panel.IsEnabled();
+        float value = panel.Value();
+        string text = panel.Text();
+        string name = panel.Name();
+        int childCount = panel.ChildrenCount();
+        framehandle firstChild = panel.Child(0);
+        framehandle parent = panel.Parent();
+
+        trigger frameTrigger = CreateTrigger();
+        event clickEvent = panel.RegisterEvent(frameTrigger, FRAMEEVENT_CONTROL_CLICK);
+        framehandle eventFrame = FrameEvents.CurrentFrame();
+        frameeventtype eventType = FrameEvents.CurrentEvent();
+        float eventValue = FrameEvents.CurrentValue();
+        string eventText = FrameEvents.CurrentText();
+
+        float normalizedX = FrameCoordinates.PixelToFrameX(640);
+        float normalizedY = FrameCoordinates.PixelToFrameY(360);
+        int pixelX = FrameCoordinates.FrameToPixelX(normalizedX);
+        int pixelY = FrameCoordinates.FrameToPixelY(normalizedY);
+
+        panel.ClearPoints();
+        panel.SetAbsolutePoint(FRAMEPOINT_CENTER, 0.4, 0.3);
+        panel.SetAllPoints(root.Handle());
+        panel.Click();
+
+        bool ownsPanel = panel.OwnsHandle();
+        bool panelDisposedBefore = panel.IsDisposed();
+        panel.Dispose();
+        bool panelDisposedAfter = panel.IsDisposed();
+        panel.Dispose();
+
+        // Borrowed wrappers may be disposed without destroying the game-owned frames.
+        root.Dispose();
+        named.Dispose();
+        simple.Dispose();
+        typed.Dispose();
+    }
+}

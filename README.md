@@ -22,7 +22,7 @@ JASS# — язык с C#-подобным синтаксисом для разр
 
 - `src/JassSharp.Compiler` — компилятор, проверка семантики и CLI.
 - `src/jasssharp-vscode` — расширение VS Code.
-- `standard-library` — исходники стандартной библиотеки. Документация по математике и векторам: `docs/operators-and-math.md`; по 2D-геометрии: `docs/geometry.md`; по таймерам Warcraft III: `docs/timers.md`; по группам юнитов: `docs/groups.md`; по способностям: `docs/abilities.md`; Frame API будет отдельным модулем стандартной библиотеки.
+- `standard-library` — исходники стандартной библиотеки, включая обёртки над Warcraft III Frame API. Документация по математике и векторам: `docs/operators-and-math.md`; по 2D-геометрии: `docs/geometry.md`; по таймерам Warcraft III: `docs/timers.md`; по группам юнитов: `docs/groups.md`; по способностям: `docs/abilities.md`; по Frame API: `docs/frames.md`.
 - `samples` — демонстрационные проекты.
 - `tests` — smoke fixtures и сценарии проверки компилятора.
 - `docs` — дополнительные заметки по языку.
@@ -141,7 +141,7 @@ Smoke-сценарии компилятора запускаются из кор
 ./tests/run-smoke.ps1
 ```
 
-Сценарий собирает компилятор и проверяет семантические ошибки, операторы, headless-режим, массивы и `foreach`.
+Сценарий собирает компилятор и проверяет семантические ошибки, операторы, headless-режим, массивы, `foreach` и игровые модули стандартной библиотеки.
 
 
 ## Деструкторы и освобождение ресурсов

@@ -1,0 +1,387 @@
+namespace Frames
+{
+    using Warcraft3;
+
+    // A wrapper around a native framehandle. Ownership is explicit.
+    public class Frame
+    {
+        private framehandle _handle;
+        private bool _ownsHandle;
+        private bool _disposed;
+
+        public Frame(framehandle handle, bool ownsHandle)
+        {
+            _handle = handle;
+            _ownsHandle = ownsHandle;
+            _disposed = false;
+        }
+
+        public static Frame Create(string template, framehandle parent, int priority, int context)
+        {
+            return new Frame(BlzCreateFrame(template, parent, priority, context), true);
+        }
+
+        public static Frame CreateSimple(string template, framehandle parent, int context)
+        {
+            return new Frame(BlzCreateSimpleFrame(template, parent, context), true);
+        }
+
+        public static Frame CreateByType(string frameType, string name, framehandle parent, string inherits, int context)
+        {
+            return new Frame(BlzCreateFrameByType(frameType, name, parent, inherits, context), true);
+        }
+
+        // Origin frames and frames found by name are borrowed from the game UI.
+        public static Frame FromOrigin(originframetype frameType, int index)
+        {
+            return new Frame(BlzGetOriginFrame(frameType, index), false);
+        }
+
+        public static Frame FindByName(string name, int context)
+        {
+            return new Frame(BlzGetFrameByName(name, context), false);
+        }
+
+        public static bool LoadTOC(string path)
+        {
+            return BlzLoadTOCFile(path);
+        }
+
+        public bool IsDisposed()
+        {
+            return _disposed;
+        }
+
+        public bool OwnsHandle()
+        {
+            return _ownsHandle;
+        }
+
+        // Returns the borrowed native handle. Do not destroy it outside this wrapper.
+        public framehandle Handle()
+        {
+            if (_disposed) { return null; }
+            return _handle;
+        }
+
+        public string Name()
+        {
+            if (_disposed) { return ""; }
+            return BlzFrameGetName(_handle);
+        }
+
+        public void SetPoint(framepointtype point, framehandle relative, framepointtype relativePoint, float x, float y)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetPoint(_handle, point, relative, relativePoint, x, y);
+        }
+
+        public void SetAbsolutePoint(framepointtype point, float x, float y)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetAbsPoint(_handle, point, x, y);
+        }
+
+        public void ClearPoints()
+        {
+            if (_disposed) { return; }
+            BlzFrameClearAllPoints(_handle);
+        }
+
+        public void SetAllPoints(framehandle relative)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetAllPoints(_handle, relative);
+        }
+
+        public void SetVisible(bool visible)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetVisible(_handle, visible);
+        }
+
+        public bool IsVisible()
+        {
+            if (_disposed) { return false; }
+            return BlzFrameIsVisible(_handle);
+        }
+
+        public void SetText(string value)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetText(_handle, value);
+        }
+
+        public string Text()
+        {
+            if (_disposed) { return ""; }
+            return BlzFrameGetText(_handle);
+        }
+
+        public void AddText(string value)
+        {
+            if (_disposed) { return; }
+            BlzFrameAddText(_handle, value);
+        }
+
+        public void SetTextSizeLimit(int limit)
+        {
+            if (_disposed) { return; }
+            if (limit < 0) { limit = 0; }
+            BlzFrameSetTextSizeLimit(_handle, limit);
+        }
+
+        public int TextSizeLimit()
+        {
+            if (_disposed) { return 0; }
+            return BlzFrameGetTextSizeLimit(_handle);
+        }
+
+        public void SetTextColor(int color)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetTextColor(_handle, color);
+        }
+
+        public void SetTextAlignment(textaligntype vertical, textaligntype horizontal)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetTextAlignment(_handle, vertical, horizontal);
+        }
+
+        public void SetFont(string path, float height, int flags)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetFont(_handle, path, height, flags);
+        }
+
+        public void SetTexture(string path, int flag, bool blend)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetTexture(_handle, path, flag, blend);
+        }
+
+        public void SetModel(string path, int camera)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetModel(_handle, path, camera);
+        }
+
+        public void SetSize(float width, float height)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetSize(_handle, width, height);
+        }
+
+        public float Width()
+        {
+            if (_disposed) { return 0.0; }
+            return BlzFrameGetWidth(_handle);
+        }
+
+        public float Height()
+        {
+            if (_disposed) { return 0.0; }
+            return BlzFrameGetHeight(_handle);
+        }
+
+        public void SetAlpha(int alpha)
+        {
+            if (_disposed) { return; }
+            if (alpha < 0) { alpha = 0; }
+            if (alpha > 255) { alpha = 255; }
+            BlzFrameSetAlpha(_handle, alpha);
+        }
+
+        public int Alpha()
+        {
+            if (_disposed) { return 0; }
+            return BlzFrameGetAlpha(_handle);
+        }
+
+        public void SetScale(float scale)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetScale(_handle, scale);
+        }
+
+        public void SetEnabled(bool enabled)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetEnable(_handle, enabled);
+        }
+
+        public bool IsEnabled()
+        {
+            if (_disposed) { return false; }
+            return BlzFrameGetEnable(_handle);
+        }
+
+        public void SetFocus(bool focused)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetFocus(_handle, focused);
+        }
+
+        public void SetTooltip(framehandle tooltip)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetTooltip(_handle, tooltip);
+        }
+
+        public void CageMouse(bool enabled)
+        {
+            if (_disposed) { return; }
+            BlzFrameCageMouse(_handle, enabled);
+        }
+
+        public void SetValue(float value)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetValue(_handle, value);
+        }
+
+        public float Value()
+        {
+            if (_disposed) { return 0.0; }
+            return BlzFrameGetValue(_handle);
+        }
+
+        public void SetMinMaxValue(float minimum, float maximum)
+        {
+            if (_disposed) { return; }
+            if (maximum < minimum) { maximum = minimum; }
+            BlzFrameSetMinMaxValue(_handle, minimum, maximum);
+        }
+
+        public void SetStepSize(float step)
+        {
+            if (_disposed) { return; }
+            if (step < 0.0) { step = 0.0; }
+            BlzFrameSetStepSize(_handle, step);
+        }
+
+        public void SetAutoScroll(bool enabled)
+        {
+            if (_disposed) { return; }
+            BlzTextAreaFrameSetAutoScroll(_handle, enabled);
+        }
+
+        public void SetSpriteAnimation(int animation, int rarity)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetSpriteAnimate(_handle, animation, rarity);
+        }
+
+        public void SetVertexColor(int color)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetVertexColor(_handle, color);
+        }
+
+        public void SetLevel(int level)
+        {
+            if (_disposed) { return; }
+            if (level < 0) { level = 0; }
+            BlzFrameSetLevel(_handle, level);
+        }
+
+        public void SetParent(framehandle parent)
+        {
+            if (_disposed) { return; }
+            BlzFrameSetParent(_handle, parent);
+        }
+
+        public framehandle Parent()
+        {
+            if (_disposed) { return null; }
+            return BlzFrameGetParent(_handle);
+        }
+
+        public int ChildrenCount()
+        {
+            if (_disposed) { return 0; }
+            return BlzFrameGetChildrenCount(_handle);
+        }
+
+        // Child handles are borrowed; this method does not transfer ownership.
+        public framehandle Child(int index)
+        {
+            if (_disposed || index < 0) { return null; }
+            if (index >= BlzFrameGetChildrenCount(_handle)) { return null; }
+            return BlzFrameGetChild(_handle, index);
+        }
+
+        public void Click()
+        {
+            if (_disposed) { return; }
+            BlzFrameClick(_handle);
+        }
+
+        public event RegisterEvent(trigger triggerHandle, frameeventtype eventType)
+        {
+            if (_disposed) { return null; }
+            return BlzTriggerRegisterFrameEvent(triggerHandle, _handle, eventType);
+        }
+
+        ~Frame()
+        {
+            if (!_disposed)
+            {
+                if (_ownsHandle)
+                {
+                    BlzDestroyFrame(_handle);
+                }
+                _disposed = true;
+            }
+        }
+    }
+
+    // Frame event context is read inside the trigger action registered for that event.
+    public class FrameEvents
+    {
+        public static framehandle CurrentFrame()
+        {
+            return BlzGetTriggerFrame();
+        }
+
+        public static frameeventtype CurrentEvent()
+        {
+            return BlzGetTriggerFrameEvent();
+        }
+
+        public static float CurrentValue()
+        {
+            return BlzGetTriggerFrameValue();
+        }
+
+        public static string CurrentText()
+        {
+            return BlzGetTriggerFrameText();
+        }
+    }
+
+    // Coordinates are expressed in Warcraft III's normalized frame coordinate space.
+    public class FrameCoordinates
+    {
+        public static float PixelToFrameX(int pixels)
+        {
+            return BlzPixelToFrameX(pixels);
+        }
+
+        public static float PixelToFrameY(int pixels)
+        {
+            return BlzPixelToFrameY(pixels);
+        }
+
+        public static int FrameToPixelX(float value)
+        {
+            return BlzFrameToPixelX(value);
+        }
+
+        public static int FrameToPixelY(float value)
+        {
+            return BlzFrameToPixelY(value);
+        }
+    }
+}
