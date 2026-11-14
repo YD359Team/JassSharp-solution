@@ -13,6 +13,15 @@
       "include": "#rawcode"
     },
     {
+      "include": "#interpolated-raw-string"
+    },
+    {
+      "include": "#interpolated-string"
+    },
+    {
+      "include": "#raw-string"
+    },
+    {
       "include": "#string"
     },
     {
@@ -149,6 +158,57 @@
     "punctuation": {
       "name": "punctuation.separator.jasssharp",
       "match": "[{}()\\[\\].,;]"
+    },
+    "string-escape": {
+      "name": "constant.character.escape.jasssharp",
+      "match": "\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4})"
+    },
+    "interpolation": {
+      "name": "meta.interpolation.jasssharp",
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        {
+          "include": "#keyword"
+        },
+        {
+          "include": "#type"
+        },
+        {
+          "include": "#number"
+        },
+        {
+          "include": "#operator"
+        }
+      ]
+    },
+    "interpolated-string": {
+      "name": "string.quoted.interpolated.jasssharp",
+      "begin": "\\$\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "include": "#interpolation"
+        },
+        {
+          "include": "#string-escape"
+        }
+      ]
+    },
+    "raw-string": {
+      "name": "string.quoted.raw.jasssharp",
+      "begin": "\"\"\"",
+      "end": "\"\"\""
+    },
+    "interpolated-raw-string": {
+      "name": "string.quoted.interpolated.raw.jasssharp",
+      "begin": "\\$\"\"\"",
+      "end": "\"\"\"",
+      "patterns": [
+        {
+          "include": "#interpolation"
+        }
+      ]
     }
   }
 }
