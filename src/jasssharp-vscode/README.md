@@ -1,40 +1,78 @@
 # JASS# для VS Code
 
-Подсветка `.w3js`, диагностика, сборка скрипта и карты.
+Подсветка \`.w3js\`, IntelliSense, диагностика и запуск команд компилятора JASS#.
 
-## Сборка VSIX
+## Установка и сборка VSIX
 
 Из папки расширения:
 
-```bash
+\`\`\`powershell
 cd src/jasssharp-vscode
-npm install
-npm run package
-```
+npm.cmd install
+npm.cmd run package
+\`\`\`
 
-`npm run package` компилирует TypeScript и вызывает `@vscode/vsce package`. Появится файл `jasssharp-0.1.0.vsix`.
-
-Установка в VS Code: **Extensions** → `…` → **Install from VSIX…**.
-
-Если `vsce` не в PATH после `npm install`, можно так:
-
-```bash
-npx @vscode/vsce package
-```
-
-## Иконка
-
-Положите логотип как `icon.png` (128×128) в эту папку. Он указан в `package.json` как иконка расширения и языка.
+Установка в VS Code: **Extensions** → \`…\` → **Install from VSIX…**.
 
 ## Команды
 
-- **JASS#: Build** / **Build vJASS** / **Build Lua** — трансляция текущего файла
-- **JASS#: Build Map** — по `jasssharp.json` пишет `war3map.lua` или `war3map.j` в папку карты
-- **JASS#: Run Map** — то же и запускает Warcraft III с `-loadfile`
+- **JASS#: Build** / **Build Lua** — трансляция текущего файла в Lua.
+- **JASS#: Build Map** — сборка карты в режиме \`wc3\`.
+- **JASS#: Run Map** — сборка и запуск карты в режиме \`wc3\`.
+- **JASS#: Open in World Editor** — открытие карты в World Editor.
 
-Диагностика идёт сама: расширение зовёт `jasssharp check` и подчёркивает ошибки.
+В режиме \`headless\` команды карты и запуска скрыты. Используйте **Build Lua** или CLI-команду \`jasssharp map\`.
 
-## Настройка
+## Режим проекта
 
-`jasssharp.compilerPath` — путь к собранному `jasssharp`. Пусто — ищется в PATH.
-`jasssharp.gamePath` — запасной путь к игре (передаётся как `JASSSHARP_GAME`).
+Режим задаётся в \`jasssharp.json\`:
+
+\`\`\`json
+{
+  "mode": "wc3",
+  "map": "map",
+  "target": "lua",
+  "entry": "src/Main.w3js"
+}
+\`\`\`
+
+\`mode\` необязателен. Если он отсутствует, используется \`wc3\`.
+
+### wc3
+
+Обычный режим разработки карт Warcraft III. Сохраняется текущий pipeline сборки карты, включая MPQ-инструменты, игровые пути и стандартные Lua entry points.
+
+### headless
+
+Автономная трансляция W3JS в Lua. Не требует установленной игры, пути к Warcraft III, карты или MPQ-инструментов. Например:
+
+\`\`\`json
+{
+  "mode": "headless",
+  "entry": "src/Main.w3js",
+  "output": "bin/Main.lua"
+}
+\`\`\`
+
+Если \`entry\` не задан, компилируются все исходники из \`src\`. Если \`output\` не задан, результат сохраняется в \`bin/<имя-проекта>.lua\`.
+
+В headless-режиме не генерируются Warcraft III entry points \`config()\` и \`main()\`, а встроенный \`Print(...)\` транслируется в Lua \`print(...)\`.
+
+## Модуль Warcraft III
+
+Типы, native-функции, константы и расширенные члены Warcraft III доступны в IntelliSense после явного подключения:
+
+\`\`\`csharp
+using Warcraft3;
+\`\`\`
+
+В headless-режиме это подключение также включает семантическую проверку Warcraft III API. Оно не добавляет игру или Warcraft runtime в Lua-файл — headless остаётся режимом трансляции.
+
+## Настройки расширения
+
+- \`jasssharp.compilerPath\` — путь к \`jasssharp.exe\` или \`jasssharp.dll\`. Пустое значение означает поиск в \`PATH\`.
+- \`jasssharp.projectFile\` — имя или путь к конфигурации проекта; по умолчанию \`jasssharp.json\`.
+- \`jasssharp.gamePath\` — запасной путь к Warcraft III, передаваемый как \`JASSSHARP_GAME\` в режиме \`wc3\`.
+- \`jasssharp.mpqToolPath\` — путь к MPQ-инструменту для сборки карты.
+
+Диагностика запускается автоматически для сохранённых файлов через \`jasssharp check\`. Ошибки несовместимых присваиваний также подсвечиваются непосредственно при редактировании.
