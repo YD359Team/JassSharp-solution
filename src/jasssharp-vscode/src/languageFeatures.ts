@@ -471,7 +471,11 @@ function isVariableVisibleAt(
 ): boolean {
     if (variable.offset >= offset) return false;
     if (variable.scopeStart === undefined) return true;
-    if (currentFunction && variable.scopeStart === currentFunction.bodyStart) return true;
+    if (currentFunction && variable.offset >= currentFunction.bodyStart! &&
+        variable.offset <= currentFunction.bodyEnd! &&
+        variable.scopeStart >= currentFunction.bodyStart! &&
+        variable.scopeEnd! <= currentFunction.bodyEnd! &&
+        variable.scopeStart <= offset && offset <= variable.scopeEnd) return true;
     return !!currentClass && variable.scopeStart === currentClass.bodyStart &&
         variable.scopeEnd === currentClass.bodyEnd;
 }
