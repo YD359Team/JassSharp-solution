@@ -23,4 +23,4 @@ The constructor creates a non-permanent text tag, positions it in world coordina
 
 `SetVelocity` forwards native X/Y velocity values without reinterpretation. `SetAge` changes the native age. `SetSuspended` pauses/resumes native text-tag motion and aging; it does not pause the whole game.
 
-A finite lifespan is handled by Warcraft III itself. The wrapper still owns the handle and exposes explicit `Dispose()`; do not rely on Lua garbage collection to destroy it. The game increased the floating-text cap to 10,000 in patch 3.0.0, but that is a hard engine cap, not a recommended target for simultaneous effects.
+A finite lifespan is handled by Warcraft III itself. The wrapper still owns the handle and exposes explicit, idempotent `Dispose()`; repeated calls are safe no-ops. Do not rely on Lua garbage collection to destroy the handle. The game increased the floating-text cap to 10,000 in patch 3.0.0, but that is a hard engine cap, not a recommended target for simultaneous effects.
