@@ -781,6 +781,9 @@ public static class Checker
                     if (receiverType is null)
                         return null;
 
+                    if (member.Name == "Length" && receiverType == "string")
+                        return "int";
+
                     if (member.Name == "Count" && IsCollectionType(receiverType))
                         return "int";
 
