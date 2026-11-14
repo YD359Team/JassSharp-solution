@@ -394,10 +394,10 @@ end
         foreach (var m in en.Members)
         {
             string value;
-            if (m.Value is NumExpr n && int.TryParse(n.Text, out var v))
+            if (m.Value is NumExpr n && TryParseInt32Literal(n.Text, out var v))
             {
-                value = n.Text;
-                next = v + 1;
+                value = EmitNumber(n.Text);
+                next = unchecked(v + 1);
             }
             else if (m.Value is not null)
             {
@@ -1394,14 +1394,30 @@ end
         return arguments.All(argument => argument.Length > 0);
     }
 
-    private static string EmitNumber(string text)
+    private static bool TryParseInt32Literal(string text, out int value)
     {
         if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) &&
             uint.TryParse(text.AsSpan(2), System.Globalization.NumberStyles.AllowHexSpecifier,
-                System.Globalization.CultureInfo.InvariantCulture, out uint value))
-            return "(" + unchecked((int)value).ToString(System.Globalization.CultureInfo.InvariantCulture) + ")";
+                System.Globalization.CultureInfo.InvariantCulture, out uint unsignedValue))
+        {
+            value = unchecked((int)unsignedValue);
+            return true;
+        }
 
-        return text;
+        return int.TryParse(text, System.Globalization.NumberStyles.None,
+            System.Globalization.CultureInfo.InvariantCulture, out value);
+    }
+
+    private static string EmitNumber(string text)
+    {
+        if (!text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) ||
+            !TryParseInt32Literal(text, out int value))
+            return text;
+
+        string emitted = value == int.MinValue
+            ? "(-2147483647 - 1)"
+            : "(" + value.ToString(System.Globalization.CultureInfo.InvariantCulture) + ")";
+        return emitted;
     }
 
     private string Op(string op) => op switch
