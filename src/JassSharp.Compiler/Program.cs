@@ -164,11 +164,15 @@ try
     var projectDirectory = FindProjectDirectory(file);
     var allUnits = MapBuild.LoadProject(projectDirectory);
     var imports = MapBuild.ResolveImports(unit, allUnits);
-    var diagnostics = Checker.Check(unit, file, imports);
-    foreach (var diagnostic in diagnostics)
-        Console.Error.WriteLine($"{diagnostic.Line}:{diagnostic.Col}: {diagnostic.Severity}: {diagnostic.Message}");
-    if (diagnostics.Any(diagnostic => diagnostic.Severity == "error"))
-        return 1;
+    foreach (var sourceUnit in imports.Append(unit))
+    {
+        var sourceImports = imports.Where(dependency => dependency.Name != sourceUnit.Name);
+        var diagnostics = Checker.Check(sourceUnit, file, sourceImports);
+        foreach (var diagnostic in diagnostics)
+            Console.Error.WriteLine($"{sourceUnit.Name}:{diagnostic.Line}:{diagnostic.Col}: {diagnostic.Severity}: {diagnostic.Message}");
+        if (diagnostics.Any(diagnostic => diagnostic.Severity == "error"))
+            return 1;
+    }
 
     var sourceDirectory = Path.GetDirectoryName(file) ?? Directory.GetCurrentDirectory();
     var outputDirectory = Path.Combine(sourceDirectory, "bin");
