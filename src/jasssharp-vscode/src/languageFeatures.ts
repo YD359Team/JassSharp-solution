@@ -264,6 +264,36 @@ function readFunctions(text: string, classes = readClasses(text)): FunctionInfo[
     return result;
 }
 
+function findInnermostBlockScope(
+    text: string,
+    fn: FunctionInfo,
+    offset: number
+): { start: number; end: number } {
+    const bodyStart = fn.bodyStart!;
+    const bodyEnd = fn.bodyEnd!;
+    const source = maskNonCode(text.slice(bodyStart, bodyEnd));
+    const stack: number[] = [];
+    let best = { start: bodyStart, end: bodyEnd };
+
+    for (let i = 0; i < source.length; i++) {
+        const absolute = bodyStart + i;
+        if (source[i] === "{") {
+            stack.push(absolute);
+            continue;
+        }
+
+        if (source[i] !== "}") continue;
+        const open = stack.pop();
+        if (open === undefined || offset <= open || offset >= absolute) continue;
+
+        if (absolute - open < best.end - best.start) {
+            best = { start: open + 1, end: absolute - 1 };
+        }
+    }
+
+    return best;
+}
+
 function readVariables(text: string, classes = readClasses(text), functions = readFunctions(text, classes)): VariableInfo[] {
     const result: VariableInfo[] = [];
     const source = maskNonCode(text);
@@ -307,8 +337,9 @@ function readVariables(text: string, classes = readClasses(text), functions = re
             fn.bodyEnd !== undefined && variable.offset >= fn.bodyStart && variable.offset <= fn.bodyEnd);
         const ownerClass = classes.find(cls => variable.offset >= cls.bodyStart && variable.offset <= cls.bodyEnd);
         if (ownerFunction) {
-            variable.scopeStart = ownerFunction.bodyStart;
-            variable.scopeEnd = ownerFunction.bodyEnd;
+            const scope = findInnermostBlockScope(text, ownerFunction, variable.offset);
+            variable.scopeStart = scope.start;
+            variable.scopeEnd = scope.end;
         } else if (ownerClass) {
             variable.scopeStart = ownerClass.bodyStart;
             variable.scopeEnd = ownerClass.bodyEnd;
@@ -330,13 +361,25 @@ function readVariables(text: string, classes = readClasses(text), functions = re
         const ownerFunction = functions.find(fn => fn.bodyStart !== undefined &&
             fn.bodyEnd !== undefined && declaration.offset >= fn.bodyStart && declaration.offset <= fn.bodyEnd);
         const ownerClass = classes.find(cls => declaration.offset >= cls.bodyStart && declaration.offset <= cls.bodyEnd);
-        const scopeStart = ownerFunction?.bodyStart ?? ownerClass?.bodyStart;
-        const scopeEnd = ownerFunction?.bodyEnd ?? ownerClass?.bodyEnd;
+        const scope = ownerFunction
+            ? findInnermostBlockScope(text, ownerFunction, declaration.offset)
+            : ownerClass
+                ? { start: ownerClass.bodyStart, end: ownerClass.bodyEnd }
+                : undefined;
+        const scopeStart = scope?.start;
+        const scopeEnd = scope?.end;
         const visibleDeclarations = priorDeclarations.filter(prior => {
             if (prior.offset >= declaration.offset) return false;
             if (prior.scopeStart === undefined) return true;
-            if (ownerFunction && prior.scopeStart === ownerFunction.bodyStart) return true;
-            return !!ownerClass && prior.scopeStart === ownerClass.bodyStart && prior.scopeEnd === ownerClass.bodyEnd;
+            if (ownerFunction) {
+                const priorFunction = functions.find(fn => fn.bodyStart !== undefined &&
+                    fn.bodyEnd !== undefined && prior.offset >= fn.bodyStart && prior.offset <= fn.bodyEnd);
+                return priorFunction === ownerFunction &&
+                    prior.scopeStart <= declaration.offset && declaration.offset <= prior.scopeEnd!;
+            }
+            return !!ownerClass && prior.scopeStart <= declaration.offset &&
+                declaration.offset <= prior.scopeEnd! &&
+                prior.offset >= ownerClass.bodyStart && prior.offset <= ownerClass.bodyEnd;
         });
         const knownTypes = new Map<string, string>();
         for (const prior of visibleDeclarations) knownTypes.set(prior.name, prior.type);
