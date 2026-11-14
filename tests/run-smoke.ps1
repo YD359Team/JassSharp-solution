@@ -218,7 +218,7 @@ foreach ($fragment in @(
     'Product: ',
     'Enabled: ',
     'Braces: {literal}',
-    'Line one\\nLine two\\tindented',
+    'Line one\nLine two\tindented',
     'C:\\temp\\file'
 )) {
     if (-not $stringsLua.Contains($fragment)) {
