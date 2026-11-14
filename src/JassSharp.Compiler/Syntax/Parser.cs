@@ -452,7 +452,98 @@ public sealed class Parser(List<Token> tokens)
     }
 
     // Full remaining methods (ParseExpr through Eat) are identical to the version in /tmp/Parser.cs
+    public Expr ParseExpressionOnly()
+    {
+        var expression = ParseExpr();
+        if (Peek.Kind != TokKind.Eof)
+            throw new ParseException($"лишний токен в выражении: {Peek.Text}", Peek.Line, Peek.Col);
+        return expression;
+    }
+
     private Expr ParseExpr() => ParseOr();
+
+    private InterpolatedExpr ParseInterpolatedString(Token token)
+    {
+        var parts = new List<InterpolatedPart>();
+        var literal = new System.Text.StringBuilder();
+        string text = token.Text;
+
+        void FlushLiteral()
+        {
+            if (literal.Length == 0) return;
+            parts.Add(InterpolatedPart.Literal(literal.ToString()));
+            literal.Clear();
+        }
+
+        for (int i = 0; i < text.Length;)
+        {
+            if (text[i] == '{' && i + 1 < text.Length && text[i + 1] == '{')
+            {
+                literal.Append('{');
+                i += 2;
+                continue;
+            }
+
+            if (text[i] == '}' && i + 1 < text.Length && text[i + 1] == '}')
+            {
+                literal.Append('}');
+                i += 2;
+                continue;
+            }
+
+            if (text[i] == '}')
+                throw new ParseException("одиночная закрывающая фигурная скобка в интерполируемой строке", token.Line, token.Col);
+
+            if (text[i] != '{')
+            {
+                literal.Append(text[i++]);
+                continue;
+            }
+
+            FlushLiteral();
+            int expressionStart = ++i;
+            int depth = 1;
+            char quote = '\0';
+            bool escaped = false;
+
+            while (i < text.Length && depth > 0)
+            {
+                char current = text[i];
+                if (quote != '\0')
+                {
+                    if (escaped) escaped = false;
+                    else if (current == '\\') escaped = true;
+                    else if (current == quote) quote = '\0';
+                    i++;
+                    continue;
+                }
+
+                if (current is '"' or '\'')
+                {
+                    quote = current;
+                    i++;
+                    continue;
+                }
+
+                if (current == '{') depth++;
+                else if (current == '}') depth--;
+                i++;
+            }
+
+            if (depth != 0)
+                throw new ParseException("незакрытое выражение интерполяции", token.Line, token.Col);
+
+            string expressionText = text[expressionStart..(i - 1)].Trim();
+            if (expressionText.Length == 0)
+                throw new ParseException("пустое выражение интерполяции", token.Line, token.Col);
+
+            var expression = new Parser(new Lexer(expressionText).Lex()).ParseExpressionOnly();
+            parts.Add(InterpolatedPart.Value(expression));
+        }
+
+        FlushLiteral();
+        return new InterpolatedExpr(parts, token.Line, token.Col);
+    }
     private Expr ParseOr() { var l = ParseAnd(); while (Accept("||")) l = new BinaryExpr("||", l, ParseAnd()); return l; }
     private Expr ParseAnd() { var l = ParseEq(); while (Accept("&&")) l = new BinaryExpr("&&", l, ParseEq()); return l; }
     private Expr ParseEq() { var l = ParseRel(); while (true) { if (Accept("==")) l = new BinaryExpr("==", l, ParseRel()); else if (Accept("!=")) l = new BinaryExpr("!=", l, ParseRel()); else break; } return l; }
@@ -531,6 +622,11 @@ public sealed class Parser(List<Token> tokens)
             var grouped = ParseExpr();
             Expect(")");
             return grouped;
+        }
+        if (Peek.Kind == TokKind.Interpolated)
+        {
+            var interpolated = tokens[_i++];
+            return ParseInterpolatedString(interpolated);
         }
         if (CheckId("new")) 
         { 
