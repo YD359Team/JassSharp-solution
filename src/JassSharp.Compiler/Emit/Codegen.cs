@@ -152,22 +152,28 @@ function __stack_peek(s)
 end
 
 function __dictionary_new()
-    return { _items = {}, _count = 0 }
+    local items = {}
+    setmetatable(items, {
+        __index = function(_, key)
+            error("The given key was not present in the dictionary: " .. tostring(key))
+        end
+    })
+    return { _items = items, _count = 0 }
 end
 function __dictionary_add(d, key, value)
     if key == nil then error("Dictionary key cannot be nil") end
-    if d._items[key] ~= nil then error("An item with the same key already exists") end
+    if value == nil then error("Dictionary value cannot be nil") end
+    if rawget(d._items, key) ~= nil then error("An item with the same key already exists") end
     d._items[key] = value
-    d._count = d._count + 1
 end
 function __dictionary_remove(d, key)
-    if d._items[key] == nil then return false end
+    if rawget(d._items, key) == nil then return false end
     d._items[key] = nil
     d._count = d._count - 1
     return true
 end
 function __dictionary_tryadd(d, key, value)
-    if key == nil or d._items[key] ~= nil then return false end
+    if key == nil or value == nil or rawget(d._items, key) ~= nil then return false end
     d._items[key] = value
     d._count = d._count + 1
     return true
@@ -176,7 +182,7 @@ function __dictionary_tryremove(d, key)
     return __dictionary_remove(d, key)
 end
 function __dictionary_containskey(d, key)
-    return d._items[key] ~= nil
+    return rawget(d._items, key) ~= nil
 end
 ");
         }
@@ -844,6 +850,16 @@ end
         var receiverType = RecvType(expression.Object);
         if (receiverType is null)
             return null;
+
+        if (expression.Name == "Count" && IsGenericType(receiverType, "List") ||
+            expression.Name == "Count" && IsGenericType(receiverType, "Queue") ||
+            expression.Name == "Count" && IsGenericType(receiverType, "Stack") ||
+            expression.Name == "Count" && IsGenericType(receiverType, "Dictionary"))
+            return "int";
+
+        if (TryGetGenericArguments(receiverType, out var genericName, out var genericArgs) &&
+            genericName == "KeyValuePair" && genericArgs.Count == 2)
+            return expression.Name switch { "Key" => genericArgs[0], "Value" => genericArgs[1], _ => null };
 
         if (_classFields.TryGetValue(receiverType, out var fields) &&
             fields.TryGetValue(expression.Name, out var fieldType))
