@@ -124,7 +124,7 @@
       "editor/context": [
         {
           "command": "jasssharp.build",
-          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
+          "when": "editorLangId == jasssharp",
           "group": "navigation"
         },
         {
