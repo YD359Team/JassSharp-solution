@@ -7,6 +7,10 @@ namespace ForeachSmoke
         foreach (var row in matrix)
         {
             Print(row[0]);
+            foreach (var value in row)
+            {
+                Print(value);
+            }
         }
     }
 
