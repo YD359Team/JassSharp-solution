@@ -181,6 +181,12 @@ end
 function __dictionary_tryremove(d, key)
     return __dictionary_remove(d, key)
 end
+function __dictionary_set(d, key, value)
+    if key == nil then error("Dictionary key cannot be nil") end
+    if value == nil then error("Dictionary value cannot be nil") end
+    if rawget(d._items, key) == nil then d._count = d._count + 1 end
+    d._items[key] = value
+end
 function __dictionary_containskey(d, key)
     return rawget(d._items, key) ~= nil
 end
@@ -715,6 +721,14 @@ end
 
     private void EmitAssign(Expr target, Expr value)
     {
+        if (_lua && target is IndexExpr dictionaryIndex &&
+            RecvType(dictionaryIndex.Object) is { } dictionaryType &&
+            IsGenericType(dictionaryType, "Dictionary"))
+        {
+            Line($"__dictionary_set({EmitExpr(dictionaryIndex.Object)}, {EmitExpr(dictionaryIndex.Index)}, {EmitExpr(value)})");
+            return;
+        }
+
         if (target is MemberExpr m)
         {
             var rt = RecvType(m.Object);
