@@ -76,6 +76,29 @@ const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; ret: string
     Lua: [
         { name: "Raw", ret: "void", kind: "Method", parameters: ["string code"] }
     ],
+    Color: [
+        { name: "FromBytes", ret: "Color", kind: "Method", parameters: ["int red", "int green", "int blue", "int alpha"] },
+        { name: "FromPercent", ret: "Color", kind: "Method", parameters: ["float red", "float green", "float blue", "float alpha"] },
+        { name: "White", ret: "Color", kind: "Method", parameters: [] },
+        { name: "Black", ret: "Color", kind: "Method", parameters: [] },
+        { name: "Red", ret: "Color", kind: "Method", parameters: [] },
+        { name: "Green", ret: "Color", kind: "Method", parameters: [] },
+        { name: "Blue", ret: "Color", kind: "Method", parameters: [] },
+        { name: "Transparent", ret: "Color", kind: "Method", parameters: [] },
+        { name: "ApplyPlayerColorToUnit", ret: "void", kind: "Method", parameters: ["unit target", "playercolor color"] },
+        { name: "ApplyPlayerColorToItem", ret: "void", kind: "Method", parameters: ["item target", "playercolor color"] },
+        { name: "ApplyPlayerColorToEffect", ret: "void", kind: "Method", parameters: ["effect target", "player owner"] }
+    ],
+    Talents: [
+        { name: "Reset", ret: "void", kind: "Method", parameters: ["unit target"] }
+    ],
+    RpgCombat: [
+        { name: "Heal", ret: "float", kind: "Method", parameters: ["unit target", "unit source", "float amount", "bool isItem", "bool applyStatBonuses"] }
+    ],
+    InventoryEvents: [
+        { name: "EquippedItem", ret: "item", kind: "Method", parameters: [] },
+        { name: "UnequippedItem", ret: "item", kind: "Method", parameters: [] }
+    ],
     Strings: [
         { name: "Length", ret: "int", kind: "Method", parameters: ["string value"] },
         { name: "Substring", ret: "string", kind: "Method", parameters: ["string value", "int startIndex", "int length"] },
