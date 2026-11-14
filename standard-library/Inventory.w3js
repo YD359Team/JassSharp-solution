@@ -93,7 +93,7 @@ namespace Inventory
         }
     }
 
-    public static class Talents
+    public class Talents
     {
         // Resets the unit's talent allocation using the Warcraft III 3.0 native.
         public static void Reset(unit target)
@@ -103,7 +103,7 @@ namespace Inventory
         }
     }
 
-    public static class RpgCombat
+    public class RpgCombat
     {
         // applyStatBonuses lets the engine include supported RPG stat bonuses in healing.
         public static float Heal(unit target, unit source, float amount, bool isItem, bool applyStatBonuses)
@@ -113,7 +113,7 @@ namespace Inventory
         }
     }
 
-    public static class InventoryEvents
+    public class InventoryEvents
     {
         // Valid only while handling the corresponding native inventory event.
         public static item EquippedItem()
