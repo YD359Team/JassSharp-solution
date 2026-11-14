@@ -21,6 +21,8 @@ namespace StringsSmoke
             Braces: {{literal}}
             """;
         string concatenated = $"Interpolated {x}" + " tail";
+        string escapedSequences = "Line one\\nLine two\\tindented";
+        string rawPath = """C:\\temp\\file""";
 
         Print(basic);
         Print(mixed);
@@ -28,5 +30,7 @@ namespace StringsSmoke
         Print(multiline);
         Print(multilineInterpolated);
         Print(concatenated);
+        Print(escapedSequences);
+        Print(rawPath);
     }
 }
