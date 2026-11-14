@@ -334,6 +334,66 @@ if ($stringsExitCode -eq 0 -or $stringsErrors.Count -ne 1) {
     throw "Interpolation type safety did not reject assigning a string to int. Exit code: $stringsExitCode. Errors: $($stringsErrors.Count). Output: $stringsText"
 }
 
+Write-Host "[5f] Building the Strings standard-library API..."
+$stringsApiFixture = Join-Path $PSScriptRoot "fixtures/StringsApiSmoke.w3js"
+$stringsApiBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $stringsApiFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Strings API fixture failed to compile: $($stringsApiBuildOutput -join [Environment]::NewLine)"
+}
+$stringsApiLuaPath = Join-Path $PSScriptRoot "fixtures/bin/StringsApiSmoke.lua"
+if (-not (Test-Path $stringsApiLuaPath)) {
+    throw "Expected generated Strings API Lua file was not created: $stringsApiLuaPath"
+}
+$stringsApiLua = Get-Content -LiteralPath $stringsApiLuaPath -Raw
+foreach ($fragment in @(
+    "function Strings.Substring(value, startIndex, length)",
+    "function Strings.Replace(value, oldValue, newValue)",
+    "function Strings.IndexOf(value, searchValue)",
+    "function Strings.LastIndexOf(value, searchValue)",
+    "function Strings.Contains(value, searchValue)",
+    "function Strings.Trim(value)",
+    "function Strings.TrimStart(value)",
+    "function Strings.TrimEnd(value)",
+    "function Strings.ToLower(value)",
+    "function Strings.ToUpper(value)",
+    "function Strings.Split(value, separator)",
+    "function Strings.Join(separator, values)",
+    "utf8.offset(value, startIndex + 1)"
+)) {
+    if (-not $stringsApiLua.Contains($fragment)) {
+        throw "Generated Strings API Lua is missing expected fragment: $fragment"
+    }
+}
+
+Write-Host "[5g] Verifying do-while and Lua.Raw..."
+$doWhileFixture = Join-Path $PSScriptRoot "fixtures/DoWhileSmoke.w3js"
+$doWhileOutput = dotnet run --configuration Release --no-build --project $project -- build $doWhileFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Do-while fixture failed to compile: $($doWhileOutput -join [Environment]::NewLine)"
+}
+$doWhileLuaPath = Join-Path $PSScriptRoot "fixtures/bin/DoWhileSmoke.lua"
+if (-not (Test-Path $doWhileLuaPath)) {
+    throw "Expected generated do-while Lua file was not created: $doWhileLuaPath"
+}
+$doWhileLua = Get-Content -LiteralPath $doWhileLuaPath -Raw
+if (-not $doWhileLua.Contains("repeat") -or -not $doWhileLua.Contains("until not ((value < 3))")) {
+    throw "Do-while did not lower to Lua repeat/until. Output: $doWhileLua"
+}
+
+$luaRawFixture = Join-Path $PSScriptRoot "fixtures/LuaRawSmoke.w3js"
+$luaRawOutput = dotnet run --configuration Release --no-build --project $project -- build $luaRawFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Lua.Raw fixture failed to compile: $($luaRawOutput -join [Environment]::NewLine)"
+}
+$luaRawPath = Join-Path $PSScriptRoot "fixtures/bin/LuaRawSmoke.lua"
+if (-not (Test-Path $luaRawPath)) {
+    throw "Expected generated Lua.Raw file was not created: $luaRawPath"
+}
+$luaRaw = Get-Content -LiteralPath $luaRawPath -Raw
+if (-not $luaRaw.Contains("local rawValue = 42") -or -not $luaRaw.Contains("assert(rawValue == 42)")) {
+    throw "Lua.Raw block was not emitted verbatim. Output: $luaRaw"
+}
+
 Write-Host "[6/20] Generating Lua and validating 2D geometry..."
 $geometryFixture = Join-Path $PSScriptRoot "fixtures/GeometrySmoke.w3js"
 $geometryBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $geometryFixture --target lua
