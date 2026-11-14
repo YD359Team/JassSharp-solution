@@ -294,8 +294,15 @@ public static class Checker
                     break;
 
                 case NameExpr name:
-                    if (!TryLookup(name.Name, out _) && !IsKnownSymbol(name.Name))
+                    if (!TryLookup(name.Name, out _) && TryGetCurrentField(name.Name, out _))
+                    {
+                        if (_currentMethodIsStatic)
+                            Add(name.Line, name.Col, "error", $"поле экземпляра {name.Name} недоступно внутри static-метода");
+                    }
+                    else if (!TryLookup(name.Name, out _) && !IsKnownSymbol(name.Name))
+                    {
                         Add(name.Line, name.Col, "warning", $"неизвестное имя {name.Name}");
+                    }
                     break;
 
                 case ThisExpr self:
@@ -472,6 +479,8 @@ public static class Checker
                 case NameExpr name:
                     if (TryLookup(name.Name, out var localType))
                         return localType;
+                    if (TryGetCurrentField(name.Name, out var fieldType))
+                        return fieldType;
                     return _globals.TryGetValue(name.Name, out var globalType) ? globalType : null;
 
                 case ThisExpr:
@@ -649,6 +658,17 @@ public static class Checker
 
             var end = template.IndexOf('(');
             return (end >= 0 ? template[..end] : template).Trim();
+        }
+
+        private bool TryGetCurrentField(string name, out string type)
+        {
+            if (_currentClass is not null &&
+                _classFields.TryGetValue(_currentClass, out var fields) &&
+                fields.TryGetValue(name, out type!))
+                return true;
+
+            type = null!;
+            return false;
         }
 
         private bool IsKnownSymbol(string name)
