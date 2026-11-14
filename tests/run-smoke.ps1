@@ -513,7 +513,7 @@ foreach ($fragment in @(
     "BlzRemoveEffect(value)",
     "BlzSetCameraAllowsHotkeyTargetLock(allowed)",
     "BlzGetCameraAllowsHotkeyTargetLock()",
-    "SetThematicMusicAbsoluteVolume(volume)"
+    "BlzSetThematicMusicAbsoluteVolume(volume)"
 )) {
     if (-not $visualLua.Contains($fragment)) {
         throw "Generated visual/RPG Lua is missing expected fragment: $fragment"
