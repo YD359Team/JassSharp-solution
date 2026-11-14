@@ -1,0 +1,13 @@
+namespace DestructorDuplicateSmoke
+{
+    public class Resource
+    {
+        ~Resource()
+        {
+        }
+
+        ~Resource()
+        {
+        }
+    }
+}

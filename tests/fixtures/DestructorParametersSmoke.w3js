@@ -1,0 +1,9 @@
+namespace DestructorParametersSmoke
+{
+    public class Resource
+    {
+        ~Resource(int value)
+        {
+        }
+    }
+}

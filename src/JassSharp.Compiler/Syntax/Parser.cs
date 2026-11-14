@@ -96,6 +96,7 @@ public sealed class Parser(List<Token> tokens)
         {
             if (Peek.Kind == TokKind.Eof) throw new ParseException($"незакрытый class {name}", Peek.Line, Peek.Col);
             var attrs = ParseAttributes();
+            bool hasVisibilityModifier = CheckId("public") || CheckId("private");
             SkipVis();
             bool isStatic = false;
             if (CheckId("static"))
@@ -120,6 +121,8 @@ public sealed class Parser(List<Token> tokens)
                     throw new ParseException($"деструктор должен называться ~{name}", destructorName.Line, destructorName.Col);
                 if (isStatic)
                     throw new ParseException("деструктор не может быть static", destructorName.Line, destructorName.Col);
+                if (hasVisibilityModifier)
+                    throw new ParseException("деструктор не может иметь модификатор доступа", destructorName.Line, destructorName.Col);
                 Expect("(");
                 Expect(")");
                 Expect("{");
@@ -143,9 +146,10 @@ public sealed class Parser(List<Token> tokens)
                 methods.Add(new FnDecl(type, "__operator_" + OperatorIdentifier(opToken.Text), operatorParams, ParseBlock(), attrs, isStatic, opToken.Text));
                 continue;
             }
-            var id = Eat(TokKind.Id).Text;
+            var memberToken = Eat(TokKind.Id);
+            var id = memberToken.Text;
             if (id == "Dispose" && methods.Any(method => method.Name == "Dispose" && method.Operator is null))
-                throw new ParseException($"класс {name} уже объявляет Dispose()", Peek.Line, Peek.Col);
+                throw new ParseException($"класс {name} уже объявляет Dispose()", memberToken.Line, memberToken.Col);
             if (Accept("("))
             {
                 var ps = ParseParams();

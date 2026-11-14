@@ -10,13 +10,13 @@ $output = Join-Path $PSScriptRoot "fixtures/bin/MathOperatorsSmoke.lua"
 $headlessProject = Join-Path $PSScriptRoot "headless-smoke"
 $headlessOutput = Join-Path $headlessProject "bin/HeadlessSmoke.lua"
 
-Write-Host "[1/13] Building compiler..."
+Write-Host "[1/15] Building compiler..."
 dotnet build $project -c Release
 if ($LASTEXITCODE -ne 0) {
     throw "Compiler build failed with exit code $LASTEXITCODE"
 }
 
-Write-Host "[2/13] Verifying invalid static method calls are rejected..."
+Write-Host "[2/15] Verifying invalid static method calls are rejected..."
 $misuseDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $invalidFixture 2>&1
 $misuseExitCode = $LASTEXITCODE
 $misuseText = $misuseDiagnostics -join "`n"
@@ -29,7 +29,7 @@ if ($misuseExitCode -eq 0 -or -not $hasErrorSeverity -or -not $hasStaticCallErro
     throw "Static/instance misuse was not rejected with all expected diagnostics. Exit code: $misuseExitCode. Output: $misuseText"
 }
 
-Write-Host "[3/13] Verifying build rejects semantic errors..."
+Write-Host "[3/15] Verifying build rejects semantic errors..."
 $previousErrorActionPreference = $ErrorActionPreference
 try {
     # PowerShell can promote native stderr output to a terminating error when
@@ -46,7 +46,7 @@ if ($invalidBuildExitCode -eq 0) {
     throw "Build accepted a fixture with invalid static/instance method calls. Output: $($invalidBuildOutput -join [Environment]::NewLine)"
 }
 
-Write-Host "[4/13] Verifying strict assignment compatibility..."
+Write-Host "[4/15] Verifying strict assignment compatibility..."
 $previousErrorActionPreference = $ErrorActionPreference
 try {
     # Native stderr can become a terminating PowerShell error under Stop.
@@ -81,7 +81,7 @@ if ($typeExitCode -eq 0 -or $typeErrors.Count -ne 4 -or $actualErrorLines -ne $e
     throw "Strict assignment compatibility was not enforced at all expected source locations. Exit code: $typeExitCode. Error lines: $actualErrorLines. Output: $typeText"
 }
 
-Write-Host "[5/13] Checking the operator/Math fixture..."
+Write-Host "[5/15] Checking the operator/Math fixture..."
 dotnet run --configuration Release --no-build --project $project -- check $fixture
 if ($LASTEXITCODE -ne 0) {
     throw "Fixture check failed with exit code $LASTEXITCODE"
@@ -92,7 +92,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Standard library check failed with exit code $LASTEXITCODE"
 }
 
-Write-Host "[6/13] Generating Lua..."
+Write-Host "[6/15] Generating Lua..."
 dotnet run --configuration Release --no-build --project $project -- build $fixture
 if ($LASTEXITCODE -ne 0) {
     throw "Fixture build failed with exit code $LASTEXITCODE"
@@ -102,7 +102,7 @@ if (-not (Test-Path $output)) {
     throw "Expected generated Lua file was not created: $output"
 }
 
-Write-Host "[7/13] Verifying generated static calls and operator adapters..."
+Write-Host "[7/15] Verifying generated static calls and operator adapters..."
 $lua = Get-Content -LiteralPath $output -Raw
 $requiredFragments = @(
     "function Score.FromValue(value)",
@@ -130,7 +130,7 @@ foreach ($fragment in $requiredFragments) {
     }
 }
 
-Write-Host "[8/13] Verifying headless mode emits standalone Lua without Warcraft entry points..."
+Write-Host "[8/15] Verifying headless mode emits standalone Lua without Warcraft entry points..."
 $headlessBuildOutput = dotnet run --configuration Release --no-build --project $project -- map --project $headlessProject
 if ($LASTEXITCODE -ne 0) {
     throw "Headless build failed: $($headlessBuildOutput -join [Environment]::NewLine)"
@@ -156,7 +156,7 @@ if ($missingUsingExitCode -eq 0) {
     throw "Headless mode accepted Warcraft III symbols without using Warcraft3."
 }
 
-Write-Host "[9/13] Verifying explicit using Warcraft3 enables the built-in module..."
+Write-Host "[9/15] Verifying explicit using Warcraft3 enables the built-in module..."
 $warcraftProject = Join-Path $PSScriptRoot "headless-warcraft-smoke"
 $warcraftBuildOutput = dotnet run --configuration Release --no-build --project $project -- map --project $warcraftProject
 if ($LASTEXITCODE -ne 0) {
@@ -167,7 +167,7 @@ if (-not $warcraftLua.Contains("CreateGroup()") -or $warcraftLua.Contains("funct
     throw "Explicit Warcraft3 module did not compile to standalone Lua as expected."
 }
 
-Write-Host "[10/13] Verifying jagged array parsing, typing, and Lua indexing..."
+Write-Host "[10/15] Verifying jagged array parsing, typing, and Lua indexing..."
 $arrayFixture = Join-Path $PSScriptRoot "fixtures/ArrayTypesSmoke.w3js"
 $arrayBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $arrayFixture --target lua
 if ($LASTEXITCODE -ne 0) {
@@ -196,14 +196,14 @@ foreach ($fragment in $arrayFragments) {
     }
 }
 
-Write-Host "[11/13] Verifying incompatible array element types are rejected..."
+Write-Host "[11/15] Verifying incompatible array element types are rejected..."
 $arrayMismatchFixture = Join-Path $PSScriptRoot "fixtures/ArrayTypeMismatchSmoke.w3js"
 $arrayMismatchOutput = dotnet run --configuration Release --no-build --project $project -- check $arrayMismatchFixture 2>&1
 if ($LASTEXITCODE -eq 0) {
     throw "Compiler accepted assignment from float[] to int[]."
 }
 
-Write-Host "[12/13] Verifying foreach array loops and Warcraft group iteration..."
+Write-Host "[12/15] Verifying foreach array loops and Warcraft group iteration..."
 $foreachFixture = Join-Path $PSScriptRoot "fixtures/ForeachSmoke.w3js"
 $foreachBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $foreachFixture --target lua
 if ($LASTEXITCODE -ne 0) {
@@ -227,14 +227,14 @@ foreach ($fragment in $foreachFragments) {
     }
 }
 
-Write-Host "[13/13] Verifying unsupported foreach collection types are rejected..."
+Write-Host "[13/15] Verifying unsupported foreach collection types are rejected..."
 $unsupportedForeachFixture = Join-Path $PSScriptRoot "fixtures/ForeachUnsupportedSmoke.w3js"
 $unsupportedForeachOutput = dotnet run --configuration Release --no-build --project $project -- check $unsupportedForeachFixture 2>&1
 if ($LASTEXITCODE -eq 0) {
     throw "Compiler accepted foreach over a scalar value."
 }
 
-Write-Host "[14/14] Verifying manually invoked class destructors..."
+Write-Host "[14/15] Verifying manually invoked class destructors..."
 $destructorFixture = Join-Path $PSScriptRoot "fixtures/DestructorSmoke.w3js"
 $destructorBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $destructorFixture --target lua
 if ($LASTEXITCODE -ne 0) {
@@ -249,6 +249,24 @@ if (-not $destructorLua.Contains("function TemporaryResource:Dispose()") -or
 }
 if ($destructorLua.Contains("TemporaryResource.__gc") -or $destructorLua.Contains("newproxy")) {
     throw "Destructor must not be wired to automatic Lua garbage collection."
+}
+
+
+Write-Host "[15/15] Verifying invalid destructor declarations are rejected..."
+$invalidDestructorFixtures = @(
+    @{ Path = "DestructorWrongNameSmoke.w3js"; Description = "mismatched destructor name" },
+    @{ Path = "DestructorParametersSmoke.w3js"; Description = "destructor parameters" },
+    @{ Path = "DestructorStaticSmoke.w3js"; Description = "static destructor" },
+    @{ Path = "DestructorVisibilitySmoke.w3js"; Description = "destructor visibility modifier" },
+    @{ Path = "DestructorDuplicateSmoke.w3js"; Description = "duplicate destructor" },
+    @{ Path = "DestructorDisposeConflictSmoke.w3js"; Description = "explicit Dispose conflict" }
+)
+foreach ($invalidCase in $invalidDestructorFixtures) {
+    $invalidDestructorPath = Join-Path $PSScriptRoot ("fixtures/" + $invalidCase.Path)
+    $invalidDestructorOutput = dotnet run --configuration Release --no-build --project $project -- check $invalidDestructorPath 2>&1
+    if ($LASTEXITCODE -eq 0) {
+        throw "Compiler accepted invalid destructor declaration ($($invalidCase.Description)): $invalidDestructorPath"
+    }
 }
 
 Write-Host "All JASS# compiler smoke checks passed."

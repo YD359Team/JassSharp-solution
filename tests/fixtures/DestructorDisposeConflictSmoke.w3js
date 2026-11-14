@@ -1,0 +1,13 @@
+namespace DestructorDisposeConflictSmoke
+{
+    public class Resource
+    {
+        void Dispose()
+        {
+        }
+
+        ~Resource()
+        {
+        }
+    }
+}
