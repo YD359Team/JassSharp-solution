@@ -6,13 +6,13 @@ $fixture = Join-Path $PSScriptRoot "fixtures/MathOperatorsSmoke.w3js"
 $invalidFixture = Join-Path $PSScriptRoot "fixtures/StaticMethodMisuse.w3js"
 $output = Join-Path $PSScriptRoot "fixtures/bin/MathOperatorsSmoke.lua"
 
-Write-Host "[1/5] Building compiler..."
+Write-Host "[1/6] Building compiler..."
 dotnet build $project -c Release
 if ($LASTEXITCODE -ne 0) {
     throw "Compiler build failed with exit code $LASTEXITCODE"
 }
 
-Write-Host "[2/5] Verifying invalid static method calls are rejected..."
+Write-Host "[2/6] Verifying invalid static method calls are rejected..."
 $misuseDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $invalidFixture 2>&1
 $misuseExitCode = $LASTEXITCODE
 $misuseText = $misuseDiagnostics -join "`n"
@@ -24,13 +24,20 @@ if ($misuseExitCode -eq 0 -or -not $hasErrorSeverity -or -not $hasStaticCallErro
     throw "Static method misuse was not rejected with both expected diagnostics. Exit code: $misuseExitCode. Output: $misuseText"
 }
 
-Write-Host "[3/5] Checking the operator/Math fixture..."
+Write-Host "[3/6] Verifying build rejects semantic errors..."
+$invalidBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $invalidFixture 2>&1
+$invalidBuildExitCode = $LASTEXITCODE
+if ($invalidBuildExitCode -eq 0) {
+    throw "Build accepted a fixture with invalid static/instance method calls. Output: $($invalidBuildOutput -join [Environment]::NewLine)"
+}
+
+Write-Host "[4/6] Checking the operator/Math fixture..."
 dotnet run --configuration Release --no-build --project $project -- check $fixture
 if ($LASTEXITCODE -ne 0) {
     throw "Fixture check failed with exit code $LASTEXITCODE"
 }
 
-Write-Host "[4/5] Generating Lua..."
+Write-Host "[5/6] Generating Lua..."
 dotnet run --configuration Release --no-build --project $project -- build $fixture
 if ($LASTEXITCODE -ne 0) {
     throw "Fixture build failed with exit code $LASTEXITCODE"
@@ -40,13 +47,16 @@ if (-not (Test-Path $output)) {
     throw "Expected generated Lua file was not created: $output"
 }
 
-Write-Host "[5/5] Verifying generated static calls and operator adapters..."
+Write-Host "[6/6] Verifying generated static calls and operator adapters..."
 $lua = Get-Content -LiteralPath $output -Raw
 $requiredFragments = @(
     "function Score.FromValue(value)",
     "Score.FromValue(10.0)",
     "function Vector2.__add(arg0, arg1)",
-    "__operator_Add_Vector2_Vector2"
+    "__operator_Add_Vector2_Vector2",
+    "math.sqrt(self.X * self.X + self.Y * self.Y)",
+    "self.Y * self.Z - self.Z * self.Y",
+    "self.X * self.Y - self.Y * self.X"
 )
 
 foreach ($fragment in $requiredFragments) {
