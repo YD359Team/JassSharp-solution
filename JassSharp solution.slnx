@@ -33,6 +33,41 @@
   <Folder Name="/src/jasssharp-vscode/syntaxes/">
     <File Path="src/jasssharp-vscode/syntaxes/jasssharp.tmLanguage.json" />
   </Folder>
+  <Folder Name="/standard-library/">
+    <File Path="standard-library/Math.w3js" />
+  </Folder>
+  <Folder Name="/tests/">
+    <File Path="tests/run-smoke.ps1" />
+  </Folder>
+  <Folder Name="/tests/fixtures/">
+    <File Path="tests/fixtures/ArrayTypeMismatchSmoke.w3js" />
+    <File Path="tests/fixtures/ArrayTypesSmoke.w3js" />
+    <File Path="tests/fixtures/DestructorDisposeConflictSmoke.w3js" />
+    <File Path="tests/fixtures/DestructorDuplicateSmoke.w3js" />
+    <File Path="tests/fixtures/DestructorParametersSmoke.w3js" />
+    <File Path="tests/fixtures/DestructorSmoke.w3js" />
+    <File Path="tests/fixtures/DestructorStaticSmoke.w3js" />
+    <File Path="tests/fixtures/DestructorVisibilitySmoke.w3js" />
+    <File Path="tests/fixtures/DestructorWrongNameSmoke.w3js" />
+    <File Path="tests/fixtures/ForeachSmoke.w3js" />
+    <File Path="tests/fixtures/ForeachUnsupportedSmoke.w3js" />
+    <File Path="tests/fixtures/MathOperatorsSmoke.w3js" />
+    <File Path="tests/fixtures/StaticMethodMisuse.w3js" />
+    <File Path="tests/fixtures/TypeSafetySmoke.w3js" />
+  </Folder>
+  <Folder Name="/tests/headless-smoke/">
+    <File Path="tests/headless-smoke/jasssharp.json" />
+  </Folder>
+  <Folder Name="/tests/headless-smoke/src/">
+    <File Path="tests/headless-smoke/src/HeadlessSmoke.w3js" />
+    <File Path="tests/headless-smoke/src/HeadlessWarcraftMissingUsing.w3js" />
+  </Folder>
+  <Folder Name="/tests/headless-warcraft-smoke/">
+    <File Path="tests/headless-warcraft-smoke/jasssharp.json" />
+  </Folder>
+  <Folder Name="/tests/headless-warcraft-smoke/src/">
+    <File Path="tests/headless-warcraft-smoke/src/HeadlessWarcraftUsing.w3js" />
+  </Folder>
   <Folder Name="/Элементы решения/">
     <File Path=".gitattributes" />
     <File Path=".gitignore" />
