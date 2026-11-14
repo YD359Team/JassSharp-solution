@@ -21,7 +21,8 @@ namespace Math
 
         public static float Lerp(float a, float b, float t)
         {
-            return a + (b - a) * t;
+            float delta = b - a;
+            return a + delta * t;
         }
 
         public static float Round(float value)
