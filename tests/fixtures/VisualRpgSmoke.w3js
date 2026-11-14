@@ -52,6 +52,7 @@ namespace VisualRpgSmoke
         popup.SetAge(0.0);
         popup.SetLifespan(2.0, 1.5);
         popup.Dispose();
+        popup.Dispose();
 
         LightningEffect bolt = new LightningEffect(
             "CLPB", true,
@@ -65,6 +66,7 @@ namespace VisualRpgSmoke
         bolt.Move(
             new Vector3(GetUnitX(hero), GetUnitY(hero), 40.0),
             new Vector3(GetUnitX(target), GetUnitY(target), 40.0));
+        bolt.Dispose();
         bolt.Dispose();
 
         UnitInventory inventory = new UnitInventory(hero);
