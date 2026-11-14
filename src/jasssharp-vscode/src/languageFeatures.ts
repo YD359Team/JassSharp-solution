@@ -520,6 +520,13 @@ function readClassMembers(text: string, classInfo: ClassInfo): Array<{ name: str
     }
 
     const result: Array<{ name: string; type: string; kind: "Method" | "Property"; parameters: string[] }> = [];
+    const destructor = /~([A-Za-z_]\w*)\s*\(\s*\)/g;
+    for (const match of body.matchAll(destructor)) {
+        const matchOffset = match.index ?? 0;
+        if (depthAt[matchOffset] === 0 && match[1] === classInfo.name) {
+            result.push({ name: "Dispose", type: "void", kind: "Method", parameters: [] });
+        }
+    }
     const re = /\b(?:public\s+|private\s+|static\s+|const\s+)*([A-Za-z_]\w*)\s+([A-Za-z_]\w*)\s*(\(([^()]*)\))?/g;
     for (const match of body.matchAll(re)) {
         const matchOffset = match.index ?? 0;

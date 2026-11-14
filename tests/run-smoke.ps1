@@ -234,4 +234,21 @@ if ($LASTEXITCODE -eq 0) {
     throw "Compiler accepted foreach over a scalar value."
 }
 
+Write-Host "[14/14] Verifying manually invoked class destructors..."
+$destructorFixture = Join-Path $PSScriptRoot "fixtures/DestructorSmoke.w3js"
+$destructorBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $destructorFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Destructor fixture failed to compile: $($destructorBuildOutput -join [Environment]::NewLine)"
+}
+$destructorLuaPath = Join-Path $PSScriptRoot "fixtures/bin/DestructorSmoke.lua"
+$destructorLua = Get-Content -LiteralPath $destructorLuaPath -Raw
+if (-not $destructorLua.Contains("function TemporaryResource:Dispose()") -or
+    -not $destructorLua.Contains("resource:Dispose()") -or
+    -not $destructorLua.Contains('print("resource released")')) {
+    throw "Destructor was not emitted as a manually callable Dispose method."
+}
+if ($destructorLua.Contains("TemporaryResource.__gc") -or $destructorLua.Contains("newproxy")) {
+    throw "Destructor must not be wired to automatic Lua garbage collection."
+}
+
 Write-Host "All JASS# compiler smoke checks passed."

@@ -1,0 +1,24 @@
+namespace DestructorSmoke
+{
+    public class TemporaryResource
+    {
+        public int Value;
+
+        public TemporaryResource(int value)
+        {
+            this.Value = value;
+        }
+
+        ~TemporaryResource()
+        {
+            Print("resource released");
+            this.Value = 0;
+        }
+    }
+
+    public void ReleaseResource()
+    {
+        TemporaryResource resource = new TemporaryResource(42);
+        resource.Dispose();
+    }
+}

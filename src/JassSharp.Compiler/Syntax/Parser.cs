@@ -113,6 +113,21 @@ public sealed class Parser(List<Token> tokens)
                 ctor = new FnDecl(name, "create", ps, ParseBlock(), attrs);
                 continue;
             }
+            if (Accept("~"))
+            {
+                var destructorName = Eat(TokKind.Id);
+                if (destructorName.Text != name)
+                    throw new ParseException($"деструктор должен называться ~{name}", destructorName.Line, destructorName.Col);
+                if (isStatic)
+                    throw new ParseException("деструктор не может быть static", destructorName.Line, destructorName.Col);
+                Expect("(");
+                Expect(")");
+                Expect("{");
+                if (methods.Any(method => method.Name == "Dispose" && method.Operator is null))
+                    throw new ParseException($"класс {name} уже объявляет Dispose()", destructorName.Line, destructorName.Col);
+                methods.Add(new FnDecl("void", "Dispose", [], ParseBlock(), attrs));
+                continue;
+            }
             var type = ParseTypeName();
             var isArray = type.EndsWith("[]", StringComparison.Ordinal);
             if (CheckId("operator"))
@@ -129,6 +144,8 @@ public sealed class Parser(List<Token> tokens)
                 continue;
             }
             var id = Eat(TokKind.Id).Text;
+            if (id == "Dispose" && methods.Any(method => method.Name == "Dispose" && method.Operator is null))
+                throw new ParseException($"класс {name} уже объявляет Dispose()", Peek.Line, Peek.Col);
             if (Accept("("))
             {
                 var ps = ParseParams();
