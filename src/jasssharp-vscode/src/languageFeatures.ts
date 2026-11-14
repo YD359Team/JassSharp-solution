@@ -487,6 +487,62 @@ function inferExpressionType(expression: string, documentText: string, offset: n
     return type;
 }
 
+function collectLiveAssignmentDiagnostics(document: vscode.TextDocument): vscode.Diagnostic[] {
+    const text = document.getText();
+    const source = maskNonCode(text);
+    const classes = readClasses(text);
+    const functions = readFunctions(text, classes);
+    const variables = readVariables(text, classes, functions);
+    const diagnostics: vscode.Diagnostic[] = [];
+    const assignmentPattern = /\\b([A-Za-z_]\\w*)\\s*(\\+=|-=|\\*=|\\/=|%=|(?<![=!<>])=(?!=))\\s*([^;\\r\\n{}]+)/g;
+
+    for (const match of source.matchAll(assignmentPattern)) {
+        const targetName = match[1];
+        const operator = match[2];
+        const expression = match[3].trim();
+        const targetOffset = (match.index ?? 0) + match[0].indexOf(targetName);
+        const target = variables
+            .filter(variable => variable.name === targetName && variable.offset < targetOffset &&
+                (variable.scopeStart === undefined || (variable.scopeStart <= targetOffset && targetOffset <= variable.scopeEnd!)))
+            .sort((a, b) => b.offset - a.offset)[0];
+
+        if (!target) continue;
+        // Explicit and inferred declarations are not assignments to an existing variable.
+        if (variables.some(variable => variable.offset === targetOffset)) continue;
+
+        const expressionOffset = targetOffset + match[0].indexOf(match[3]);
+        const actualType = inferExpressionType(expression, text, expressionOffset);
+        if (!actualType || actualType === "null") continue;
+
+        let incompatible = false;
+        if (operator === "=") {
+            incompatible = !areEditorTypesCompatible(actualType, target.type);
+        } else if (target.type === "int" && actualType === "float") {
+            incompatible = true;
+        }
+
+        if (!incompatible) continue;
+        const line = document.positionAt(expressionOffset).line;
+        const start = document.positionAt(expressionOffset);
+        const end = document.positionAt(Math.min(text.length, expressionOffset + Math.max(1, match[3].trim().length)));
+        const diagnostic = new vscode.Diagnostic(
+            new vscode.Range(start, end),
+            `Несовместимое присваивание: переменная ${targetName} имеет тип ${target.type}, выражение имеет тип ${actualType}`,
+            vscode.DiagnosticSeverity.Error
+        );
+        diagnostic.source = "JASS#";
+        diagnostic.code = "JASS001";
+        diagnostics.push(diagnostic);
+    }
+
+    return diagnostics;
+}
+
+function areEditorTypesCompatible(actual: string, expected: string): boolean {
+    if (actual === expected || actual === "null") return true;
+    return expected === "float" && actual === "int";
+}
+
 function nativeReturnType(name: string): string | undefined {
     const native = nativeByName.get(name);
     if (!native) return undefined;
@@ -584,6 +640,20 @@ function buildFunctionSignatures(document: vscode.TextDocument): Map<string, Fun
 }
 
 export function registerLanguageFeatures(context: vscode.ExtensionContext): void {
+    const liveDiagnostics = vscode.languages.createDiagnosticCollection("jasssharp-live-types");
+    context.subscriptions.push(liveDiagnostics);
+    const refreshLiveDiagnostics = (document: vscode.TextDocument): void => {
+        if (document.languageId !== "jasssharp" || document.uri.scheme !== "file") return;
+        liveDiagnostics.set(document.uri, collectLiveAssignmentDiagnostics(document));
+    };
+    context.subscriptions.push(
+        vscode.workspace.onDidOpenTextDocument(refreshLiveDiagnostics),
+        vscode.workspace.onDidChangeTextDocument(event => refreshLiveDiagnostics(event.document)),
+        vscode.workspace.onDidCloseTextDocument(document => liveDiagnostics.delete(document.uri)),
+        vscode.workspace.onDidSaveTextDocument(refreshLiveDiagnostics)
+    );
+    for (const document of vscode.workspace.textDocuments) refreshLiveDiagnostics(document);
+
     const completionProvider: vscode.CompletionItemProvider = {
         async provideCompletionItems(document, position, _token, _context) {
             const fullText = document.getText();
