@@ -1,0 +1,76 @@
+namespace Timers
+{
+    using Warcraft3;
+    using Math;
+
+    // Owns one Warcraft III timer handle. Dispose() is generated from the destructor.
+    public class GameTimer
+    {
+        private timer _handle;
+        private bool _disposed;
+
+        public GameTimer()
+        {
+            _handle = CreateTimer();
+            _disposed = false;
+        }
+
+        public bool IsDisposed()
+        {
+            return _disposed;
+        }
+
+        // Starting an already-running timer replaces its previous schedule.
+        public void StartOnce(float timeout, code callback)
+        {
+            if (_disposed) { return; }
+            TimerStart(_handle, Math.Max(timeout, 0.0), false, callback);
+        }
+
+        // A periodic timer invokes callback every timeout seconds until paused or disposed.
+        public void StartPeriodic(float timeout, code callback)
+        {
+            if (_disposed) { return; }
+            TimerStart(_handle, Math.Max(timeout, 0.0), true, callback);
+        }
+
+        public void Pause()
+        {
+            if (_disposed) { return; }
+            PauseTimer(_handle);
+        }
+
+        public void Resume()
+        {
+            if (_disposed) { return; }
+            ResumeTimer(_handle);
+        }
+
+        public float Elapsed()
+        {
+            if (_disposed) { return 0.0; }
+            return TimerGetElapsed(_handle);
+        }
+
+        public float Remaining()
+        {
+            if (_disposed) { return 0.0; }
+            return TimerGetRemaining(_handle);
+        }
+
+        public float Timeout()
+        {
+            if (_disposed) { return 0.0; }
+            return TimerGetTimeout(_handle);
+        }
+
+        ~GameTimer()
+        {
+            if (!_disposed)
+            {
+                DestroyTimer(_handle);
+                _disposed = true;
+            }
+        }
+    }
+}

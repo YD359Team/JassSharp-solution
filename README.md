@@ -22,7 +22,7 @@ JASS# — язык с C#-подобным синтаксисом для разр
 
 - `src/JassSharp.Compiler` — компилятор, проверка семантики и CLI.
 - `src/jasssharp-vscode` — расширение VS Code.
-- `standard-library` — исходники стандартной библиотеки. Документация по математике и векторам: `docs/operators-and-math.md`; по 2D-геометрии: `docs/geometry.md`.
+- `standard-library` — исходники стандартной библиотеки. Документация по математике и векторам: `docs/operators-and-math.md`; по 2D-геометрии: `docs/geometry.md`; по таймерам Warcraft III: `docs/timers.md`.
 - `samples` — демонстрационные проекты.
 - `tests` — smoke fixtures и сценарии проверки компилятора.
 - `docs` — дополнительные заметки по языку.

@@ -8,6 +8,7 @@ $typeFixture = Join-Path $PSScriptRoot "fixtures/TypeSafetySmoke.w3js"
 $mathLibrary = Join-Path $repoRoot "standard-library/Math.w3js"
 $vectorLibrary = Join-Path $repoRoot "standard-library/Vectors.w3js"
 $geometryLibrary = Join-Path $repoRoot "standard-library/Geometry.w3js"
+$timerLibrary = Join-Path $repoRoot "standard-library/Timers.w3js"
 $output = Join-Path $PSScriptRoot "fixtures/bin/MathOperatorsSmoke.lua"
 $headlessProject = Join-Path $PSScriptRoot "headless-smoke"
 $headlessOutput = Join-Path $headlessProject "bin/HeadlessSmoke.lua"
@@ -104,6 +105,11 @@ if ($LASTEXITCODE -ne 0) {
     throw "Geometry standard-library check failed with exit code $LASTEXITCODE"
 }
 
+dotnet run --configuration Release --no-build --project $project -- check $timerLibrary
+if ($LASTEXITCODE -ne 0) {
+    throw "Timer standard-library check failed with exit code $LASTEXITCODE"
+}
+
 Write-Host "[6/16] Generating Lua and validating 2D geometry..."
 $geometryFixture = Join-Path $PSScriptRoot "fixtures/GeometrySmoke.w3js"
 $geometryBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $geometryFixture --target lua
@@ -132,7 +138,40 @@ foreach ($fragment in $geometryFragments) {
     }
 }
 
-Write-Host "[7/16] Generating Math/vector Lua..."
+Write-Host "[7/16] Building timer fixture and checking native timer integration..."
+$timerFixture = Join-Path $PSScriptRoot "fixtures/TimerSmoke.w3js"
+$timerBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $timerFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Timer fixture failed to compile: $($timerBuildOutput -join [Environment]::NewLine)"
+}
+$timerLuaPath = Join-Path $PSScriptRoot "fixtures/bin/TimerSmoke.lua"
+if (-not (Test-Path $timerLuaPath)) {
+    throw "Expected generated timer Lua file was not created: $timerLuaPath"
+}
+$timerLua = Get-Content -LiteralPath $timerLuaPath -Raw
+$timerFragments = @(
+    "CreateTimer()",
+    "TimerStart(self._handle, math.max(timeout, 0.0), false, callback)",
+    "TimerStart(self._handle, math.max(timeout, 0.0), true, callback)",
+    "PauseTimer(self._handle)",
+    "ResumeTimer(self._handle)",
+    "TimerGetElapsed(self._handle)",
+    "TimerGetRemaining(self._handle)",
+    "TimerGetTimeout(self._handle)",
+    "function GameTimer:Dispose()",
+    "DestroyTimer(self._handle)",
+    "local __lambda"
+)
+foreach ($fragment in $timerFragments) {
+    if (-not $timerLua.Contains($fragment)) {
+        throw "Generated timer Lua is missing expected fragment: $fragment"
+    }
+}
+if ($timerLua.Contains("function GameTimer.__gc") -or $timerLua.Contains("newproxy")) {
+    throw "Timer disposal must remain explicit and must not use Lua garbage collection."
+}
+
+Write-Host "[8/16] Generating Math/vector Lua..."
 dotnet run --configuration Release --no-build --project $project -- build $fixture
 if ($LASTEXITCODE -ne 0) {
     throw "Fixture build failed with exit code $LASTEXITCODE"

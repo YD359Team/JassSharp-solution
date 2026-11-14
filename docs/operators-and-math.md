@@ -61,6 +61,8 @@ Supported operators include addition, subtraction, unary negation, scalar multip
 
 For the 2D gameplay primitives built on top of these vectors, see [the geometry standard library](geometry.md). It provides circles, axis-aligned rectangles, and finite line segments.
 
+For Warcraft III timer ownership and scheduling, see [the timer standard library](timers.md).
+
 ## User-defined operators
 
 Declare operators as public static class methods using C#-style syntax:

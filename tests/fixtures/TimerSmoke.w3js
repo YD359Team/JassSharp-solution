@@ -1,0 +1,40 @@
+namespace TimerSmoke
+{
+    using Timers;
+    using Warcraft3;
+
+    public void OnInit()
+    {
+        GameTimer timer = new GameTimer();
+
+        timer.StartOnce(2.0, () =>
+        {
+            Print("one-shot timer");
+        });
+
+        float elapsed = timer.Elapsed();
+        float remaining = timer.Remaining();
+        float timeout = timer.Timeout();
+
+        timer.Pause();
+        timer.Resume();
+
+        timer.StartPeriodic(0.25, () =>
+        {
+            Print("periodic timer");
+        });
+
+        timer.Pause();
+        timer.StartOnce(-1.0, () =>
+        {
+            Print("negative timeout is clamped");
+        });
+
+        bool disposedBefore = timer.IsDisposed();
+        timer.Dispose();
+        bool disposedAfter = timer.IsDisposed();
+
+        timer.Resume();
+        timer.Dispose();
+    }
+}
