@@ -627,11 +627,11 @@ function collectLiveAssignmentDiagnostics(document: vscode.TextDocument): vscode
     const functions = readFunctions(text, classes);
     const variables = readVariables(text, classes, functions);
     const diagnostics: vscode.Diagnostic[] = [];
-    const assignmentPattern = /\\b([A-Za-z_]\\w*(?:\\s*\\[[^\\]]+\\])*)\\s*(\\+=|-=|\\*=|\\/=|%=|(?<![=!<>])=(?![=>=]))\\s*([^;\\r\\n{}]+)/g;
+    const assignmentPattern = /\b([A-Za-z_]\w*(?:\s*\[[^\]]+\])*)\s*(\+=|-=|\*=|\/=|%=|(?<![=!<>])=(?![=>=]))\s*([^;\r\n{}]+)/g;
 
     for (const match of source.matchAll(assignmentPattern)) {
         const targetExpression = match[1].trim();
-        const targetName = /^([A-Za-z_]\\w*)/.exec(targetExpression)?.[1];
+        const targetName = /^([A-Za-z_]\w*)/.exec(targetExpression)?.[1];
         if (!targetName) continue;
 
         const operator = match[2];
@@ -646,7 +646,7 @@ function collectLiveAssignmentDiagnostics(document: vscode.TextDocument): vscode
         if (variables.some(variable => variable.offset === targetOffset)) continue;
 
         let expectedType: string | undefined = target.type;
-        const indexCount = (targetExpression.match(/\\[/g) ?? []).length;
+        const indexCount = (targetExpression.match(/\[/g) ?? []).length;
         for (let i = 0; i < indexCount && expectedType; i++) {
             if (expectedType === "string") continue;
             if (expectedType.endsWith("[]")) expectedType = expectedType.slice(0, -2);
