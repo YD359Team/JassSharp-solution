@@ -153,6 +153,23 @@ namespace Inventory
         }
     }
 
+    public class ItemSelection
+    {
+        // Returns an item rawcode, not an item handle. Pass the result to CreateItem.
+        public static int ChooseRandomRawcode(
+            itemtype type,
+            int level,
+            equipmentType equipment,
+            itemTag tag,
+            bool includeInvalidMorphs,
+            bool includeNonPickRandom)
+        {
+            return ChooseRandomItemExWithFilterAndIncludes(
+                type, level, equipment, tag,
+                includeInvalidMorphs, includeNonPickRandom);
+        }
+    }
+
     public class InventoryEvents
     {
         // Valid only while handling the corresponding native inventory event.
