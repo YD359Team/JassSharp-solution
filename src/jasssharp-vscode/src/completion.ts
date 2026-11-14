@@ -62,7 +62,7 @@ const TYPES = [
     "fogmodifier", "fogstate", "fogstyle", "force", "frameeventtype", "framehandle", "framepointtype", "gamecache",
     "gamedifficulty", "gameevent", "gamespeed", "gamestate", "gametype", "group", "handle", "hashtable", "heroattribute",
     "igamestate", "image", "integer", "item", "itembooleanfield", "itemintegerfield", "itempool", "itemrealfield",
-    "itemstringfield", "itemTag", "itemtype", "leaderboard", "lightning", "limitop", "loadoutslot", "location",
+    "itemstringfield", "itemTag", "itemtype", "equipmentType", "leaderboard", "lightning", "limitop", "loadoutslot", "location",
     "mapcontrol", "mapdensity", "mapflag", "mapsetting", "mapvisibility", "metakeytype", "minimapicon", "mousebuttontype",
     "movetype", "multiboard", "multiboarditem", "nothing", "originframetype", "oskeytype", "pathingflag", "pathingtype",
     "placement", "player", "playercolor", "playergameresult", "playerevent", "playerscore", "playerslotstate", "playerstate",
