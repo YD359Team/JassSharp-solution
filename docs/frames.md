@@ -115,6 +115,18 @@ All typed controls expose `Subscribe(frameeventtype, code)`. `TextFrame` now sup
 
 Use `PopupFrame.SubscribeSelectionChanged` for `FRAMEEVENT_POPUPMENU_ITEM_CHANGED`. Read the selected item index through `FrameEvents.CurrentValue()` inside that callback. `MenuFrame` wraps a native `MENU` frame; menu item construction remains the responsibility of its FDF/template because Warcraft III does not provide a dedicated native item-collection API for it.
 
+Typical native event support (the exact behavior can depend on the FDF template and game version):
+
+| Frame type | Common events |
+|---|---|
+| `BUTTON` | `CONTROL_CLICK` (programmatic `BlzFrameClick`), `MOUSE_ENTER`, `MOUSE_LEAVE`, `MOUSE_UP`, `MOUSE_WHEEL` |
+| `TEXT` | `CONTROL_CLICK`, `MOUSE_ENTER`, `MOUSE_LEAVE`, `MOUSE_UP`, `MOUSE_WHEEL` |
+| `SLIDER` | `MOUSE_ENTER`, `MOUSE_LEAVE`, `MOUSE_UP`, `MOUSE_WHEEL`, `SLIDER_VALUE_CHANGED` |
+| `EDITBOX` | `MOUSE_ENTER`, `MOUSE_LEAVE`, `MOUSE_UP`, `MOUSE_WHEEL`, `EDITBOX_TEXT_CHANGED`, `EDITBOX_ENTER` |
+| `CHECKBOX` | `MOUSE_ENTER`, `MOUSE_LEAVE`, `MOUSE_UP`, `MOUSE_WHEEL`, `CHECKBOX_CHECKED`, `CHECKBOX_UNCHECKED` |
+| `POPUPMENU` | `MOUSE_ENTER`, `MOUSE_LEAVE`, `MOUSE_WHEEL`, `CONTROL_CLICK`, `POPUPMENU_ITEM_CHANGED` |
+| `MENU` | `MOUSE_ENTER`, `MOUSE_LEAVE`, `MOUSE_UP`, `MOUSE_WHEEL` |
+
 Frame event types are not universally valid for every frame type. For example, checkbox events belong to checkbox frames, popup selection changes belong to popup-menu frames, edit-box events belong to edit boxes, and slider value changes belong to sliders. Select events supported by the concrete native frame type.
 
 ## Coordinate conversion
