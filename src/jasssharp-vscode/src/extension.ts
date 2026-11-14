@@ -30,7 +30,9 @@ export function activate(context: vscode.ExtensionContext) {
 
     const updateButtons = () => {
         const editor = vscode.window.activeTextEditor;
-        if (editor?.document.languageId === "jasssharp") {
+        const mode = readProject()?.mode ?? "wc3";
+        void vscode.commands.executeCommand("setContext", "jasssharp.mode", mode);
+        if (editor?.document.languageId === "jasssharp" && mode !== "headless") {
             runButton.show();
             editorButton.show();
         } else {
@@ -189,7 +191,7 @@ function projectRoot(): string | undefined {
     return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 
-function readProject(): { map?: string; game?: string } | undefined {
+function readProject(): { map?: string; game?: string; mode?: "wc3" | "headless" } | undefined {
     const root = projectRoot();
     if (!root) return undefined;
     const fileName = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile") || "jasssharp.json";
@@ -293,23 +295,30 @@ async function mapBuild(run: boolean): Promise<void> {
     const configName = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile") || "jasssharp.json";
     const configPath = path.isAbsolute(configName) ? configName : path.join(root, configName);
     info(`config: ${configPath} exists=${fs.existsSync(configPath)}`);
+    const projectConfig = readProject();
+    if (run && projectConfig?.mode === "headless") {
+        vscode.window.showWarningMessage("Run Map недоступен в режиме headless. Используйте Build Lua.");
+        return;
+    }
     if (!fs.existsSync(configPath)) { vscode.window.showErrorMessage(`Нет ${configName} в корне рабочей папки`); return; }
 
     const args = ["map", "--project", root, "--config", configName];
     if (run) args.push("--run");
     const config = vscode.workspace.getConfiguration("jasssharp");
-    const game = config.get<string>("gamePath")?.trim();
-    const mpq = config.get<string>("mpqToolPath")?.trim();
     const env: NodeJS.ProcessEnv = { ...process.env };
-    if (game) { env.JASSSHARP_GAME = game; info(`gamePath: ${game} exists=${fs.existsSync(game)}`); }
-    else info("gamePath: (not set, from jasssharp.json)");
-    if (mpq) { env.JASSSHARP_MPQ = mpq; info(`mpqTool: ${mpq} exists=${fs.existsSync(mpq)}`); }
-    else info("mpqTool: (not set)");
+    if (projectConfig?.mode !== "headless") {
+        const game = config.get<string>("gamePath")?.trim();
+        const mpq = config.get<string>("mpqToolPath")?.trim();
+        if (game) { env.JASSSHARP_GAME = game; info(`gamePath: ${game} exists=${fs.existsSync(game)}`); }
+        else info("gamePath: (not set, from jasssharp.json)");
+        if (mpq) { env.JASSSHARP_MPQ = mpq; info(`mpqTool: ${mpq} exists=${fs.existsSync(mpq)}`); }
+        else info("mpqTool: (not set)");
+    }
     info(`cmd: ${compilerPath()} ${args.join(" ")}`);
     info(`cwd: ${root}`);
 
     await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: run ? "JASS#: Run Map" : "JASS#: Build Map" },
+        { location: vscode.ProgressLocation.Notification, title: run ? "JASS#: Run Map" : projectConfig?.mode === "headless" ? "JASS#: Build Lua" : "JASS#: Build Map" },
         () => new Promise<void>(resolve => {
             const child = spawnCompiler(args, { cwd: root, env });
             child.stdout.on("data", data => info(data.toString().trimEnd()));
@@ -321,7 +330,7 @@ async function mapBuild(run: boolean): Promise<void> {
             });
             child.on("close", code => {
                 info(`exit: ${code}`);
-                if (code === 0) vscode.window.showInformationMessage("Done");
+                if (code === 0) vscode.window.showInformationMessage(projectConfig?.mode === "headless" ? "Lua generated" : "Done");
                 else vscode.window.showErrorMessage(`Компилятор завершился с кодом ${code}`);
                 resolve();
             });
