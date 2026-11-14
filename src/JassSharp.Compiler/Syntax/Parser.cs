@@ -272,7 +272,7 @@ public sealed class Parser(List<Token> tokens)
         "itemstringfield", "itemTag", "itemtype", "leaderboard", "lightning", "limitop", "loadoutslot", "location",
         "mapcontrol", "mapdensity", "mapflag", "mapsetting", "mapvisibility", "metakeytype", "minimapicon", "mousebuttontype",
         "movetype", "multiboard", "multiboarditem", "nothing", "originframetype", "oskeytype", "pathingflag", "pathingtype",
-        "placement", "player", "playercolor", "playergameresult", "playerevent", "playerscore", "playerslotstate", "playerstate",
+        "placement", "player", "playercolor", "equipmentType", "itemTag", "playergameresult", "playerevent", "playerscore", "playerslotstate", "playerstate",
         "playerunitevent", "quest", "questitem", "race", "racepreference", "raritycontrol", "real", "rect", "regentype", "region",
         "sound", "soundtype", "startlocprio", "string", "subanimtype", "targetflag", "terraindeformation", "texmapflags",
         "textaligntype", "texttag", "timerdialog", "timer", "trackable", "trigger", "triggeraction", "triggercondition",
