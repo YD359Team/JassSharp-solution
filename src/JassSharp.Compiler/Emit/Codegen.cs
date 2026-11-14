@@ -792,6 +792,25 @@ end
         return $"({l} .. {r})";
     }
 
+    private string EmitInterpolated(InterpolatedExpr expression)
+    {
+        var parts = new List<string>();
+        foreach (var part in expression.Parts)
+        {
+            if (part.Text is not null)
+                parts.Add($"\"{Esc(part.Text)}\"");
+            else if (part.Expression is not null)
+                parts.Add(ToStringExpr(part.Expression));
+        }
+
+        return parts.Count switch
+        {
+            0 => "\"\"",
+            1 => parts[0],
+            _ => $"({string.Join(" .. ", parts)})"
+        };
+    }
+
     private string ToStringExpr(Expr e)
     {
         var t = InferType(e);
@@ -817,6 +836,7 @@ end
         NewExpr n => n.Type,
         NumExpr n => IsFloatingLiteral(n.Text) ? "float" : "int",
         StrExpr => "string",
+        InterpolatedExpr => "string",
         BoolExpr => "bool",
         UnaryExpr u when u.Op == "!" => "bool",
         UnaryExpr u => InferType(u.Inner),
@@ -1017,6 +1037,7 @@ end
     {
         NumExpr n => n.Text,
         StrExpr s => $"\"{Esc(s.Text)}\"",
+        InterpolatedExpr interpolated => EmitInterpolated(interpolated),
         RawExpr r => _lua ? Rawcode.Pack(r.Id).ToString() : $"'{r.Id}'",
         BoolExpr b => b.Value ? "true" : "false",
         NullExpr => _lua ? "nil" : "null",
