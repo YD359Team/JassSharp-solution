@@ -67,12 +67,11 @@ catch {
 }
 
 $typeMessages = @($parsedTypeDiagnostics | ForEach-Object { $_.Message })
-$hasFloatToIntError = $typeMessages | Where-Object { $_ -like "*несовместимое присваивание: ожидался тип int, получен float*" }
+$floatToIntErrors = @($typeMessages | Where-Object { $_ -like "*несовместимое присваивание: ожидался тип int, получен float*" })
 $hasBoolToIntError = $typeMessages | Where-Object { $_ -like "*несовместимое присваивание: ожидался тип int, получен bool*" }
-$hasVarReassignmentError = $typeMessages | Where-Object { $_ -like "*несовместимое присваивание: ожидался тип int, получен float*" }
 $hasVarInitializerError = $typeMessages | Where-Object { $_ -like "*переменная var missingInitializer должна иметь выражение инициализации*" }
 
-if ($typeExitCode -eq 0 -or -not $hasFloatToIntError -or -not $hasBoolToIntError -or -not $hasVarReassignmentError -or -not $hasVarInitializerError) {
+if ($typeExitCode -eq 0 -or $floatToIntErrors.Count -lt 2 -or -not $hasBoolToIntError -or -not $hasVarInitializerError) {
     throw "Strict assignment compatibility was not enforced with all expected diagnostics. Exit code: $typeExitCode. Output: $typeText"
 }
 
