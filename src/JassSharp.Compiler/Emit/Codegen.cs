@@ -187,6 +187,7 @@ end
         Line($"{cls.Name}.__index = {cls.Name}");
         if (cls.Ctor is not null)
         {
+            _currentMethodIsStatic = false;
             _locals = cls.Ctor.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
             Line($"function {cls.Name}.new({string.Join(", ", cls.Ctor.Params.Select(p => p.Name))})");
             _indent++;
@@ -959,6 +960,7 @@ end
     {
         ThisExpr => _className,
         NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
+        NameExpr n when CurrentFieldType(n.Name) is { } fieldType => fieldType,
         NewExpr n => n.Type,
         BinaryExpr b => InferBinaryType(b),
         UnaryExpr u => FindOperator(InferType(u.Inner), null, u.Op, [u.Inner])?.Method.ReturnType ?? InferType(u.Inner),
