@@ -11,6 +11,13 @@ namespace StaticMethodMisuse
         {
             return 2;
         }
+
+        public int Value;
+
+        public static int ReadValue()
+        {
+            return Value;
+        }
     }
 
     public void OnInit()
@@ -18,5 +25,6 @@ namespace StaticMethodMisuse
         Factory factory;
         int invalidStaticCall = factory.Create();
         int invalidInstanceCall = Factory.Get();
+        int invalidStaticFieldAccess = Factory.ReadValue();
     }
 }
