@@ -7,6 +7,8 @@ $invalidFixture = Join-Path $PSScriptRoot "fixtures/StaticMethodMisuse.w3js"
 $typeFixture = Join-Path $PSScriptRoot "fixtures/TypeSafetySmoke.w3js"
 $mathLibrary = Join-Path $repoRoot "standard-library/Math.w3js"
 $output = Join-Path $PSScriptRoot "fixtures/bin/MathOperatorsSmoke.lua"
+$headlessProject = Join-Path $PSScriptRoot "headless-smoke"
+$headlessOutput = Join-Path $headlessProject "bin/HeadlessSmoke.lua"
 
 Write-Host "[1/7] Building compiler..."
 dotnet build $project -c Release
@@ -100,7 +102,7 @@ if (-not (Test-Path $output)) {
     throw "Expected generated Lua file was not created: $output"
 }
 
-Write-Host "[7/7] Verifying generated static calls and operator adapters..."
+Write-Host "[7/8] Verifying generated static calls and operator adapters..."
 $lua = Get-Content -LiteralPath $output -Raw
 $requiredFragments = @(
     "function Score.FromValue(value)",
@@ -126,6 +128,25 @@ foreach ($fragment in $requiredFragments) {
     if (-not $lua.Contains($fragment)) {
         throw "Generated Lua is missing expected fragment: $fragment"
     }
+}
+
+Write-Host "[8/8] Verifying headless mode emits standalone Lua without Warcraft entry points..."
+$headlessBuildOutput = dotnet run --configuration Release --no-build --project $project -- map --project $headlessProject
+if ($LASTEXITCODE -ne 0) {
+    throw "Headless build failed: $($headlessBuildOutput -join [Environment]::NewLine)"
+}
+if (-not (Test-Path $headlessOutput)) {
+    throw "Expected headless Lua output was not created: $headlessOutput"
+}
+$headlessLua = Get-Content -LiteralPath $headlessOutput -Raw
+$forbiddenHeadlessFragments = @("function config()", "function main()", "InitBlizzard()", "if not BJDebugMsg")
+foreach ($fragment in $forbiddenHeadlessFragments) {
+    if ($headlessLua.Contains($fragment)) {
+        throw "Headless Lua unexpectedly contains Warcraft runtime fragment: $fragment"
+    }
+}
+if (-not $headlessLua.Contains('print("headless mode")')) {
+    throw "Headless Print call was not translated to Lua print."
 }
 
 Write-Host "All JASS# compiler smoke checks passed."

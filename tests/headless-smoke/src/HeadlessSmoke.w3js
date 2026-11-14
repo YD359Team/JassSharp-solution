@@ -1,0 +1,7 @@
+namespace HeadlessSmoke
+{
+    public void OnInit()
+    {
+        Print("headless mode");
+    }
+}

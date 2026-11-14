@@ -400,7 +400,9 @@ end
                     _ => "?"
                 };
                 var msg = $"[trace] {loc}";
-                Line(_lua ? $"BJDebugMsg(\"{Esc(msg)}\")" : $"call BJDebugMsg(\"{Esc(msg)}\")");
+                Line(_lua
+                    ? (_headless ? $"print(\"{Esc(msg)}\")" : $"BJDebugMsg(\"{Esc(msg)}\")")
+                    : $"call BJDebugMsg(\"{Esc(msg)}\")");
             }
             switch (s)
             {

@@ -1,0 +1,5 @@
+{
+  "mode": "headless",
+  "entry": "src/HeadlessSmoke.w3js",
+  "output": "bin/HeadlessSmoke.lua"
+}
