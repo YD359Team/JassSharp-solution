@@ -782,7 +782,7 @@ end
     }
 
     private bool IsStringish(Expr e) =>
-        e is StrExpr ||
+        e is StrExpr or InterpolatedExpr ||
         (e is BinaryExpr b && b.Op == "+" && (IsStringish(b.Left) || IsStringish(b.Right)));
 
     private string Concat(Expr left, Expr right)
@@ -813,6 +813,9 @@ end
 
     private string ToStringExpr(Expr e)
     {
+        if (e is NullExpr)
+            return "\\"\\"";
+
         var t = InferType(e);
         var emitted = EmitExpr(e);
         return t switch
@@ -820,7 +823,7 @@ end
             "int" => _lua ? $"tostring({emitted})" : $"I2S({emitted})",
             "float" => _lua ? $"tostring({emitted})" : $"R2S({emitted})",
             "bool" => _lua ? $"tostring({emitted})" : $"B2S({emitted})",
-            "string" => emitted,
+            "string" => _lua ? $"({emitted} or \\"\\")" : emitted,
             "unit" => $"GetUnitName({emitted})",
             "player" => $"GetPlayerName({emitted})",
             "item" => $"GetItemName({emitted})",
