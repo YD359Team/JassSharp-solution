@@ -284,7 +284,11 @@ public static class Checker
                 case ForeachStmt loop:
                 {
                     CheckExpression(loop.Collection);
-                    string? elementType = GetForeachElementType(InferType(loop.Collection));
+                    string? collectionType = InferType(loop.Collection);
+                    string? elementType = GetForeachElementType(collectionType);
+                    if (elementType is null && collectionType != "List")
+                        Add(loop.Line, loop.Col, "error",
+                            $"foreach не поддерживает коллекцию типа {collectionType ?? "?"}");
 
                     string itemType = loop.Type;
                     if (itemType == "var")
