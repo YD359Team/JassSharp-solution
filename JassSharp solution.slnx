@@ -51,6 +51,7 @@
     <File Path="tests/fixtures/DestructorWrongNameSmoke.w3js" />
     <File Path="tests/fixtures/ForeachSmoke.w3js" />
     <File Path="tests/fixtures/ForeachUnsupportedSmoke.w3js" />
+    <File Path="tests/fixtures/FrameControlsSmoke.w3js" />
     <File Path="tests/fixtures/MathOperatorsSmoke.w3js" />
     <File Path="tests/fixtures/StaticMethodMisuse.w3js" />
     <File Path="tests/fixtures/TypeSafetySmoke.w3js" />
