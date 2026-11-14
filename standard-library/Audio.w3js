@@ -9,7 +9,7 @@ namespace Audio
         {
             if (volume < 0) { volume = 0; }
             if (volume > 127) { volume = 127; }
-            BlzSetThematicMusicAbsoluteVolume(volume);
+            SetThematicMusicAbsoluteVolume(volume);
         }
     }
 }
