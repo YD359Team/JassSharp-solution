@@ -41,7 +41,10 @@ export function activate(context: vscode.ExtensionContext) {
         }
     };
     updateButtons();
-    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(updateButtons));
+    context.subscriptions.push(
+        vscode.window.onDidChangeActiveTextEditor(updateButtons),
+        vscode.workspace.onDidSaveTextDocument(() => updateButtons())
+    );
 
     context.subscriptions.push(
         vscode.commands.registerCommand("jasssharp.build", () => build("")),
@@ -197,7 +200,7 @@ function readProject(): { map?: string; game?: string; mode?: "wc3" | "headless"
     const fileName = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile") || "jasssharp.json";
     const filePath = path.isAbsolute(fileName) ? fileName : path.join(root, fileName);
     if (!fs.existsSync(filePath)) return undefined;
-    try { return JSON.parse(fs.readFileSync(filePath, "utf8")) as { map?: string; game?: string }; }
+    try { return JSON.parse(fs.readFileSync(filePath, "utf8")) as { map?: string; game?: string; mode?: "wc3" | "headless" }; }
     catch { return undefined; }
 }
 

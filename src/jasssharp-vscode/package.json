@@ -124,34 +124,34 @@
       "editor/context": [
         {
           "command": "jasssharp.build",
-          "when": "editorLangId == jasssharp",
+          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
           "group": "navigation"
         },
         {
           "command": "jasssharp.runMap",
-          "when": "editorLangId == jasssharp",
+          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
           "group": "navigation"
         },
         {
           "command": "jasssharp.openEditor",
-          "when": "editorLangId == jasssharp",
+          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
           "group": "navigation"
         }
       ],
       "editor/title": [
         {
           "command": "jasssharp.runMap",
-          "when": "editorLangId == jasssharp",
+          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
           "group": "navigation@1"
         },
         {
           "command": "jasssharp.buildMap",
-          "when": "editorLangId == jasssharp",
+          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
           "group": "navigation@2"
         },
         {
           "command": "jasssharp.openEditor",
-          "when": "editorLangId == jasssharp",
+          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
           "group": "navigation@3"
         }
       ]
