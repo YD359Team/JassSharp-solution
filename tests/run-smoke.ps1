@@ -19,10 +19,11 @@ $misuseExitCode = $LASTEXITCODE
 $misuseText = $misuseDiagnostics -join "`n"
 $hasStaticCallError = $misuseText.Contains("Factory.Create")
 $hasInstanceCallError = $misuseText.Contains("Factory.Get")
+$hasStaticFieldError = $misuseText.Contains("Value")
 $hasErrorSeverity = $misuseText.Contains('"Severity":"error"')
 
-if ($misuseExitCode -eq 0 -or -not $hasErrorSeverity -or -not $hasStaticCallError -or -not $hasInstanceCallError) {
-    throw "Static method misuse was not rejected with both expected diagnostics. Exit code: $misuseExitCode. Output: $misuseText"
+if ($misuseExitCode -eq 0 -or -not $hasErrorSeverity -or -not $hasStaticCallError -or -not $hasInstanceCallError -or -not $hasStaticFieldError) {
+    throw "Static/instance misuse was not rejected with all expected diagnostics. Exit code: $misuseExitCode. Output: $misuseText"
 }
 
 Write-Host "[3/6] Verifying build rejects semantic errors..."
