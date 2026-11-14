@@ -87,7 +87,53 @@ const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; ret: string
         { name: "Transparent", ret: "Color", kind: "Method", parameters: [] },
         { name: "ApplyPlayerColorToUnit", ret: "void", kind: "Method", parameters: ["unit target", "playercolor color"] },
         { name: "ApplyPlayerColorToItem", ret: "void", kind: "Method", parameters: ["item target", "playercolor color"] },
-        { name: "ApplyPlayerColorToEffect", ret: "void", kind: "Method", parameters: ["effect target", "player owner"] }
+        { name: "ApplyPlayerColorToEffect", ret: "void", kind: "Method", parameters: ["effect target", "player owner"] },
+        { name: "RedByte", ret: "int", kind: "Method", parameters: [] },
+        { name: "GreenByte", ret: "int", kind: "Method", parameters: [] },
+        { name: "BlueByte", ret: "int", kind: "Method", parameters: [] },
+        { name: "AlphaByte", ret: "int", kind: "Method", parameters: [] },
+        { name: "ToArgb", ret: "int", kind: "Method", parameters: [] },
+        { name: "ToMarkup", ret: "string", kind: "Method", parameters: [] },
+        { name: "WrapText", ret: "string", kind: "Method", parameters: ["string value"] },
+        { name: "ApplyToUnitVertexColor", ret: "void", kind: "Method", parameters: ["unit target"] },
+        { name: "ApplyToEffect", ret: "void", kind: "Method", parameters: ["effect target"] },
+        { name: "ApplyToLightning", ret: "bool", kind: "Method", parameters: ["lightning target"] },
+        { name: "ApplyToTextTag", ret: "void", kind: "Method", parameters: ["texttag target"] },
+        { name: "ApplyToFrameText", ret: "void", kind: "Method", parameters: ["framehandle target"] },
+        { name: "ApplyToFrameVertex", ret: "void", kind: "Method", parameters: ["framehandle target"] }
+    ],
+    FloatingTextTag: [
+        { name: "SetText", ret: "void", kind: "Method", parameters: ["string value", "float size"] },
+        { name: "SetPosition", ret: "void", kind: "Method", parameters: ["float x", "float y", "float z"] },
+        { name: "AttachToUnit", ret: "void", kind: "Method", parameters: ["unit target", "float zOffset"] },
+        { name: "SetVelocity", ret: "void", kind: "Method", parameters: ["float x", "float y"] },
+        { name: "SetColor", ret: "void", kind: "Method", parameters: ["Color value"] },
+        { name: "SetVisible", ret: "void", kind: "Method", parameters: ["bool visible"] },
+        { name: "SetSuspended", ret: "void", kind: "Method", parameters: ["bool suspended"] },
+        { name: "SetPermanent", ret: "void", kind: "Method", parameters: ["bool permanent"] },
+        { name: "SetLifespan", ret: "void", kind: "Method", parameters: ["float seconds", "float fadepoint"] },
+        { name: "SetAge", ret: "void", kind: "Method", parameters: ["float seconds"] },
+        { name: "Dispose", ret: "void", kind: "Method", parameters: [] }
+    ],
+    LightningEffect: [
+        { name: "Move", ret: "bool", kind: "Method", parameters: ["Vector3 start", "Vector3 end", "bool checkVisibility"] },
+        { name: "SetColor", ret: "bool", kind: "Method", parameters: ["Color value"] },
+        { name: "Dispose", ret: "void", kind: "Method", parameters: [] }
+    ],
+    UnitInventory: [
+        { name: "BagSize", ret: "int", kind: "Method", parameters: [] },
+        { name: "BagItem", ret: "item", kind: "Method", parameters: ["int slot"] },
+        { name: "EquipmentItem", ret: "item", kind: "Method", parameters: ["loadoutslot slot"] },
+        { name: "IsInBag", ret: "bool", kind: "Method", parameters: ["item value"] },
+        { name: "IsEquipped", ret: "bool", kind: "Method", parameters: ["item value"] },
+        { name: "HasEquipmentType", ret: "bool", kind: "Method", parameters: ["equipmentType value"] },
+        { name: "CanEquip", ret: "bool", kind: "Method", parameters: ["equipmentType value"] },
+        { name: "HasEmptySlot", ret: "bool", kind: "Method", parameters: ["loadoutslot slot"] },
+        { name: "Equip", ret: "bool", kind: "Method", parameters: ["item value"] },
+        { name: "Unequip", ret: "void", kind: "Method", parameters: ["item value"] },
+        { name: "UnequipSlot", ret: "item", kind: "Method", parameters: ["loadoutslot slot"] },
+        { name: "ItemEquipmentType", ret: "equipmentType", kind: "Method", parameters: ["item value"] },
+        { name: "ItemTag", ret: "itemTag", kind: "Method", parameters: ["item value"] }
     ],
     Talents: [
         { name: "Reset", ret: "void", kind: "Method", parameters: ["unit target"] }
