@@ -13,9 +13,10 @@ namespace FloatingText
         public FloatingTextTag(string text, float x, float y, float z, float size, float lifespan, float fadepoint)
         {
             _handle = CreateTextTag();
-            _disposed = false;
+            _disposed = _handle == null;
             _lifespan = lifespan;
             if (_lifespan < 0.0) { _lifespan = 0.0; }
+            if (_disposed) { return; }
 
             SetTextTagText(_handle, text, size);
             SetTextTagPos(_handle, x, y, z);
