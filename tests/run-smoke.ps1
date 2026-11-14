@@ -439,6 +439,59 @@ if ($vjassTargetExitCode -eq 0) {
     throw "The removed vJASS target was accepted. Output: $($vjassTargetOutput -join [Environment]::NewLine)"
 }
 
+Write-Host "[5i] Checking Color, floating text, lightning and Warcraft III 3.0 RPG modules..."
+$visualLibraries = @(
+    "Colors.w3js",
+    "FloatingText.w3js",
+    "Lightning.w3js",
+    "Inventory.w3js"
+)
+foreach ($libraryName in $visualLibraries) {
+    $libraryPath = Join-Path $repoRoot ("standard-library/" + $libraryName)
+    $libraryOutput = dotnet run --configuration Release --no-build --project $project -- check $libraryPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "$libraryName standard-library check failed: $($libraryOutput -join [Environment]::NewLine)"
+    }
+}
+$visualFixture = Join-Path $PSScriptRoot "fixtures/VisualRpgSmoke.w3js"
+$visualBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $visualFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Visual/RPG fixture failed to compile: $($visualBuildOutput -join [Environment]::NewLine)"
+}
+$visualLuaPath = Join-Path $PSScriptRoot "fixtures/bin/VisualRpgSmoke.lua"
+if (-not (Test-Path $visualLuaPath)) {
+    throw "Expected visual/RPG Lua file was not created: $visualLuaPath"
+}
+$visualLua = Get-Content -LiteralPath $visualLuaPath -Raw
+foreach ($fragment in @(
+    "function Color.FromBytes(red, green, blue, alpha)",
+    "function Color:ToArgb()",
+    "BlzFrameSetTextColor(target, self:ToArgb())",
+    "SetUnitVertexColor(target, self:RedByte(), self:GreenByte(), self:BlueByte(), self:AlphaByte())",
+    "SetLightningColor(target, self.R, self.G, self.B, self.A)",
+    "function FloatingTextTag.new(text, x, y, z, size, lifespan, fadepoint)",
+    "SetTextTagPosUnit(self._handle, target, zOffset)",
+    "DestroyTextTag(self._handle)",
+    "function LightningEffect.new(codeName, checkVisibility, start, end)",
+    "MoveLightningEx(self._handle, checkVisibility",
+    "DestroyLightning(self._handle)",
+    "BlzUnitExtendedInventorySize(self._owner)",
+    "BlzUnitItemInBagSlot(self._owner, slot)",
+    "BlzUnitEquipItem(self._owner, value)",
+    "BlzUnitUnequipItemFromSlot(self._owner, slot)",
+    "BlzResetUnitTalents(target)",
+    "BlzUnitHeal(target, source, amount, isItem, applyStatBonuses)"
+)) {
+    if (-not $visualLua.Contains($fragment)) {
+        throw "Generated visual/RPG Lua is missing expected fragment: $fragment"
+    }
+}
+if ($visualLua.Contains("function UnitInventory.__gc") -or
+    $visualLua.Contains("function FloatingTextTag.__gc") -or
+    $visualLua.Contains("function LightningEffect.__gc")) {
+    throw "Game handle wrappers must use explicit disposal, not Lua GC finalizers."
+}
+
 Write-Host "[6/20] Generating Lua and validating 2D geometry..."
 $geometryFixture = Join-Path $PSScriptRoot "fixtures/GeometrySmoke.w3js"
 $geometryBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $geometryFixture --target lua
