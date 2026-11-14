@@ -537,8 +537,8 @@ public static class Checker
                         return null;
 
                     if (_classFields.TryGetValue(receiverType, out var fields) &&
-                        fields.TryGetValue(member.Name, out var fieldType))
-                        return fieldType;
+                        fields.TryGetValue(member.Name, out var fieldType2))
+                        return fieldType2;
 
                     var nativeMember = NativeTable.Find(receiverType, member.Name);
                     if (nativeMember is null || nativeMember.Kind == MemberKind.Method)
