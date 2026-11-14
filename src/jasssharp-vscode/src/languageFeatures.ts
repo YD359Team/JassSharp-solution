@@ -270,54 +270,80 @@ function readVariables(text: string, classes = readClasses(text), functions = re
         result.push({ name, type, offset, isParameter: false });
     }
 
+    const parameterVariables: VariableInfo[] = [];
+    for (const fn of functions) {
+        for (const parameter of fn.parameters) {
+            const match = /^\\s*([A-Za-z_]\\w*)\\s+([A-Za-z_]\\w*)/.exec(parameter);
+            if (!match) continue;
+            const fnText = text.slice(fn.offset);
+            const paren = fnText.indexOf("(");
+            const parameterTextOffset = fnText.slice(paren + 1).indexOf(parameter);
+            if (paren < 0 || parameterTextOffset < 0) continue;
+            const paramOffset = fn.offset + paren + 1 + parameterTextOffset + parameter.indexOf(match[2]);
+            parameterVariables.push({ name: match[2], type: match[1], offset: paramOffset, isParameter: true });
+        }
+    }
+
+    const varDeclarations = Array.from(source.matchAll(/\\bvar\\s+([A-Za-z_]\\w*)\\s*=\\s*([^;\\r\\n]+)/g))
+        .map(match => ({
+            name: match[1],
+            initializer: match[2].trim(),
+            offset: (match.index ?? 0) + match[0].indexOf(match[1])
+        }))
+        .sort((a, b) => a.offset - b.offset);
+
+    // Infer declarations in source order. A declaration below the current one must
+    // never participate in its initializer's type inference.
+    const priorDeclarations = [...result, ...parameterVariables].sort((a, b) => a.offset - b.offset);
     const knownTypes = new Map<string, string>();
-    for (const variable of result) knownTypes.set(variable.name, variable.type);
-    for (const match of source.matchAll(/\bvar\s+([A-Za-z_]\w*)\s*=\s*([^;\r\n]+)/g)) {
-        const name = match[1];
-        const initializer = match[2].trim();
-        const offset = (match.index ?? 0) + match[0].indexOf(name);
+    let declarationIndex = 0;
+
+    for (const declaration of varDeclarations) {
+        while (declarationIndex < priorDeclarations.length &&
+            priorDeclarations[declarationIndex].offset < declaration.offset) {
+            const prior = priorDeclarations[declarationIndex++];
+            knownTypes.set(prior.name, prior.type);
+        }
+
+        const initializer = declaration.initializer;
         let inferred: string | undefined;
-        const creation = /^new\s+([A-Za-z_]\w*)/.exec(initializer);
+        const creation = /^new\\s+([A-Za-z_]\\w*)/.exec(initializer);
         if (creation) inferred = creation[1];
         else if (/^(?:true|false)$/.test(initializer)) inferred = "bool";
         else if (/^null$/.test(initializer)) inferred = undefined;
         else if (/^["']/.test(initializer)) inferred = "string";
-        else if (/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(initializer))
+        else if (/^\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$/.test(initializer))
             inferred = /[.eE]/.test(initializer) ? "float" : "int";
         else {
-            const identifier = /^([A-Za-z_]\w*)$/.exec(initializer);
+            const identifier = /^([A-Za-z_]\\w*)$/.exec(initializer);
             if (identifier) inferred = knownTypes.get(identifier[1]);
+
             if (!inferred) {
-                const call = /^([A-Za-z_]\w*)\s*\(/.exec(initializer);
+                const call = /^([A-Za-z_]\\w*)\\s*\\(/.exec(initializer);
                 if (call) inferred = functions.find(fn => fn.name === call[1])?.returnType ?? nativeReturnType(call[1]);
             }
+
             if (!inferred && /[+*/%-]/.test(initializer)) {
                 const operands = initializer.split(/[+*/%-]/).map(part => part.trim()).filter(Boolean);
                 const operandTypes = operands.map(part => {
-                    if (/^\d+\.\d/.test(part)) return "float";
-                    if (/^\d+$/.test(part)) return "int";
+                    if (/^\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$/.test(part))
+                        return /[.eE]/.test(part) ? "float" : "int";
                     return knownTypes.get(part);
                 });
-                if (operandTypes.every(Boolean) && operandTypes.some(type => type === "float")) inferred = "float";
-                else if (operandTypes.length && operandTypes.every(type => type === "int")) inferred = "int";
+                if (operandTypes.length && operandTypes.every(Boolean) && operandTypes.some(type => type === "float"))
+                    inferred = "float";
+                else if (operandTypes.length && operandTypes.every(type => type === "int"))
+                    inferred = "int";
             }
         }
+
         if (inferred) {
-            result.push({ name, type: inferred, offset, isParameter: false });
-            knownTypes.set(name, inferred);
+            result.push({ name: declaration.name, type: inferred, offset: declaration.offset, isParameter: false });
+            knownTypes.set(declaration.name, inferred);
         }
     }
 
-    for (const fn of functions) {
-        for (const parameter of fn.parameters) {
-            const match = /^\s*([A-Za-z_]\w*)\s+([A-Za-z_]\w*)/.exec(parameter);
-            if (!match) continue;
-            const fnText = text.slice(fn.offset);
-            const paren = fnText.indexOf("(");
-            const paramOffset = fn.offset + paren + 1 + fnText.slice(paren + 1).indexOf(parameter) + parameter.indexOf(match[2]);
-            result.push({ name: match[2], type: match[1], offset: paramOffset, isParameter: true });
-        }
-    }
+    result.push(...parameterVariables);
 
     // The latest declaration wins for a variable name in a simple lexical scan.
     result.sort((a, b) => a.offset - b.offset);
