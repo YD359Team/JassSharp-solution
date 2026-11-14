@@ -3,6 +3,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $repoRoot "src/JassSharp.Compiler/JassSharp.Compiler.csproj"
 $fixture = Join-Path $PSScriptRoot "fixtures/MathOperatorsSmoke.w3js"
+$invalidFixture = Join-Path $PSScriptRoot "fixtures/StaticMethodMisuse.w3js"
 $output = Join-Path $PSScriptRoot "fixtures/bin/MathOperatorsSmoke.lua"
 
 Write-Host "[1/4] Building compiler..."
@@ -11,13 +12,23 @@ if ($LASTEXITCODE -ne 0) {
     throw "Compiler build failed with exit code $LASTEXITCODE"
 }
 
-Write-Host "[2/4] Checking the operator/Math fixture..."
+Write-Host "[2/5] Verifying invalid static method calls are rejected..."
+$misuseDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $invalidFixture 2>&1
+$misuseExitCode = $LASTEXITCODE
+$misuseText = $misuseDiagnostics -join "`n"
+if ($misuseExitCode -eq 0 -or
+    -not $misuseText.Contains("статический метод") -or
+    -not $misuseText.Contains("нестатический метод")) {
+    throw "Static method misuse was not rejected with both expected diagnostics. Output: $misuseText"
+}
+
+Write-Host "[3/5] Checking the operator/Math fixture..."
 dotnet run --configuration Release --no-build --project $project -- check $fixture
 if ($LASTEXITCODE -ne 0) {
     throw "Fixture check failed with exit code $LASTEXITCODE"
 }
 
-Write-Host "[3/4] Generating Lua..."
+Write-Host "[4/5] Generating Lua..."
 dotnet run --configuration Release --no-build --project $project -- build $fixture
 if ($LASTEXITCODE -ne 0) {
     throw "Fixture build failed with exit code $LASTEXITCODE"
@@ -27,7 +38,7 @@ if (-not (Test-Path $output)) {
     throw "Expected generated Lua file was not created: $output"
 }
 
-Write-Host "[4/4] Verifying generated static calls and operator adapters..."
+Write-Host "[5/5] Verifying generated static calls and operator adapters..."
 $lua = Get-Content -LiteralPath $output -Raw
 $requiredFragments = @(
     "function Score.FromValue(value)",
