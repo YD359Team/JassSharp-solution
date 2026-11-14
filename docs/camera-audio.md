@@ -21,4 +21,4 @@ using Audio;
 AudioSettings.SetThematicMusicVolume(96);
 ```
 
-The method wraps `SetThematicMusicAbsoluteVolume` and clamps the input to the engine's 0..127 volume scale.
+The method wraps `BlzSetThematicMusicAbsoluteVolume` and clamps the input to the engine's 0..127 volume scale.
