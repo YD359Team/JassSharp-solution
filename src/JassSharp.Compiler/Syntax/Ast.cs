@@ -25,9 +25,10 @@ public sealed record ExprStmt(Expr Expr) : Stmt;
 public sealed record ReturnStmt(Expr? Expr) : Stmt;
 public sealed record IfStmt(Expr Cond, List<Stmt> Then, List<Stmt>? Else) : Stmt;
 public sealed record WhileStmt(Expr Cond, List<Stmt> Body) : Stmt;
+public sealed record DoWhileStmt(List<Stmt> Body, Expr Cond, int Line = 1, int Col = 1) : Stmt;
+public sealed record RawLuaStmt(string Code, int Line = 1, int Col = 1) : Stmt;
 public sealed record ForStmt(Stmt? Init, Expr? Cond, Stmt? Step, List<Stmt> Body) : Stmt;
 public sealed record ForeachStmt(string Type, string Name, Expr Collection, List<Stmt> Body, int Line = 1, int Col = 1) : Stmt;
-public sealed record CondStmt(string Target, List<Stmt> Then, List<Stmt>? Else) : Stmt; // #if LUA / VJASS
 
 public abstract record Expr(int Line = 1, int Col = 1);
 public sealed record NameExpr(string Name, int Line = 1, int Col = 1) : Expr(Line, Col);
