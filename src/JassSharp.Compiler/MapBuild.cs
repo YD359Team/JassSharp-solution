@@ -124,6 +124,16 @@ static class MapBuild
                 {
                     var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
                     var imports = ResolveImports(unit, allUnits);
+                    var diagnostics = Checker.Check(unit, file, imports);
+                    foreach (var diagnostic in diagnostics)
+                    {
+                        Console.Error.WriteLine(
+                            $"{file}:{diagnostic.Line}:{diagnostic.Col}: {diagnostic.Severity}: {diagnostic.Message}");
+                    }
+
+                    if (diagnostics.Any(diagnostic => diagnostic.Severity == "error"))
+                        return Fail($"semantic analysis failed for '{file}'");
+
                     string emitted = new LuaEmitter().Emit(unit, imports);
 
                     if (target == "lua" && unit.Functions.Any(fn => fn.Name == "OnInit"))
