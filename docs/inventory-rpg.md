@@ -19,7 +19,7 @@ if (inventory.IsEquipped(weapon))
 }
 
 inventory.Equip(potion);
-inventory.Dispose();
+// UnitInventory is a non-owning view; no disposal is required.
 ```
 
 `UnitInventory` is a non-owning view over a unit. It never creates, destroys, or transfers ownership of the unit or its items. Bag indices are zero-based and validated against `BlzUnitExtendedInventorySize`. Equipment slots use the native `loadoutslot` type. Equipment operations and queries forward to the Blz-prefixed 3.0 API; this avoids depending on the legacy unprefixed aliases that 3.0.1 announced would be removed in a future patch.
