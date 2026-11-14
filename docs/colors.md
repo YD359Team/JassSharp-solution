@@ -6,7 +6,9 @@ The compiler embeds `standard-library/Colors.w3js`. Import `Colors`:
 using Colors;
 
 Color accent = new Color(0.2, 0.6, 1.0, 1.0);
+Color opaque = Color.FromRgb(40, 120, 255);
 Color translucent = Color.FromBytes(40, 120, 255, 160);
+Color fromFrameColor = Color.FromArgb(0xA02878FF);
 Color percentage = Color.FromPercent(20.0, 60.0, 100.0, 100.0);
 string colored = accent.WrapText("|cffffcc00JASS#|r");
 ```
