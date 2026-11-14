@@ -1,0 +1,98 @@
+namespace Abilities
+{
+    using Warcraft3;
+    using Math;
+
+    // A non-owning view of one ability identified by rawcode on a unit.
+    public class UnitAbility
+    {
+        private unit _owner;
+        private int _rawcode;
+
+        public UnitAbility(unit owner, int rawcode)
+        {
+            _owner = owner;
+            _rawcode = rawcode;
+        }
+
+        public bool IsPresent()
+        {
+            return GetUnitAbilityLevel(_owner, _rawcode) > 0;
+        }
+
+        public bool Add()
+        {
+            return UnitAddAbility(_owner, _rawcode);
+        }
+
+        public bool Remove()
+        {
+            return UnitRemoveAbility(_owner, _rawcode);
+        }
+
+        public int Level()
+        {
+            return GetUnitAbilityLevel(_owner, _rawcode);
+        }
+
+        public int SetLevel(int level)
+        {
+            if (level < 0) { level = 0; }
+            return SetUnitAbilityLevel(_owner, _rawcode, level);
+        }
+
+        public int IncreaseLevel()
+        {
+            return IncUnitAbilityLevel(_owner, _rawcode);
+        }
+
+        public int DecreaseLevel()
+        {
+            return DecUnitAbilityLevel(_owner, _rawcode);
+        }
+
+        public bool SetPermanent(bool permanent)
+        {
+            return UnitMakeAbilityPermanent(_owner, permanent, _rawcode);
+        }
+
+        // hideUI controls whether the disabled ability is also hidden from the command UI.
+        public void SetEnabled(bool enabled, bool hideUI)
+        {
+            BlzUnitDisableAbility(_owner, _rawcode, !enabled, hideUI);
+        }
+
+        public float Cooldown(int level)
+        {
+            if (level < 1) { level = 1; }
+            return BlzGetUnitAbilityCooldown(_owner, _rawcode, level);
+        }
+
+        public float RemainingCooldown()
+        {
+            return BlzGetUnitAbilityCooldownRemaining(_owner, _rawcode);
+        }
+
+        public void StartCooldown(float seconds)
+        {
+            BlzStartUnitAbilityCooldown(_owner, _rawcode, Math.Max(seconds, 0.0));
+        }
+
+        public void EndCooldown()
+        {
+            BlzEndUnitAbilityCooldown(_owner, _rawcode);
+        }
+
+        public int ManaCost(int level)
+        {
+            if (level < 1) { level = 1; }
+            return BlzGetUnitAbilityManaCost(_owner, _rawcode, level);
+        }
+
+        // Returns the borrowed native handle for advanced BlzGetAbility*Field calls.
+        public ability Handle()
+        {
+            return BlzGetUnitAbility(_owner, _rawcode);
+        }
+    }
+}

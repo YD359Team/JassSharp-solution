@@ -1,0 +1,51 @@
+# Ability standard library
+
+The compiler embeds `standard-library/Abilities.w3js`. The module provides `Abilities.UnitAbility`, a non-owning wrapper around one ability identified by its rawcode on a specific unit.
+
+```csharp
+using Abilities;
+using Warcraft3;
+
+public void OnInit()
+{
+    UnitAbility firebolt = new UnitAbility(GetTriggerUnit(), AbilityId("AHbz"));
+
+    if (!firebolt.IsPresent())
+    {
+        firebolt.Add();
+    }
+
+    firebolt.SetLevel(2);
+    firebolt.SetEnabled(false, false);
+    firebolt.StartCooldown(3.0);
+}
+```
+
+## UnitAbility
+
+The constructor accepts the owning `unit` and an integer ability rawcode. Use Warcraft III's `AbilityId("AHbz")` to convert a four-character rawcode to the integer expected by the natives.
+
+| Method | Behavior |
+|---|---|
+| `IsPresent()` | Checks whether the unit currently has a positive ability level |
+| `Add()` / `Remove()` | Adds or removes the ability; returns the native result |
+| `Level()` | Reads the current ability level |
+| `SetLevel(level)` | Sets the level; negative input is clamped to zero |
+| `IncreaseLevel()` / `DecreaseLevel()` | Uses the native level adjustment functions |
+| `SetPermanent(permanent)` | Controls whether the ability is permanent |
+| `SetEnabled(enabled, hideUI)` | Enables/disables the ability; `hideUI` is forwarded to Warcraft III |
+| `Cooldown(level)` | Reads the cooldown duration for a 1-based ability level |
+| `RemainingCooldown()` | Reads the current remaining cooldown |
+| `StartCooldown(seconds)` / `EndCooldown()` | Starts or ends this ability's cooldown |
+| `ManaCost(level)` | Reads mana cost for a 1-based ability level |
+| `Handle()` | Returns the borrowed native `ability` handle for advanced field access |
+
+Cooldown duration is expressed in game seconds. Negative cooldown durations are clamped to zero. Level arguments to `Cooldown` and `ManaCost` are clamped to at least one.
+
+## Ownership and lifetime
+
+`UnitAbility` is a lightweight, non-owning view. It does not create or destroy the unit or ability, and it does not own the handle returned by `Handle()`. No destructor or `Dispose()` is needed. The view remains associated with its original unit and rawcode; if the ability is removed and later re-added, the same wrapper addresses that ability again.
+
+The wrapper does not validate that the unit is non-null, alive, or currently owns the ability before forwarding calls to Warcraft III. Check `IsPresent()` when that distinction matters. Gameplay-specific preconditions remain the caller's responsibility.
+
+This module uses Warcraft III natives at runtime. In headless mode it can be checked and translated with `using Warcraft3;`, but the generated Lua still requires the Warcraft III runtime for these calls.

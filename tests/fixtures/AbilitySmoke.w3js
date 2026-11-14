@@ -1,0 +1,32 @@
+namespace AbilitySmoke
+{
+    using Abilities;
+    using Warcraft3;
+
+    public void OnInit()
+    {
+        unit caster = GetTriggerUnit();
+        UnitAbility firebolt = new UnitAbility(caster, AbilityId("AHbz"));
+
+        bool presentBefore = firebolt.IsPresent();
+        bool added = firebolt.Add();
+        int level = firebolt.Level();
+        int setLevel = firebolt.SetLevel(2);
+        int increased = firebolt.IncreaseLevel();
+        int decreased = firebolt.DecreaseLevel();
+        bool permanent = firebolt.SetPermanent(true);
+
+        firebolt.SetEnabled(false, false);
+        firebolt.SetEnabled(true, false);
+
+        float cooldown = firebolt.Cooldown(1);
+        int manaCost = firebolt.ManaCost(1);
+        firebolt.StartCooldown(2.5);
+        float remaining = firebolt.RemainingCooldown();
+        firebolt.EndCooldown();
+
+        ability handle = firebolt.Handle();
+        bool removed = firebolt.Remove();
+        bool presentAfter = firebolt.IsPresent();
+    }
+}
