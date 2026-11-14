@@ -27,8 +27,18 @@ if ($misuseExitCode -eq 0 -or -not $hasErrorSeverity -or -not $hasStaticCallErro
 }
 
 Write-Host "[3/6] Verifying build rejects semantic errors..."
-$invalidBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $invalidFixture 2>&1
-$invalidBuildExitCode = $LASTEXITCODE
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    # PowerShell can promote native stderr output to a terminating error when
+    # ErrorActionPreference is Stop, even when a non-zero exit code is expected.
+    $ErrorActionPreference = "Continue"
+    $invalidBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $invalidFixture 2>&1
+    $invalidBuildExitCode = $LASTEXITCODE
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+
 if ($invalidBuildExitCode -eq 0) {
     throw "Build accepted a fixture with invalid static/instance method calls. Output: $($invalidBuildOutput -join [Environment]::NewLine)"
 }
