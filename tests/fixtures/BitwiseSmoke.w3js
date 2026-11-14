@@ -18,6 +18,7 @@ namespace BitwiseSmoke
 
         int precedence = 1 | 2 ^ 3 & 4 << 1;
         int allBits = 0xFFFFFFFF;
+        int deadBeef = 0xDEADBEEF;
         int signBit = 0x80000000;
         int minValue = -2147483648;
     }
