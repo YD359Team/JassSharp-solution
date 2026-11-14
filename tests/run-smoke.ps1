@@ -82,6 +82,7 @@ $requiredFragments = @(
     "local inferredScore = Score.FromValue(7.0)",
     "local remainder = (17 % 5)",
     "local fractionalRemainder = (7.5 % 2.0)",
+    "remainder = (remainder % 3)",
     "function Score.__operator_Modulo_Score_Score(left, right)",
     "Score.FromValue(10.0)",
     "function Vector2.__add(arg0, arg1)",
