@@ -66,13 +66,17 @@ catch {
     throw "Could not parse type-safety diagnostics as JSON. Exit code: $typeExitCode. Output: $typeText"
 }
 
-$typeMessages = @($parsedTypeDiagnostics | ForEach-Object { $_.Message })
-$floatToIntErrors = @($typeMessages | Where-Object { $_ -like "*несовместимое присваивание: ожидался тип int, получен float*" })
-$hasBoolToIntError = $typeMessages | Where-Object { $_ -like "*несовместимое присваивание: ожидался тип int, получен bool*" }
-$hasVarInitializerError = $typeMessages | Where-Object { $_ -like "*переменная var missingInitializer должна иметь выражение инициализации*" }
+$typeErrors = @($parsedTypeDiagnostics | Where-Object { $_.Severity -eq "error" })
+$errorLines = @($typeErrors | ForEach-Object { [int]$_.Line } | Sort-Object)
+$actualErrorLines = $errorLines -join ","
+$expectedErrorLines = "7,8,10,11"
 
-if ($typeExitCode -eq 0 -or $floatToIntErrors.Count -lt 2 -or -not $hasBoolToIntError -or -not $hasVarInitializerError) {
-    throw "Strict assignment compatibility was not enforced with all expected diagnostics. Exit code: $typeExitCode. Output: $typeText"
+# Keep this assertion ASCII-only: Windows PowerShell 5.1 may decode a UTF-8
+# script without BOM using the active ANSI code page, corrupting Cyrillic text.
+# These four source lines correspond to float->int, bool->int, var reassignment,
+# and var without an initializer, respectively.
+if ($typeExitCode -eq 0 -or $typeErrors.Count -ne 4 -or $actualErrorLines -ne $expectedErrorLines) {
+    throw "Strict assignment compatibility was not enforced at all expected source locations. Exit code: $typeExitCode. Error lines: $actualErrorLines. Output: $typeText"
 }
 
 Write-Host "[5/7] Checking the operator/Math fixture..."
