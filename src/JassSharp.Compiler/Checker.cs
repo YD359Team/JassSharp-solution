@@ -366,11 +366,21 @@ public static class Checker
             if (call.Callee is NameExpr name)
             {
                 if (_functions.TryGetValue(name.Name, out var function))
+                {
                     CheckArguments(name, call.Args, function.Params.Select(p => p.Type).ToArray());
+                }
                 else if (NativeSigs.Map.TryGetValue(name.Name, out var native))
+                {
                     CheckArguments(name, call.Args, native.Params);
-                else if (!IsKnownSymbol(name.Name))
-                    Add(name.Line, name.Col, "warning", $"неизвестный вызов {name.Name}");
+                }
+                else
+                {
+                    if (!IsKnownSymbol(name.Name))
+                        Add(name.Line, name.Col, "warning", $"неизвестный вызов {name.Name}");
+
+                    foreach (var argument in call.Args)
+                        CheckExpression(argument);
+                }
 
                 return;
             }
@@ -409,10 +419,23 @@ public static class Checker
                 return;
             }
 
-            if (receiverType is not null && NativeTable.Find(receiverType, member.Name) is null)
+            if (receiverType is not null)
             {
-                Add(member.Line, member.Col, "warning",
-                    $"тип {receiverType} не содержит метода {member.Name}");
+                var nativeMember = NativeTable.Find(receiverType, member.Name);
+                if (nativeMember?.Kind == MemberKind.Method)
+                {
+                    var nativeName = GetNativeName(nativeMember.Read);
+                    if (nativeName is not null && NativeSigs.Map.TryGetValue(nativeName, out var nativeMethod))
+                    {
+                        CheckArguments(member, call.Args, nativeMethod.Params);
+                        return;
+                    }
+                }
+                else if (nativeMember is null)
+                {
+                    Add(member.Line, member.Col, "warning",
+                        $"тип {receiverType} не содержит метода {member.Name}");
+                }
             }
 
             foreach (var argument in call.Args)
