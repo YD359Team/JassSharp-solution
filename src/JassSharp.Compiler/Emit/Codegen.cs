@@ -409,10 +409,13 @@ end
                         EmitStmts(c.Else, trace);
                     break;
                 case VarStmt v:
-                    _locals[v.Name] = v.Type;
+                    var inferredType = v.Type == "var" && v.Init is not null
+                        ? InferType(v.Init) ?? throw new InvalidOperationException($"Не удалось вывести тип переменной {v.Name}")
+                        : v.Type;
+                    _locals[v.Name] = inferredType;
                     var init = v.Init is null ? null : EmitExpr(v.Init);
                     if (_lua) Line(init is null ? $"local {v.Name}" : $"local {v.Name} = {init}");
-                    else Line(init is null ? $"local {MapType(v.Type)} {v.Name}" : $"local {MapType(v.Type)} {v.Name} = {init}");
+                    else Line(init is null ? $"local {MapType(inferredType)} {v.Name}" : $"local {MapType(inferredType)} {v.Name} = {init}");
                     break;
                 case AssignStmt a:
                     EmitAssign(a.Target, a.Value);

@@ -25,6 +25,11 @@ namespace MathOperatorsSmoke
         {
             return new Score(left.Value + right.Value);
         }
+
+        public static Score operator %(Score left, Score right)
+        {
+            return new Score(left.Value % right.Value);
+        }
     }
 
     public class ScoreHolder
@@ -99,6 +104,16 @@ namespace MathOperatorsSmoke
         float power = Math.Pow(2.0, 3.0);
         float root = Math.Sqrt(16.0);
         float absolute = Math.Abs(-5.0);
+
+        var inferredInt = 42;
+        var inferredFloat = 2.5;
+        var inferredScore = Score.FromValue(7.0);
+        int explicitInt = 4;
+        float explicitFloat = explicitInt;
+        int remainder = 17 % 5;
+        float fractionalRemainder = 7.5 % 2.0;
+        remainder %= 3;
+        Score overloadedRemainder = firstScore % secondScore;
         float sine = Math.Sin(1.0);
         float cosine = Math.Cos(1.0);
         float tangent = Math.Tan(1.0);

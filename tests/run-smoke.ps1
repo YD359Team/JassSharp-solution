@@ -4,6 +4,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $repoRoot "src/JassSharp.Compiler/JassSharp.Compiler.csproj"
 $fixture = Join-Path $PSScriptRoot "fixtures/MathOperatorsSmoke.w3js"
 $invalidFixture = Join-Path $PSScriptRoot "fixtures/StaticMethodMisuse.w3js"
+$typeFixture = Join-Path $PSScriptRoot "fixtures/TypeSafetySmoke.w3js"
 $mathLibrary = Join-Path $repoRoot "standard-library/Math.w3js"
 $output = Join-Path $PSScriptRoot "fixtures/bin/MathOperatorsSmoke.lua"
 
@@ -43,7 +44,15 @@ if ($invalidBuildExitCode -eq 0) {
     throw "Build accepted a fixture with invalid static/instance method calls. Output: $($invalidBuildOutput -join [Environment]::NewLine)"
 }
 
-Write-Host "[4/6] Checking the operator/Math fixture..."
+Write-Host "[4/7] Verifying strict assignment compatibility..."
+$typeDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $typeFixture 2>&1
+$typeExitCode = $LASTEXITCODE
+$typeText = $typeDiagnostics -join "`n"
+if ($typeExitCode -eq 0 -or -not $typeText.Contains("несовместимое присваивание") -or -not $typeText.Contains("ожидался тип int, получен float")) {
+    throw "Strict assignment compatibility was not enforced. Exit code: $typeExitCode. Output: $typeText"
+}
+
+Write-Host "[5/7] Checking the operator/Math fixture..."
 dotnet run --configuration Release --no-build --project $project -- check $fixture
 if ($LASTEXITCODE -ne 0) {
     throw "Fixture check failed with exit code $LASTEXITCODE"
@@ -54,7 +63,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Standard library check failed with exit code $LASTEXITCODE"
 }
 
-Write-Host "[5/6] Generating Lua..."
+Write-Host "[6/7] Generating Lua..."
 dotnet run --configuration Release --no-build --project $project -- build $fixture
 if ($LASTEXITCODE -ne 0) {
     throw "Fixture build failed with exit code $LASTEXITCODE"
@@ -64,10 +73,16 @@ if (-not (Test-Path $output)) {
     throw "Expected generated Lua file was not created: $output"
 }
 
-Write-Host "[6/6] Verifying generated static calls and operator adapters..."
+Write-Host "[7/7] Verifying generated static calls and operator adapters..."
 $lua = Get-Content -LiteralPath $output -Raw
 $requiredFragments = @(
     "function Score.FromValue(value)",
+    "local inferredInt = 42",
+    "local inferredFloat = 2.5",
+    "local inferredScore = Score.FromValue(7.0)",
+    "local remainder = (17 % 5)",
+    "local fractionalRemainder = (7.5 % 2.0)",
+    "function Score.__operator_Modulo(arg0, arg1)",
     "Score.FromValue(10.0)",
     "function Vector2.__add(arg0, arg1)",
     "__operator_Add_Vector2_Vector2",

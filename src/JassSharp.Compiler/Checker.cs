@@ -162,16 +162,38 @@ public static class Checker
             {
                 case VarStmt variable:
                 {
+                    string declaredType = variable.Type;
                     if (variable.Init is not null)
                     {
                         CheckExpression(variable.Init);
                         var actual = InferType(variable.Init);
-                        if (actual is not null && !IsCompatible(actual, variable.Type))
+                        if (declaredType == "var")
+                        {
+                            if (actual is null || actual == "null" || actual == "void")
+                            {
+                                Add(variable.Line, variable.Col, "error",
+                                    $"невозможно вывести тип переменной {variable.Name} из выражения инициализации");
+                                declaredType = "?";
+                            }
+                            else
+                            {
+                                declaredType = actual;
+                            }
+                        }
+                        else if (actual is not null && !IsCompatible(actual, declaredType))
+                        {
                             Add(variable.Line, variable.Col, "error",
-                                $"переменная {variable.Name}: ожидался тип {variable.Type}, получен {actual}");
+                                $"переменная {variable.Name}: ожидался тип {declaredType}, получен {actual}");
+                        }
+                    }
+                    else if (declaredType == "var")
+                    {
+                        Add(variable.Line, variable.Col, "error",
+                            $"переменная var {variable.Name} должна иметь выражение инициализации");
+                        declaredType = "?";
                     }
 
-                    Declare(variable.Name, variable.Type, variable.Line, variable.Col);
+                    Declare(variable.Name, declaredType, variable.Line, variable.Col);
                     break;
                 }
 
@@ -347,11 +369,25 @@ public static class Checker
                 case BinaryExpr binary:
                     CheckExpression(binary.Left);
                     CheckExpression(binary.Right);
-                    var binaryOverload = FindOperator(InferType(binary.Left), InferType(binary.Right), binary.Op, [binary.Left, binary.Right]);
+                    var leftType = InferType(binary.Left);
+                    var rightType = InferType(binary.Right);
+                    var binaryOverload = FindOperator(leftType, rightType, binary.Op, [binary.Left, binary.Right]);
                     if (binaryOverload is not null)
+                    {
                         CheckArguments(binary, [binary.Left, binary.Right], binaryOverload.Params.Select(p => p.Type).ToArray());
-                    else if (IsUserType(InferType(binary.Left)) || IsUserType(InferType(binary.Right)))
-                        Add(binary.Line, binary.Col, "error", $"оператор {binary.Op} не определён для типов {InferType(binary.Left) ?? "?"} и {InferType(binary.Right) ?? "?"}");
+                    }
+                    else if (IsUserType(leftType) || IsUserType(rightType))
+                    {
+                        Add(binary.Line, binary.Col, "error", $"оператор {binary.Op} не определён для типов {leftType ?? "?"} и {rightType ?? "?"}");
+                    }
+                    else if (binary.Op is "+" or "-" or "*" or "/" or "%")
+                    {
+                        bool stringConcatenation = binary.Op == "+" && (leftType == "string" || rightType == "string");
+                        bool numericOperands = leftType is "int" or "float" && rightType is "int" or "float";
+                        if (!stringConcatenation && !numericOperands && leftType is not null && rightType is not null)
+                            Add(binary.Line, binary.Col, "error",
+                                $"оператор {binary.Op} требует числовые операнды, получены {leftType} и {rightType}");
+                    }
                     break;
 
                 case UnaryExpr unary:
@@ -718,8 +754,6 @@ public static class Checker
     private static bool IsCompatible(string actual, string expected)
     {
         if (actual == expected || actual == "null")
-            return true;
-        if (expected == "int" && actual == "float")
             return true;
         if (expected == "float" && actual == "int")
             return true;

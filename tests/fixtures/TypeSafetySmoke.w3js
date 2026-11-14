@@ -1,0 +1,13 @@
+namespace TypeSafetySmoke
+{
+    public void OnInit()
+    {
+        int integer = 10;
+        float real = 2.5;
+        integer = real;
+        integer = true;
+        var inferred = 1;
+        inferred = 2.0;
+        var missingInitializer;
+    }
+}

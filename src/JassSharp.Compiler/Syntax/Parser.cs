@@ -207,7 +207,7 @@ public sealed class Parser(List<Token> tokens)
     private static readonly HashSet<string> TypeNames = new(StringComparer.Ordinal)
     {
         // common types
-        "int", "float", "bool", "void", "string",
+        "int", "float", "bool", "void", "string", "var",
         // extended types
         "List",
         // warctaft 3 types

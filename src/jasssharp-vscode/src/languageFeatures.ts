@@ -270,8 +270,42 @@ function readVariables(text: string, classes = readClasses(text), functions = re
         result.push({ name, type, offset, isParameter: false });
     }
 
-    for (const match of source.matchAll(/\bvar\s+([A-Za-z_]\w*)\s*=\s*new\s+([A-Za-z_]\w*)/g)) {
-        result.push({ name: match[1], type: match[2], offset: (match.index ?? 0) + match[0].indexOf(match[1]), isParameter: false });
+    const knownTypes = new Map<string, string>();
+    for (const variable of result) knownTypes.set(variable.name, variable.type);
+    for (const match of source.matchAll(/\bvar\s+([A-Za-z_]\w*)\s*=\s*([^;\r\n]+)/g)) {
+        const name = match[1];
+        const initializer = match[2].trim();
+        const offset = (match.index ?? 0) + match[0].indexOf(name);
+        let inferred: string | undefined;
+        const creation = /^new\s+([A-Za-z_]\w*)/.exec(initializer);
+        if (creation) inferred = creation[1];
+        else if (/^(?:true|false)$/.test(initializer)) inferred = "bool";
+        else if (/^null$/.test(initializer)) inferred = undefined;
+        else if (/^["']/.test(initializer)) inferred = "string";
+        else if (/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(initializer))
+            inferred = /[.eE]/.test(initializer) ? "float" : "int";
+        else {
+            const identifier = /^([A-Za-z_]\w*)$/.exec(initializer);
+            if (identifier) inferred = knownTypes.get(identifier[1]);
+            if (!inferred) {
+                const call = /^([A-Za-z_]\w*)\s*\(/.exec(initializer);
+                if (call) inferred = functions.find(fn => fn.name === call[1])?.returnType ?? nativeReturnType(call[1]);
+            }
+            if (!inferred && /[+*/%-]/.test(initializer)) {
+                const operands = initializer.split(/[+*/%-]/).map(part => part.trim()).filter(Boolean);
+                const operandTypes = operands.map(part => {
+                    if (/^\d+\.\d/.test(part)) return "float";
+                    if (/^\d+$/.test(part)) return "int";
+                    return knownTypes.get(part);
+                });
+                if (operandTypes.every(Boolean) && operandTypes.some(type => type === "float")) inferred = "float";
+                else if (operandTypes.length && operandTypes.every(type => type === "int")) inferred = "int";
+            }
+        }
+        if (inferred) {
+            result.push({ name, type: inferred, offset, isParameter: false });
+            knownTypes.set(name, inferred);
+        }
     }
 
     for (const fn of functions) {
