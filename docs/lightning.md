@@ -22,6 +22,6 @@ bolt.Move(
 bolt.Dispose();
 ```
 
-The wrapper owns the native lightning handle created by `AddLightningEx`. Coordinates are Warcraft world coordinates; Z values are passed through unchanged. `Move` updates both endpoints using `MoveLightningEx` and sets the visibility-check flag for that move. `SetColor` uses normalized RGBA channels, matching `SetLightningColor`, rather than 0..255 integers.
+The wrapper owns the native lightning handle created by `AddLightningEx`. Coordinates are Warcraft world coordinates; Z values are passed through unchanged. `Move(start, end, checkVisibility)` updates both endpoints using `MoveLightningEx` and stores the visibility-check flag. The two-argument `Move(start, end)` overload reuses the most recently selected flag (initially the constructor value). `SetColor` uses normalized RGBA channels, matching `SetLightningColor`, rather than 0..255 integers.
 
 Call `Dispose()` exactly once per owning wrapper. The native destroy result is intentionally not exposed as a gameplay success guarantee.
