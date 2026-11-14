@@ -206,7 +206,7 @@ public sealed class Lexer(string source)
             if (braceDepth == 0)
             {
                 if (!raw && c is ('\n' or '\r'))
-                    throw new ParseException("обычная интерполируемая строка не может содержать перевод строки; используйте $\\\"\\\"\\\"...\\\"\\\"\\\" ", _line, _col);
+                    throw new ParseException("обычная интерполируемая строка не может содержать перевод строки; используйте многострочную raw-интерполяцию", _line, _col);
 
                 if (!raw && c == '\\' && _i + 1 < source.Length)
                 {
