@@ -34,6 +34,12 @@ public sealed record NameExpr(string Name, int Line = 1, int Col = 1) : Expr(Lin
 public sealed record ThisExpr(int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record NumExpr(string Text, int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record StrExpr(string Text, int Line = 1, int Col = 1) : Expr(Line, Col);
+public sealed record InterpolatedExpr(List<InterpolatedPart> Parts, int Line = 1, int Col = 1) : Expr(Line, Col);
+public sealed record InterpolatedPart(string? Text, Expr? Expression)
+{
+    public static InterpolatedPart Literal(string text) => new(text, null);
+    public static InterpolatedPart Value(Expr expression) => new(null, expression);
+}
 public sealed record RawExpr(string Id, int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record BoolExpr(bool Value, int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record NullExpr(int Line = 1, int Col = 1) : Expr(Line, Col);
