@@ -125,11 +125,8 @@ public static class Checker
                 Add(1, 1, "error", $"повторное объявление перегрузки оператора {duplicate.First().Operator} с той же сигнатурой");
 
             var operators = declared.Select(method => method.Operator!).ToHashSet(StringComparer.Ordinal);
-            foreach (var pair in new[] { ("==", "!="), ("<", ">"), ("<=", ">=") })
-            {
-                if (operators.Contains(pair.Item1) != operators.Contains(pair.Item2))
-                    Add(1, 1, "error", $"операторы {pair.Item1} и {pair.Item2} должны объявляться парой");
-            }
+            if (operators.Contains("==") != operators.Contains("!="))
+                Add(1, 1, "error", "операторы == и != должны объявляться парой");
         }
 
         private void CheckFunction(FnDecl function, string? className)
