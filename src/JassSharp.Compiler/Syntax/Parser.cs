@@ -45,15 +45,9 @@ public sealed class Parser(List<Token> tokens)
             }
             else
             {
-                var typeTok = Eat(TokKind.Id);
-                string typeName = typeTok.Text;
-                if (typeName == "List" && Accept("<"))
-                {
-                    Eat(TokKind.Id);
-                    Expect(">");
-                    typeName = "List";
-                }
-                var isArray = Accept("[") && Accept("]");
+                var typeTok = Peek;
+                string typeName = ParseTypeName();
+                var isArray = typeName.EndsWith("[]", StringComparison.Ordinal);
                 var id = Eat(TokKind.Id).Text;
                 if (Accept("("))
                 {
@@ -120,14 +114,8 @@ public sealed class Parser(List<Token> tokens)
                 ctor = new FnDecl(name, "create", ps, ParseBlock(), attrs);
                 continue;
             }
-            var type = Eat(TokKind.Id).Text;
-            if (type == "List" && Accept("<"))
-            {
-                Eat(TokKind.Id);
-                Expect(">");
-                type = "List";
-            }
-            var isArray = Accept("[") && Accept("]");
+            var type = ParseTypeName();
+            var isArray = type.EndsWith("[]", StringComparison.Ordinal);
             if (CheckId("operator"))
             {
                 Eat(TokKind.Id);
@@ -183,11 +171,34 @@ public sealed class Parser(List<Token> tokens)
         return new EnumDecl(name, members);
     }
 
+    private string ParseTypeName()
+    {
+        string typeName = Eat(TokKind.Id).Text;
+        if (typeName == "List" && Accept("<"))
+        {
+            Eat(TokKind.Id);
+            Expect(">");
+        }
+
+        while (Accept("["))
+        {
+            Expect("]");
+            typeName += "[]";
+        }
+
+        return typeName;
+    }
+
     private List<ParamDecl> ParseParams()
     {
         var list = new List<ParamDecl>();
         if (Check(")")) return list;
-        do list.Add(new ParamDecl(Eat(TokKind.Id).Text, Eat(TokKind.Id).Text));
+        do
+        {
+            string type = ParseTypeName();
+            string name = Eat(TokKind.Id).Text;
+            list.Add(new ParamDecl(type, name));
+        }
         while (Accept(","));
         return list;
     }
@@ -235,16 +246,22 @@ public sealed class Parser(List<Token> tokens)
     private bool LooksLikeDecl()
     {
         if (Peek.Kind != TokKind.Id || _i + 1 >= tokens.Count) return false;
-        var next = tokens[_i + 1];
-        if (next.Kind == TokKind.Sym && next.Text == "[")
+
+        int nameIndex = _i + 1;
+        while (nameIndex + 1 < tokens.Count &&
+               tokens[nameIndex].Kind == TokKind.Sym && tokens[nameIndex].Text == "[" &&
+               tokens[nameIndex + 1].Kind == TokKind.Sym && tokens[nameIndex + 1].Text == "]")
         {
-            if (_i + 3 < tokens.Count && tokens[_i + 2].Text == "]" && tokens[_i + 3].Kind == TokKind.Id)
-                return true;
-            return false;
+            nameIndex += 2;
         }
-        if (next.Kind != TokKind.Id) return false;
-        var after = tokens[_i + 2];
-        if (after.Kind == TokKind.Sym && after.Text == "(") return false;
+
+        if (nameIndex >= tokens.Count || tokens[nameIndex].Kind != TokKind.Id)
+            return false;
+
+        if (nameIndex + 1 < tokens.Count &&
+            tokens[nameIndex + 1].Kind == TokKind.Sym && tokens[nameIndex + 1].Text == "(")
+            return false;
+
         return TypeNames.Contains(Peek.Text) || char.IsUpper(Peek.Text[0]);
     }
 
@@ -317,15 +334,8 @@ public sealed class Parser(List<Token> tokens)
         }
         if (LooksLikeDecl())
         {
-            var typeTok = Eat(TokKind.Id);
-            string typeName = typeTok.Text;
-            if (typeName == "List" && Accept("<"))
-            {
-                Eat(TokKind.Id);
-                Expect(">");
-                typeName = "List";
-            }
-            Accept("["); Accept("]");
+            var typeTok = Peek;
+            string typeName = ParseTypeName();
             var id = Eat(TokKind.Id).Text;
             Expr? init = null;
             if (Accept("=")) init = ParseExpr();
@@ -460,15 +470,12 @@ public sealed class Parser(List<Token> tokens)
         }
         if (CheckId("new")) 
         { 
-            var newTok = Eat(TokKind.Id); 
-            string type = Eat(TokKind.Id).Text;
-            if (type == "List" && Accept("<"))
-            {
-                Eat(TokKind.Id); // T
-                Expect(">");
-                type = "List";
-            }
-            Expect("("); 
+            var newTok = Eat(TokKind.Id);
+            string type = ParseTypeName();
+            if (type.EndsWith("[]", StringComparison.Ordinal) && !Check("("))
+                return new NewExpr(type, [], newTok.Line, newTok.Col);
+
+            Expect("(");
             var args = new List<Expr>(); 
             if (!Check(")")) 
             { 
