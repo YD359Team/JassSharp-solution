@@ -420,8 +420,21 @@ end
                         : v.Type;
                     _locals[v.Name] = inferredType;
                     var init = v.Init is null ? null : EmitExpr(v.Init);
-                    if (_lua) Line(init is null ? $"local {v.Name}" : $"local {v.Name} = {init}");
-                    else Line(init is null ? $"local {MapType(inferredType)} {v.Name}" : $"local {MapType(inferredType)} {v.Name} = {init}");
+                    if (_lua)
+                    {
+                        if (init is not null)
+                            Line($"local {v.Name} = {init}");
+                        else if (inferredType.EndsWith("[]", StringComparison.Ordinal))
+                            Line($"local {v.Name} = {{}}");
+                        else
+                            Line($"local {v.Name}");
+                    }
+                    else
+                    {
+                        Line(init is null
+                            ? $"local {MapType(inferredType)} {v.Name}"
+                            : $"local {MapType(inferredType)} {v.Name} = {init}");
+                    }
                     break;
                 case AssignStmt a:
                     EmitAssign(a.Target, a.Value);
@@ -630,6 +643,8 @@ end
         MemberExpr m => InferMemberType(m),
         CallExpr c => InferCallType(c),
         IndexExpr ix when InferType(ix.Object) == "string" => "string",
+        IndexExpr ix when InferType(ix.Object) is { } arrayType &&
+            arrayType.EndsWith("[]", StringComparison.Ordinal) => arrayType[..^2],
         _ => null
     };
 
@@ -810,6 +825,8 @@ end
             $"({EmitExpr(b.Left)} {Op(b.Op)} {EmitExpr(b.Right)})",
 
         IndexExpr ix => EmitIndex(ix),
+
+        NewExpr n when n.Type.EndsWith("[]", StringComparison.Ordinal) && _lua => "{}",
 
         NewExpr n when n.Type == "List" && _lua => "{}",
 
@@ -1050,14 +1067,20 @@ end
         _ => op,
     };
 
-    private static string MapType(string t) => t switch
+    private static string MapType(string t)
     {
-        "int" => "integer",
-        "float" => "real",
-        "bool" => "boolean",
-        "void" => "nothing",
-        _ => t,
-    };
+        while (t.EndsWith("[]", StringComparison.Ordinal))
+            t = t[..^2];
+
+        return t switch
+        {
+            "int" => "integer",
+            "float" => "real",
+            "bool" => "boolean",
+            "void" => "nothing",
+            _ => t,
+        };
+    }
 
     private static string Params(FnDecl fn) =>
         fn.Params.Count == 0 ? "nothing" : string.Join(", ", fn.Params.Select(p => $"{MapType(p.Type)} {p.Name}"));

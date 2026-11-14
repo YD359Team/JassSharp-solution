@@ -359,14 +359,12 @@ public static class Checker
                     break;
 
                 case NewExpr creation:
-                    if (!_classes.Contains(creation.Type) &&
-                        !(_hasWarcraft3 &&
-                            (NativeTable.Constructors.ContainsKey(creation.Type) ||
-                             NativeCatalog.Types.Contains(creation.Type))))
+                    if (!IsKnownType(creation.Type, allowVoid: false))
                     {
-                        if (NativeCatalog.Types.Contains(creation.Type) || NativeTable.Constructors.ContainsKey(creation.Type))
+                        string baseType = StripArrayRanks(creation.Type);
+                        if (NativeCatalog.Types.Contains(baseType) || NativeTable.Constructors.ContainsKey(baseType))
                             Add(creation.Line, creation.Col, "error",
-                                $"тип {creation.Type} доступен только после using Warcraft3");
+                                $"тип {baseType} доступен только после using Warcraft3");
                         else
                             Add(creation.Line, creation.Col, "warning", $"неизвестный тип {creation.Type}");
                     }
@@ -392,6 +390,11 @@ public static class Checker
                     if (indexType is not null && indexType != "int")
                         Add(index.Index.Line, index.Index.Col, "error",
                             $"индекс должен иметь тип int, получен {indexType}");
+                    var indexedType = InferType(index.Object);
+                    if (indexedType is not null && indexedType != "string" &&
+                        indexedType != "List" && !indexedType.EndsWith("[]", StringComparison.Ordinal))
+                        Add(index.Line, index.Col, "error",
+                            $"тип {indexedType} не поддерживает индексатор");
                     break;
 
                 case FromEndExpr fromEnd:
@@ -621,7 +624,13 @@ public static class Checker
                 }
 
                 case IndexExpr index:
-                    return InferType(index.Object) == "string" ? "string" : null;
+                {
+                    var indexedType = InferType(index.Object);
+                    if (indexedType == "string") return "string";
+                    return indexedType is not null && indexedType.EndsWith("[]", StringComparison.Ordinal)
+                        ? indexedType[..^2]
+                        : null;
+                }
 
                 case UnaryExpr unary:
                 {
@@ -740,14 +749,24 @@ public static class Checker
 
         private bool IsKnownType(string type, bool allowVoid)
         {
-            if (type is "int" or "float" or "bool" or "string" or "List")
+            string baseType = StripArrayRanks(type);
+            if (type != baseType && baseType.Length == 0)
+                return false;
+            if (baseType is "int" or "float" or "bool" or "string" or "List")
                 return true;
-            if (allowVoid && type == "void")
+            if (allowVoid && baseType == "void")
                 return true;
-            if (_classes.Contains(type))
+            if (_classes.Contains(baseType))
                 return true;
             return _hasWarcraft3 &&
-                (NativeCatalog.Types.Contains(type) || type is "integer" or "real" or "nothing" or "code");
+                (NativeCatalog.Types.Contains(baseType) || baseType is "integer" or "real" or "nothing" or "code");
+        }
+
+        private static string StripArrayRanks(string type)
+        {
+            while (type.EndsWith("[]", StringComparison.Ordinal))
+                type = type[..^2];
+            return type;
         }
 
         private static bool IsWarcraftSymbol(string name) =>
