@@ -131,6 +131,131 @@ namespace Abilities
             return BlzSetAbilityStringField(Handle(), field, value);
         }
 
+
+        // Level fields use zero-based ability-level indices.
+
+        public bool BooleanLevelField(abilitybooleanlevelfield field, int level)
+        {
+            return BlzGetAbilityBooleanLevelField(Handle(), field, level);
+        }
+
+        public bool SetBooleanLevelField(abilitybooleanlevelfield field, int level, bool value)
+        {
+            return BlzSetAbilityBooleanLevelField(Handle(), field, level, value);
+        }
+
+        public int IntegerLevelField(abilityintegerlevelfield field, int level)
+        {
+            return BlzGetAbilityIntegerLevelField(Handle(), field, level);
+        }
+
+        public bool SetIntegerLevelField(abilityintegerlevelfield field, int level, int value)
+        {
+            return BlzSetAbilityIntegerLevelField(Handle(), field, level, value);
+        }
+
+        public float RealLevelField(abilityreallevelfield field, int level)
+        {
+            return BlzGetAbilityRealLevelField(Handle(), field, level);
+        }
+
+        public bool SetRealLevelField(abilityreallevelfield field, int level, float value)
+        {
+            return BlzSetAbilityRealLevelField(Handle(), field, level, value);
+        }
+
+        public string StringLevelField(abilitystringlevelfield field, int level)
+        {
+            return BlzGetAbilityStringLevelField(Handle(), field, level);
+        }
+
+        public bool SetStringLevelField(abilitystringlevelfield field, int level, string value)
+        {
+            return BlzSetAbilityStringLevelField(Handle(), field, level, value);
+        }
+
+        // Level-array fields use a zero-based ability level and array index.
+
+        public bool BooleanLevelArrayField(abilitybooleanlevelarrayfield field, int level, int index)
+        {
+            return BlzGetAbilityBooleanLevelArrayField(Handle(), field, level, index);
+        }
+
+        public bool SetBooleanLevelArrayField(abilitybooleanlevelarrayfield field, int level, int index, bool value)
+        {
+            return BlzSetAbilityBooleanLevelArrayField(Handle(), field, level, index, value);
+        }
+
+        public bool AddBooleanLevelArrayField(abilitybooleanlevelarrayfield field, int level, bool value)
+        {
+            return BlzAddAbilityBooleanLevelArrayField(Handle(), field, level, value);
+        }
+
+        public bool RemoveBooleanLevelArrayField(abilitybooleanlevelarrayfield field, int level, bool value)
+        {
+            return BlzRemoveAbilityBooleanLevelArrayField(Handle(), field, level, value);
+        }
+
+        public int IntegerLevelArrayField(abilityintegerlevelarrayfield field, int level, int index)
+        {
+            return BlzGetAbilityIntegerLevelArrayField(Handle(), field, level, index);
+        }
+
+        public bool SetIntegerLevelArrayField(abilityintegerlevelarrayfield field, int level, int index, int value)
+        {
+            return BlzSetAbilityIntegerLevelArrayField(Handle(), field, level, index, value);
+        }
+
+        public bool AddIntegerLevelArrayField(abilityintegerlevelarrayfield field, int level, int value)
+        {
+            return BlzAddAbilityIntegerLevelArrayField(Handle(), field, level, value);
+        }
+
+        public bool RemoveIntegerLevelArrayField(abilityintegerlevelarrayfield field, int level, int value)
+        {
+            return BlzRemoveAbilityIntegerLevelArrayField(Handle(), field, level, value);
+        }
+
+        public float RealLevelArrayField(abilityreallevelarrayfield field, int level, int index)
+        {
+            return BlzGetAbilityRealLevelArrayField(Handle(), field, level, index);
+        }
+
+        public bool SetRealLevelArrayField(abilityreallevelarrayfield field, int level, int index, float value)
+        {
+            return BlzSetAbilityRealLevelArrayField(Handle(), field, level, index, value);
+        }
+
+        public bool AddRealLevelArrayField(abilityreallevelarrayfield field, int level, float value)
+        {
+            return BlzAddAbilityRealLevelArrayField(Handle(), field, level, value);
+        }
+
+        public bool RemoveRealLevelArrayField(abilityreallevelarrayfield field, int level, float value)
+        {
+            return BlzRemoveAbilityRealLevelArrayField(Handle(), field, level, value);
+        }
+
+        public string StringLevelArrayField(abilitystringlevelarrayfield field, int level, int index)
+        {
+            return BlzGetAbilityStringLevelArrayField(Handle(), field, level, index);
+        }
+
+        public bool SetStringLevelArrayField(abilitystringlevelarrayfield field, int level, int index, string value)
+        {
+            return BlzSetAbilityStringLevelArrayField(Handle(), field, level, index, value);
+        }
+
+        public bool AddStringLevelArrayField(abilitystringlevelarrayfield field, int level, string value)
+        {
+            return BlzAddAbilityStringLevelArrayField(Handle(), field, level, value);
+        }
+
+        public bool RemoveStringLevelArrayField(abilitystringlevelarrayfield field, int level, string value)
+        {
+            return BlzRemoveAbilityStringLevelArrayField(Handle(), field, level, value);
+        }
+
         // Returns the borrowed native ability handle for advanced native API calls.
         public ability Handle()
         {

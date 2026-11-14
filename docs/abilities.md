@@ -42,9 +42,21 @@ The constructor accepts the owning `unit` and an integer ability rawcode. Use Wa
 | `IntegerField(field)` / `SetIntegerField(field, value)` | Reads or writes an integer ability field using `abilityintegerfield` |
 | `RealField(field)` / `SetRealField(field, value)` | Reads or writes a real ability field using `abilityrealfield` |
 | `StringField(field)` / `SetStringField(field, value)` | Reads or writes a string ability field using `abilitystringfield` |
+| `BooleanLevelField(field, level)` / `SetBooleanLevelField(field, level, value)` | Reads or writes a typed per-level ability field using `abilitybooleanlevelfield` |
+| `BooleanLevelArrayField(field, level, index)` / `SetBooleanLevelArrayField(field, level, index, value)` | Reads or writes a typed per-level array element using `abilitybooleanlevelarrayfield` |
+| `AddBooleanLevelArrayField(field, level, value)` / `RemoveBooleanLevelArrayField(field, level, value)` | Adds or removes a value from a typed per-level array field |
+| `IntegerLevelField(field, level)` / `SetIntegerLevelField(field, level, value)` | Reads or writes a typed per-level ability field using `abilityintegerlevelfield` |
+| `IntegerLevelArrayField(field, level, index)` / `SetIntegerLevelArrayField(field, level, index, value)` | Reads or writes a typed per-level array element using `abilityintegerlevelarrayfield` |
+| `AddIntegerLevelArrayField(field, level, value)` / `RemoveIntegerLevelArrayField(field, level, value)` | Adds or removes a value from a typed per-level array field |
+| `RealLevelField(field, level)` / `SetRealLevelField(field, level, value)` | Reads or writes a typed per-level ability field using `abilityreallevelfield` |
+| `RealLevelArrayField(field, level, index)` / `SetRealLevelArrayField(field, level, index, value)` | Reads or writes a typed per-level array element using `abilityreallevelarrayfield` |
+| `AddRealLevelArrayField(field, level, value)` / `RemoveRealLevelArrayField(field, level, value)` | Adds or removes a value from a typed per-level array field |
+| `StringLevelField(field, level)` / `SetStringLevelField(field, level, value)` | Reads or writes a typed per-level ability field using `abilitystringlevelfield` |
+| `StringLevelArrayField(field, level, index)` / `SetStringLevelArrayField(field, level, index, value)` | Reads or writes a typed per-level array element using `abilitystringlevelarrayfield` |
+| `AddStringLevelArrayField(field, level, value)` / `RemoveStringLevelArrayField(field, level, value)` | Adds or removes a value from a typed per-level array field |
 | `Handle()` | Returns the borrowed native `ability` handle for advanced native API calls |
 
-Cooldown duration is expressed in game seconds. Negative cooldown durations are clamped to zero. The level arguments to `Cooldown` and `ManaCost` use Warcraft III's zero-based indexing and are clamped to at least zero. This differs from `GetUnitAbilityLevel`, which reports the unit's ability level starting at one.
+Level-field and level-array-field indices are zero-based, matching the native API. Array accessors take both a level and an array index; add/remove operations take a level and a value. The wrapper forwards these indices unchanged and does not clamp or validate them. The caller must use a field handle of the matching type and valid indices.\n\nCooldown duration is expressed in game seconds. Negative cooldown durations are clamped to zero. The level arguments to `Cooldown` and `ManaCost` use Warcraft III's zero-based indexing and are clamped to at least zero. This differs from `GetUnitAbilityLevel`, which reports the unit's ability level starting at one.
 
 ## Ownership and lifetime
 

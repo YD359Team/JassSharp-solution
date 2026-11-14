@@ -37,6 +37,33 @@ namespace AbilitySmoke
         string abilityName = firebolt.StringField(ABILITY_SF_NAME);
         bool stringFieldSet = firebolt.SetStringField(ABILITY_SF_NAME, abilityName);
 
+
+        // Level fields: level indices are zero-based.
+        boolean booleanLevelValue = firebolt.BooleanLevelField(ConvertAbilityBooleanLevelField(0), 0);
+        bool booleanLevelSet = firebolt.SetBooleanLevelField(ConvertAbilityBooleanLevelField(0), 0, booleanLevelValue);
+        boolean booleanArrayValue = firebolt.BooleanLevelArrayField(ConvertAbilityBooleanLevelArrayField(0), 0, 0);
+        bool booleanArraySet = firebolt.SetBooleanLevelArrayField(ConvertAbilityBooleanLevelArrayField(0), 0, 0, booleanArrayValue);
+        bool booleanArrayAdded = firebolt.AddBooleanLevelArrayField(ConvertAbilityBooleanLevelArrayField(0), 0, true);
+        bool booleanArrayRemoved = firebolt.RemoveBooleanLevelArrayField(ConvertAbilityBooleanLevelArrayField(0), 0, true);
+        integer integerLevelValue = firebolt.IntegerLevelField(ConvertAbilityIntegerLevelField(0), 0);
+        bool integerLevelSet = firebolt.SetIntegerLevelField(ConvertAbilityIntegerLevelField(0), 0, integerLevelValue);
+        integer integerArrayValue = firebolt.IntegerLevelArrayField(ConvertAbilityIntegerLevelArrayField(0), 0, 0);
+        bool integerArraySet = firebolt.SetIntegerLevelArrayField(ConvertAbilityIntegerLevelArrayField(0), 0, 0, integerArrayValue);
+        bool integerArrayAdded = firebolt.AddIntegerLevelArrayField(ConvertAbilityIntegerLevelArrayField(0), 0, 1);
+        bool integerArrayRemoved = firebolt.RemoveIntegerLevelArrayField(ConvertAbilityIntegerLevelArrayField(0), 0, 1);
+        real realLevelValue = firebolt.RealLevelField(ConvertAbilityRealLevelField(0), 0);
+        bool realLevelSet = firebolt.SetRealLevelField(ConvertAbilityRealLevelField(0), 0, realLevelValue);
+        real realArrayValue = firebolt.RealLevelArrayField(ConvertAbilityRealLevelArrayField(0), 0, 0);
+        bool realArraySet = firebolt.SetRealLevelArrayField(ConvertAbilityRealLevelArrayField(0), 0, 0, realArrayValue);
+        bool realArrayAdded = firebolt.AddRealLevelArrayField(ConvertAbilityRealLevelArrayField(0), 0, 1.5);
+        bool realArrayRemoved = firebolt.RemoveRealLevelArrayField(ConvertAbilityRealLevelArrayField(0), 0, 1.5);
+        string stringLevelValue = firebolt.StringLevelField(ConvertAbilityStringLevelField(0), 0);
+        bool stringLevelSet = firebolt.SetStringLevelField(ConvertAbilityStringLevelField(0), 0, stringLevelValue);
+        string stringArrayValue = firebolt.StringLevelArrayField(ConvertAbilityStringLevelArrayField(0), 0, 0);
+        bool stringArraySet = firebolt.SetStringLevelArrayField(ConvertAbilityStringLevelArrayField(0), 0, 0, stringArrayValue);
+        bool stringArrayAdded = firebolt.AddStringLevelArrayField(ConvertAbilityStringLevelArrayField(0), 0, "sample");
+        bool stringArrayRemoved = firebolt.RemoveStringLevelArrayField(ConvertAbilityStringLevelArrayField(0), 0, "sample");
+
         ability handle = firebolt.Handle();
         bool removed = firebolt.Remove();
         bool presentAfter = firebolt.IsPresent();

@@ -454,7 +454,31 @@ $abilityFragments = @(
     "BlzGetAbilityRealField(self:Handle(), field)",
     "BlzSetAbilityRealField(self:Handle(), field, value)",
     "BlzGetAbilityStringField(self:Handle(), field)",
-    "BlzSetAbilityStringField(self:Handle(), field, value)"
+    "BlzSetAbilityStringField(self:Handle(), field, value)",
+    "BlzGetAbilityBooleanLevelField(self:Handle(), field, level)",
+    "BlzSetAbilityBooleanLevelField(self:Handle(), field, level, value)",
+    "BlzGetAbilityBooleanLevelArrayField(self:Handle(), field, level, index)",
+    "BlzSetAbilityBooleanLevelArrayField(self:Handle(), field, level, index, value)",
+    "BlzAddAbilityBooleanLevelArrayField(self:Handle(), field, level, value)",
+    "BlzRemoveAbilityBooleanLevelArrayField(self:Handle(), field, level, value)",
+    "BlzGetAbilityIntegerLevelField(self:Handle(), field, level)",
+    "BlzSetAbilityIntegerLevelField(self:Handle(), field, level, value)",
+    "BlzGetAbilityIntegerLevelArrayField(self:Handle(), field, level, index)",
+    "BlzSetAbilityIntegerLevelArrayField(self:Handle(), field, level, index, value)",
+    "BlzAddAbilityIntegerLevelArrayField(self:Handle(), field, level, value)",
+    "BlzRemoveAbilityIntegerLevelArrayField(self:Handle(), field, level, value)",
+    "BlzGetAbilityRealLevelField(self:Handle(), field, level)",
+    "BlzSetAbilityRealLevelField(self:Handle(), field, level, value)",
+    "BlzGetAbilityRealLevelArrayField(self:Handle(), field, level, index)",
+    "BlzSetAbilityRealLevelArrayField(self:Handle(), field, level, index, value)",
+    "BlzAddAbilityRealLevelArrayField(self:Handle(), field, level, value)",
+    "BlzRemoveAbilityRealLevelArrayField(self:Handle(), field, level, value)",
+    "BlzGetAbilityStringLevelField(self:Handle(), field, level)",
+    "BlzSetAbilityStringLevelField(self:Handle(), field, level, value)",
+    "BlzGetAbilityStringLevelArrayField(self:Handle(), field, level, index)",
+    "BlzSetAbilityStringLevelArrayField(self:Handle(), field, level, index, value)",
+    "BlzAddAbilityStringLevelArrayField(self:Handle(), field, level, value)",
+    "BlzRemoveAbilityStringLevelArrayField(self:Handle(), field, level, value)"
 )
 foreach ($fragment in $abilityFragments) {
     if (-not $abilityLua.Contains($fragment)) {
