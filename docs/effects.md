@@ -6,7 +6,7 @@ The compiler embeds `standard-library/Effects.w3js`. Import `Effects` and `Warcr
 using Effects;
 using Warcraft3;
 
-effect fx = AddSpecialEffect("Abilities\\Spells\\Other\\TalkToMe\\TalkToMe.mdl", x, y);
+effect fx = AddSpecialEffect("Abilities/Spells/Other/TalkToMe/TalkToMe.mdl", x, y);
 SpecialEffects.Remove(fx);
 ```
 
