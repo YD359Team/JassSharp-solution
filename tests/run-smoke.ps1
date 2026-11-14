@@ -224,6 +224,29 @@ foreach ($fragment in @(
     }
 }
 
+Write-Host "[5e] Verifying interpolation type safety..."
+$stringsInvalidFixture = Join-Path $PSScriptRoot "fixtures/StringsTypeMismatchSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $stringsDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $stringsInvalidFixture 2>&1
+    $stringsExitCode = $LASTEXITCODE
+    $stringsText = $stringsDiagnostics -join "\`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $parsedStringsDiagnostics = ConvertFrom-Json -InputObject $stringsText
+}
+catch {
+    throw "Could not parse interpolation diagnostics as JSON. Exit code: $stringsExitCode. Output: $stringsText"
+}
+$stringsErrors = @($parsedStringsDiagnostics | Where-Object { $_.Severity -eq "error" })
+if ($stringsExitCode -eq 0 -or $stringsErrors.Count -ne 1) {
+    throw "Interpolation type safety did not reject assigning a string to int. Exit code: $stringsExitCode. Errors: $($stringsErrors.Count). Output: $stringsText"
+}
+
 Write-Host "[6/20] Generating Lua and validating 2D geometry..."
 $geometryFixture = Join-Path $PSScriptRoot "fixtures/GeometrySmoke.w3js"
 $geometryBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $geometryFixture --target lua
