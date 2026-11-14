@@ -1,0 +1,129 @@
+namespace Inventory
+{
+    using Warcraft3;
+
+    // Non-owning facade over a unit's extended bag and equipment loadout.
+    public class UnitInventory
+    {
+        private unit _owner;
+
+        public UnitInventory(unit owner)
+        {
+            _owner = owner;
+        }
+
+        public unit Owner()
+        {
+            return _owner;
+        }
+
+        // Number of extended bag slots exposed by the game runtime.
+        public int BagSize()
+        {
+            return BlzUnitExtendedInventorySize(_owner);
+        }
+
+        // Bag slots use the native zero-based slot index.
+        public item BagItem(int slot)
+        {
+            if (slot < 0 || slot >= BagSize()) { return null; }
+            return BlzUnitItemInBagSlot(_owner, slot);
+        }
+
+        public item EquipmentItem(loadoutslot slot)
+        {
+            return BlzUnitItemInEquipmentSlot(_owner, slot);
+        }
+
+        public bool IsInBag(item value)
+        {
+            if (value == null) { return false; }
+            return BlzUnitHasItemBagged(_owner, value);
+        }
+
+        public bool IsEquipped(item value)
+        {
+            if (value == null) { return false; }
+            return BlzUnitHasItemEquipped(_owner, value);
+        }
+
+        public bool HasEquipmentType(equipmentType value)
+        {
+            return BlzUnitHasItemEquipmentOfType(_owner, value);
+        }
+
+        public bool CanEquip(equipmentType value)
+        {
+            return BlzUnitCanEquipItemOfEquipmentType(_owner, value);
+        }
+
+        public bool HasEmptySlot(loadoutslot slot)
+        {
+            return BlzUnitHasLoadoutSlotEmpty(_owner, slot);
+        }
+
+        public bool Equip(item value)
+        {
+            if (value == null) { return false; }
+            return BlzUnitEquipItem(_owner, value);
+        }
+
+        public void Unequip(item value)
+        {
+            if (value == null) { return; }
+            BlzUnitUnequipItem(_owner, value);
+        }
+
+        public item UnequipSlot(loadoutslot slot)
+        {
+            return BlzUnitUnequipItemFromSlot(_owner, slot);
+        }
+
+        // The item argument is an item handle, not a bag/equipment slot index.
+        public equipmentType ItemEquipmentType(item value)
+        {
+            if (value == null) { return ConvertEquipmentType(0); }
+            return BlzGetItemEquipmentType(value);
+        }
+
+        public itemTag ItemTag(item value)
+        {
+            if (value == null) { return ConvertItemTag(0); }
+            return BlzGetItemTag(value);
+        }
+    }
+
+    public static class Talents
+    {
+        // Resets the unit's talent allocation using the Warcraft III 3.0 native.
+        public static void Reset(unit target)
+        {
+            if (target == null) { return; }
+            BlzResetUnitTalents(target);
+        }
+    }
+
+    public static class RpgCombat
+    {
+        // applyStatBonuses lets the engine include supported RPG stat bonuses in healing.
+        public static float Heal(unit target, unit source, float amount, bool isItem, bool applyStatBonuses)
+        {
+            if (target == null || amount <= 0.0) { return 0.0; }
+            return BlzUnitHeal(target, source, amount, isItem, applyStatBonuses);
+        }
+    }
+
+    public static class InventoryEvents
+    {
+        // Valid only while handling the corresponding native inventory event.
+        public static item EquippedItem()
+        {
+            return BlzGetEquippedItem();
+        }
+
+        public static item UnequippedItem()
+        {
+            return BlzGetUnequippedItem();
+        }
+    }
+}
