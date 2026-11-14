@@ -68,5 +68,9 @@ namespace CollectionsSmoke
         {
             int copy = value;
         }
+
+        List<string> nullableValues = new List<string>();
+        nullableValues.Add(null);
+        string nullValue = nullableValues[0];
     }
 }
