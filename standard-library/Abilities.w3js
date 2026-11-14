@@ -85,7 +85,7 @@ namespace Abilities
 
         public int ManaCost(int level)
         {
-            if (level < 1) { level = 1; }
+            if (level < 0) { level = 0; }
             return BlzGetUnitAbilityManaCost(_owner, _rawcode, level);
         }
 

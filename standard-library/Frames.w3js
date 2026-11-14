@@ -47,6 +47,11 @@ namespace Frames
             return BlzLoadTOCFile(path);
         }
 
+        public static void HideOriginFrames(bool hide)
+        {
+            BlzHideOriginFrames(hide);
+        }
+
         public bool IsDisposed()
         {
             return _disposed;
@@ -364,6 +369,21 @@ namespace Frames
     // Coordinates are expressed in Warcraft III's normalized frame coordinate space.
     public class FrameCoordinates
     {
+        public static float HudScale()
+        {
+            return BlzGetHUDScale();
+        }
+
+        public static int ClientWidth()
+        {
+            return BlzGetLocalClientWidth();
+        }
+
+        public static int ClientHeight()
+        {
+            return BlzGetLocalClientHeight();
+        }
+
         public static float PixelToFrameX(int pixels)
         {
             return BlzPixelToFrameX(pixels);

@@ -39,7 +39,9 @@ public void OnInit()
 | `Frame.FromOrigin(type, index)` | Wraps `BlzGetOriginFrame` | Borrowed |
 | `Frame.FindByName(name, context)` | Wraps `BlzGetFrameByName` | Borrowed |
 
-`Frame.LoadTOC(path)` forwards to `BlzLoadTOCFile`. Load the TOC before creating frames that depend on templates defined by it.
+`Frame.LoadTOC(path)` forwards to `BlzLoadTOCFile`; `Frame.HideOriginFrames(hide)` forwards to `BlzHideOriginFrames`.
+
+`FrameCoordinates.HudScale()`, `ClientWidth()`, and `ClientHeight()` expose the current client's HUD scale and dimensions. Load the TOC before creating frames that depend on templates defined by it.
 
 The public constructor `Frame(framehandle, ownsHandle)` is intended for advanced interop. Pass `true` only when this wrapper is the unique owner responsible for destroying the handle. Never create two owning wrappers for the same native frame.
 

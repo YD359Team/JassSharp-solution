@@ -58,6 +58,11 @@ namespace FrameSmoke
         float eventValue = FrameEvents.CurrentValue();
         string eventText = FrameEvents.CurrentText();
 
+        Frame.HideOriginFrames(false);
+        float hudScale = FrameCoordinates.HudScale();
+        int clientWidth = FrameCoordinates.ClientWidth();
+        int clientHeight = FrameCoordinates.ClientHeight();
+
         float normalizedX = FrameCoordinates.PixelToFrameX(640);
         float normalizedY = FrameCoordinates.PixelToFrameY(360);
         int pixelX = FrameCoordinates.FrameToPixelX(normalizedX);
