@@ -74,6 +74,12 @@ namespace VisualRpgSmoke
         itemTag itemTagValue = inventory.ItemTag(equipment);
 
         Talents.Reset(hero);
+        int talentRawcode = AbilityId("A0T1");
+        bool talentAdded = Talents.GrantAbility(hero, talentRawcode);
+        int talentRank = Talents.AbilityRank(hero, talentRawcode);
+        bool talentRankSet = Talents.SetAbilityRank(hero, talentRawcode, 2);
+        bool talentPermanent = Talents.SetAbilityPermanent(hero, talentRawcode, true);
+        bool talentRemoved = Talents.RemoveAbility(hero, talentRawcode);
         float healed = RpgCombat.Heal(target, hero, 125.0, false, true);
         item eventEquipped = InventoryEvents.EquippedItem();
         item eventUnequipped = InventoryEvents.UnequippedItem();
