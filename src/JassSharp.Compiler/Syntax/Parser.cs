@@ -307,6 +307,18 @@ public sealed class Parser(List<Token> tokens)
             Expect("{");
             return new WhileStmt(c, ParseBlock());
         }
+        if (CheckId("foreach"))
+        {
+            var foreachToken = Eat(TokKind.Id);
+            Expect("(");
+            string itemType = ParseTypeName();
+            string itemName = Eat(TokKind.Id).Text;
+            EatId("in");
+            var collection = ParseExpr();
+            Expect(")");
+            Expect("{");
+            return new ForeachStmt(itemType, itemName, collection, ParseBlock(), foreachToken.Line, foreachToken.Col);
+        }
         if (CheckId("for"))
         {
             Eat(TokKind.Id);
