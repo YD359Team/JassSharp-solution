@@ -46,7 +46,7 @@ namespace Lightning
 
         public bool SetColor(Color value)
         {
-            if (_disposed || value == null) { return false; }
+            if (_disposed) { return false; }
             return value.ApplyToLightning(_handle);
         }
 
