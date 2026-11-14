@@ -419,6 +419,15 @@ public static class Checker
                     {
                         Add(number.Line, number.Col, "error", "целочисленный литерал выходит за пределы int32");
                     }
+                    else if ((number.Text.Contains('.') || number.Text.Contains('e') || number.Text.Contains('E')) &&
+                             (!double.TryParse(number.Text, System.Globalization.NumberStyles.Float,
+                                  System.Globalization.CultureInfo.InvariantCulture, out double floatingValue) ||
+                              !double.IsFinite(floatingValue) ||
+                              floatingValue > float.MaxValue || floatingValue < -float.MaxValue ||
+                              (floatingValue != 0.0 && (float)floatingValue == 0.0f)))
+                    {
+                        Add(number.Line, number.Col, "error", "числовой литерал выходит за пределы float32");
+                    }
                     break;
 
                 case InterpolatedExpr interpolated:
