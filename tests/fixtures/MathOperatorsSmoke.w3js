@@ -11,6 +11,11 @@ namespace MathOperatorsSmoke
             this.Value = value;
         }
 
+        public static Score FromValue(float value)
+        {
+            return new Score(value);
+        }
+
         public static Score operator +(Score left, Score right)
         {
             return new Score(left.Value + right.Value);
@@ -19,7 +24,7 @@ namespace MathOperatorsSmoke
 
     public void OnInit()
     {
-        Score firstScore = new Score(10.0);
+        Score firstScore = Score.FromValue(10.0);
         Score secondScore = new Score(5.0);
         Score totalScore = firstScore + secondScore;
 
