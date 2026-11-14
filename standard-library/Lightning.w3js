@@ -19,7 +19,7 @@ namespace Lightning
                 checkVisibility,
                 start.X, start.Y, start.Z,
                 end.X, end.Y, end.Z);
-            _disposed = false;
+            _disposed = _handle == null;
         }
 
         public bool IsDisposed()
@@ -31,6 +31,11 @@ namespace Lightning
         {
             if (_disposed) { return null; }
             return _handle;
+        }
+
+        public bool Move(Vector3 start, Vector3 end)
+        {
+            return Move(start, end, _checkVisibility);
         }
 
         public bool Move(Vector3 start, Vector3 end, bool checkVisibility)
