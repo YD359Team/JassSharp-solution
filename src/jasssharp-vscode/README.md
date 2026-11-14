@@ -14,6 +14,20 @@ npm.cmd run package
 
 Установка в VS Code: **Extensions** → \`…\` → **Install from VSIX…**.
 
+ 
+## Сборка GitHub Release
+
+Workflow `.github/workflows/release.yml` запускается при публикации GitHub Release. Он:
+
+1. Собирает компилятор и запускает `tests/run-smoke.ps1`.
+2. Устанавливает зависимости расширения через `npm ci` и компилирует TypeScript.
+3. Берёт версию VSIX из тега релиза (например, `v0.2.0` → `jasssharp-0.2.0.vsix`).
+4. Прикладывает готовый VSIX к опубликованному GitHub Release.
+
+Тот же workflow можно запустить вручную через **Actions → Release → Run workflow**. В этом случае версия берётся из `package.json`, а VSIX публикуется как workflow artifact, без изменения GitHub Release.
+
+Для автоматической публикации требуется тег с SemVer-версией: `vMAJOR.MINOR.PATCH` (например, `v0.2.0`). Workflow не публикует расширение в Visual Studio Marketplace — он прикладывает VSIX к GitHub Release.
+
 ## Команды
 
 - **JASS#: Build** / **Build Lua** — трансляция текущего файла в Lua.
