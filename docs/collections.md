@@ -89,7 +89,7 @@ foreach (var pair in scores)
 
 JASS# currently has no `out` parameters, so `TryRemove` returns only a boolean; read the value through the indexer before removing it when it is needed.
 
-Lua tables cannot represent a `nil` key or value. Dictionary keys and values therefore cannot be `null` at runtime. Keys must also be valid Lua table keys. As with .NET dictionaries, mutating the collection while enumerating it is not supported.
+Lua tables cannot represent `nil` keys or values directly. The runtime stores collection null values through an internal sentinel, so List, Queue, Stack and Dictionary values can be `null`; Dictionary keys cannot. Keys must be valid Lua table keys (for example, `null` is not a valid key). As with .NET dictionaries, mutating the collection while enumerating it is not supported.
 
 ## Backend and runtime notes
 
