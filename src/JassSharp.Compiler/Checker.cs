@@ -286,9 +286,9 @@ public static class Checker
                     CheckExpression(loop.Collection);
                     string? collectionType = InferType(loop.Collection);
                     string? elementType = GetForeachElementType(collectionType);
-                    if (elementType is null && collectionType != "List")
+                    if (elementType is null)
                         Add(loop.Line, loop.Col, "error",
-                            $"foreach не поддерживает коллекцию типа {collectionType ?? "?"}");
+                            $"foreach не поддерживает коллекцию типа {collectionType ?? "?"}; поддерживаются массивы и group с using Warcraft3");
 
                     string itemType = loop.Type;
                     if (itemType == "var")

@@ -519,6 +519,10 @@ end
 
     private void EmitForeach(ForeachStmt loop, bool trace)
     {
+        if (!_lua)
+            throw new NotSupportedException(
+                $"foreach пока поддерживается только Lua backend (строка {loop.Line})");
+
         string collectionType = InferType(loop.Collection) ?? throw new InvalidOperationException(
             $"Не удалось определить тип коллекции foreach в строке {loop.Line}");
         string collection = EmitExpr(loop.Collection);
@@ -541,8 +545,6 @@ end
         string elementType;
         if (collectionType.EndsWith("[]", StringComparison.Ordinal))
             elementType = collectionType[..^2];
-        else if (collectionType == "List")
-            elementType = loop.Type == "var" ? "?" : loop.Type;
         else
             throw new NotSupportedException(
                 $"foreach does not support collection type '{collectionType}' (line {loop.Line})");
