@@ -59,6 +59,8 @@ Methods:
 
 Supported operators include addition, subtraction, unary negation, scalar multiplication, division by a scalar, and value equality/inequality. Scalar multiplication is supported in both operand orders. Division by zero follows the generated Lua numeric semantics; callers should guard a zero divisor.
 
+For the 2D gameplay primitives built on top of these vectors, see [the geometry standard library](geometry.md). It provides circles, axis-aligned rectangles, and finite line segments.
+
 ## User-defined operators
 
 Declare operators as public static class methods using C#-style syntax:

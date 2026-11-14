@@ -1,0 +1,40 @@
+namespace GeometrySmoke
+{
+    using Math;
+    using Geometry;
+
+    public void OnInit()
+    {
+        Vector2 origin = new Vector2(0.0, 0.0);
+        Vector2 point = new Vector2(3.0, 4.0);
+
+        Circle circle = new Circle(origin, 5.0);
+        bool insideCircle = circle.Contains(point);
+        Vector2 circleEdge = circle.ClosestPoint(new Vector2(10.0, 0.0));
+        float circleArea = circle.Area();
+        float circleCircumference = circle.Circumference();
+        Circle overlappingCircle = new Circle(new Vector2(8.0, 0.0), 3.0);
+        bool circlesIntersect = circle.Intersects(overlappingCircle);
+
+        Rect2 rectangle = new Rect2(0.0, 0.0, 10.0, 5.0);
+        bool insideRectangle = rectangle.Contains(point);
+        Vector2 rectangleCenter = rectangle.Center();
+        Vector2 rectangleEdge = rectangle.ClosestPoint(new Vector2(20.0, 2.0));
+        float rectangleArea = rectangle.Area();
+        float rectanglePerimeter = rectangle.Perimeter();
+        Rect2 overlappingRectangle = new Rect2(9.0, 4.0, 5.0, 5.0);
+        bool rectanglesIntersect = rectangle.Intersects(overlappingRectangle);
+        bool rectangleCircleIntersect = rectangle.IntersectsCircle(circle);
+
+        Rect2 reversedRectangle = new Rect2(10.0, 5.0, -10.0, -5.0);
+        bool reversedContains = reversedRectangle.Contains(point);
+
+        LineSegment2 segment = new LineSegment2(origin, new Vector2(10.0, 0.0));
+        float segmentLength = segment.Length();
+        Vector2 segmentClosest = segment.ClosestPoint(new Vector2(5.0, 4.0));
+        float segmentDistance = segment.DistanceToPoint(new Vector2(5.0, 4.0));
+        bool onSegment = segment.ContainsPoint(new Vector2(5.0, 0.0));
+        LineSegment2 pointSegment = new LineSegment2(origin, origin);
+        Vector2 degenerateClosest = pointSegment.ClosestPoint(point);
+    }
+}
