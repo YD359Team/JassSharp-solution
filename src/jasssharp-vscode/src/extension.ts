@@ -30,7 +30,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     const updateButtons = () => {
         const editor = vscode.window.activeTextEditor;
-        const mode = readProject()?.mode ?? "wc3";
+        const mode = readProject(editor?.document)?.mode ?? "wc3";
         void vscode.commands.executeCommand("setContext", "jasssharp.mode", mode);
         if (editor?.document.languageId === "jasssharp" && mode !== "headless") {
             runButton.show();
@@ -43,6 +43,10 @@ export function activate(context: vscode.ExtensionContext) {
     updateButtons();
     context.subscriptions.push(
         vscode.window.onDidChangeActiveTextEditor(updateButtons),
+        vscode.workspace.onDidChangeWorkspaceFolders(updateButtons),
+        vscode.workspace.onDidChangeConfiguration(event => {
+            if (event.affectsConfiguration("jasssharp.projectFile")) updateButtons();
+        }),
         vscode.workspace.onDidSaveTextDocument(() => updateButtons())
     );
 
@@ -190,12 +194,15 @@ async function build(forcedTarget: string): Promise<void> {
     );
 }
 
-function projectRoot(): string | undefined {
-    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+function projectRoot(document?: vscode.TextDocument): string | undefined {
+    const documentFolder = document
+        ? vscode.workspace.getWorkspaceFolder(document.uri)
+        : undefined;
+    return documentFolder?.uri.fsPath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 
-function readProject(): { map?: string; game?: string; mode?: "wc3" | "headless" } | undefined {
-    const root = projectRoot();
+function readProject(document?: vscode.TextDocument): { map?: string; game?: string; mode?: "wc3" | "headless" } | undefined {
+    const root = projectRoot(document);
     if (!root) return undefined;
     const fileName = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile") || "jasssharp.json";
     const filePath = path.isAbsolute(fileName) ? fileName : path.join(root, fileName);
@@ -204,9 +211,9 @@ function readProject(): { map?: string; game?: string; mode?: "wc3" | "headless"
     catch { return undefined; }
 }
 
-function mapPath(): string | undefined {
-    const root = projectRoot();
-    const project = readProject();
+function mapPath(document?: vscode.TextDocument): string | undefined {
+    const root = projectRoot(document);
+    const project = readProject(document);
     if (!root || !project?.map) return undefined;
     return path.isAbsolute(project.map) ? project.map : path.join(root, project.map);
 }
@@ -232,7 +239,7 @@ function findEditor(): string | undefined {
 async function openEditor(): Promise<void> {
     log.show(true);
     info("=== Open Editor ===");
-    const map = mapPath();
+    const map = mapPath(vscode.window.activeTextEditor?.document);
     info(`map: ${map ?? "(not found)"}`);
     if (!map) { vscode.window.showErrorMessage("Не найдена карта в jasssharp.json"); return; }
     const editor = findEditor();
@@ -286,14 +293,14 @@ async function packMap(): Promise<void> {
 async function mapBuild(run: boolean): Promise<void> {
     log.show(true);
     info(`=== ${run ? "Run Map" : "Build Map"} ===`);
-    const folder = vscode.workspace.workspaceFolders?.[0];
-    if (!folder) {
+    const activeDocument = vscode.window.activeTextEditor?.document;
+    const root = projectRoot(activeDocument);
+    if (!root) {
         info("no workspace folder");
         vscode.window.showWarningMessage("Откройте папку проекта с jasssharp.json");
         return;
     }
 
-    const root = folder.uri.fsPath;
     info(`project: ${root}`);
     const configName = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile") || "jasssharp.json";
     const configPath = path.isAbsolute(configName) ? configName : path.join(root, configName);

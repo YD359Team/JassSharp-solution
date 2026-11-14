@@ -1,53 +1,144 @@
-# JASS# Lua-only CLI and project-check update
+# JASS#
 
-This archive contains complete replacement files for the repository paths listed below.
+JASS# — язык с C#-подобным синтаксисом для разработки логики Warcraft III Reforged и автономной трансляции исходников `.w3js` в Lua.
 
-## Files
+Репозиторий содержит компилятор/CLI на .NET и расширение VS Code с подсветкой синтаксиса, IntelliSense и диагностикой.
 
-- `src/JassSharp.Compiler/Program.cs`
-- `src/JassSharp.Compiler/MapBuild.cs`
-- `src/jasssharp-vscode/package.json`
-- `src/jasssharp-vscode/src/extension.ts`
+## Возможности
 
-Copy the archive contents over the repository root, replacing the corresponding files.
+- Классы, поля, методы, конструкторы и статические методы.
+- Примитивные типы `int`, `float`, `bool`, `string`, а также типы Warcraft III.
+- Вывод типа локальной переменной через `var`.
+- Проверка совместимости типов и диагностика некорректных присваиваний.
+- Перегрузка арифметических, сравнительных и пользовательских операторов.
+- Массивы и jagged arrays (`T[][]`) с нулевой индексацией в исходном коде.
+- `foreach` по массивам и Warcraft III `group` (Lua backend).
+- Пространства имён, `using` и разрешение зависимостей между исходными файлами.
+- Встроенная библиотека Warcraft III и стандартная библиотека.
 
-## Changes
+Текущая цель генерации — Lua. Генерация vJASS/JASS через CLI больше не поддерживается.
 
-### Compiler CLI
+## Структура репозитория
 
-- Lua is now the only accepted `build --target` value.
-- The default build target is Lua; the CLI no longer emits `.j` vJASS files.
-- `map` can be invoked without a dummy second argument.
-- `check` resolves the current source file's project, loads imported namespaces, and passes them to `Checker.Check`.
-- `symbols` reports loading/parsing failures instead of silently terminating with an unhandled exception.
-- Unknown or incomplete CLI options are rejected with an error.
+- `src/JassSharp.Compiler` — компилятор, проверка семантики и CLI.
+- `src/jasssharp-vscode` — расширение VS Code.
+- `standard-library` — исходники стандартной библиотеки.
+- `samples` — демонстрационные проекты.
+- `tests` — smoke fixtures и сценарии проверки компилятора.
+- `docs` — дополнительные заметки по языку.
 
-### Map build
+## Сборка компилятора
 
-- Map build configuration accepts only `target: "lua"`.
-- The build always injects `war3map.lua` and uses `LuaEmitter`.
-- The project source catalog used for checks no longer silently skips malformed `.w3js` files.
-- Project loading reports duplicate namespace names.
-- Import resolution reports missing namespaces and cyclic imports, and keeps dependency-first order.
+Требуется .NET SDK, соответствующий целевому фреймворку проекта.
 
-### VS Code extension
+```powershell
+dotnet build "JassSharp solution.slnx" -c Release
+```
 
-- Removed the vJASS build command from the contributed command list and command registration.
-- The Build command defaults to Lua regardless of stale user settings.
-- The extension now forwards the configured `jasssharp.projectFile` path to `jasssharp map --config`, including custom config filenames.
-- Compiler DLL invocation through `dotnet` and per-document diagnostics debounce are retained.
+После сборки CLI можно запускать через проект:
 
-## Compatibility notes
+```powershell
+dotnet run --project src/JassSharp.Compiler -- check samples/fireball.w3js
+dotnet run --project src/JassSharp.Compiler -- build samples/fireball.w3js --target lua
+```
 
-Projects whose `jasssharp.json` still declares `"target": "vjass"` or `"target": "both"` now fail explicitly. Change the value to `"lua"`.
+Команда `build` сохраняет Lua-файл в каталоге `bin` рядом с исходником.
 
-The former VS Code `jasssharp.buildVjass` command has been removed. The `jasssharp.buildLua` command remains as an explicit Lua build alias.
+## Режимы проекта
 
-## Validation performed
+Режим задаётся необязательным свойством `mode` в `jasssharp.json`. Если свойство отсутствует, используется `wc3`.
 
-- `package.json` parsed as valid JSON.
-- Source-level checks confirmed the vJASS command is absent from extension registration and that custom project config is forwarded.
-- TypeScript parsing was checked with the globally installed TypeScript compiler. The check could not resolve `vscode`, Node.js typings, or the sibling `languageFeatures` module because this isolated archive does not include `node_modules` or the rest of the extension source tree.
-- A full .NET build was not run: the execution environment has no .NET SDK/compiler installed.
+### Warcraft III — `wc3`
 
-Run `dotnet build` and `npm.cmd run compile` in the full repository after replacing the files.
+Обычный режим сборки карты. Использует конфигурацию карты, игровые пути и MPQ-инструменты. Минимальная конфигурация:
+
+```json
+{
+  "mode": "wc3",
+  "map": "map",
+  "target": "lua",
+  "entry": "src/Main.w3js"
+}
+```
+
+### Автономная трансляция — `headless`
+
+Режим для использования JASS# как самостоятельного транслятора. Не требует установленной игры, пути к Warcraft III, карты или MPQ-инструментов.
+
+```json
+{
+  "mode": "headless",
+  "entry": "src/Main.w3js",
+  "output": "bin/Main.lua"
+}
+```
+
+Запуск:
+
+```powershell
+dotnet run --project src/JassSharp.Compiler -- map --project .
+```
+
+Если `entry` не задан, обрабатываются все файлы `.w3js` в `src`. Если `output` не задан, результат записывается в `bin/<имя-проекта>.lua`. В headless-режиме не создаются Warcraft III entry points `config()` и `main()`; встроенный `Print(...)` преобразуется в Lua `print(...)`.
+
+### Модуль Warcraft III
+
+В headless-режиме Warcraft III API не подключается неявно. Для доступа к типам, native-функциям, константам и расширенным членам API требуется:
+
+```csharp
+using Warcraft3;
+```
+
+Это разрешает компилятору проверять символы Warcraft III, но само по себе не добавляет Warcraft runtime в автономный Lua-файл.
+
+## Массивы и foreach
+
+Массивы объявляются с указанием типа элемента. Поддерживаются массивы массивов:
+
+```csharp
+int[][] matrix = new int[][];
+matrix[0] = new int[];
+matrix[0][1] = 42;
+
+foreach (var row in matrix)
+{
+    Print(row[0]);
+}
+```
+
+Индексы в исходном JASS# начинаются с нуля; Lua backend выполняет необходимую коррекцию индексации. Для массивов `foreach` генерирует индексный Lua-цикл. Для Warcraft III `group` используется `ForGroup` и `GetEnumUnit()`. Переменная итерации может объявляться через `var`.
+
+`foreach` поддерживается Lua backend. Для него требуется коллекция-массив либо `group` с подключённым `using Warcraft3;`.
+
+## Расширение VS Code
+
+Исходники расширения находятся в `src/jasssharp-vscode`.
+
+```powershell
+cd src/jasssharp-vscode
+npm.cmd install
+npm.cmd run compile
+npm.cmd run package
+```
+
+Полученный VSIX можно установить через **Extensions → … → Install from VSIX…**.
+
+Основные настройки:
+
+- `jasssharp.compilerPath` — путь к `jasssharp.exe` или `jasssharp.dll`; пустое значение означает поиск в `PATH`.
+- `jasssharp.projectFile` — имя или путь к конфигурации проекта; по умолчанию `jasssharp.json`.
+- `jasssharp.gamePath` — путь к Warcraft III для операций в режиме `wc3`.
+- `jasssharp.editorPath` — путь к World Editor.
+- `jasssharp.mpqToolPath` — путь к MPQ-инструменту.
+
+Расширение выполняет диагностику сохранённых файлов и предоставляет completion, hover, semantic highlighting и форматирование.
+
+## Проверки
+
+Smoke-сценарии компилятора запускаются из корня репозитория:
+
+```powershell
+./tests/run-smoke.ps1
+```
+
+Сценарий собирает компилятор и проверяет семантические ошибки, операторы, headless-режим, массивы и `foreach`.
