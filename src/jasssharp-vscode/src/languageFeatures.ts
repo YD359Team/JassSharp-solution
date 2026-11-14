@@ -130,6 +130,7 @@ const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; ret: string
         { name: "EquipmentItem", ret: "item", kind: "Method", parameters: ["loadoutslot slot"] },
         { name: "IsInBag", ret: "bool", kind: "Method", parameters: ["item value"] },
         { name: "IsEquipped", ret: "bool", kind: "Method", parameters: ["item value"] },
+        { name: "HasAnyEquippedItem", ret: "bool", kind: "Method", parameters: [] },
         { name: "HasEquipmentType", ret: "bool", kind: "Method", parameters: ["equipmentType value"] },
         { name: "CanEquip", ret: "bool", kind: "Method", parameters: ["equipmentType value"] },
         { name: "HasEmptySlot", ret: "bool", kind: "Method", parameters: ["loadoutslot slot"] },
@@ -149,6 +150,9 @@ const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; ret: string
     ],
     RpgCombat: [
         { name: "Heal", ret: "float", kind: "Method", parameters: ["unit target", "unit source", "float amount", "bool isItem", "bool applyStatBonuses"] }
+    ],
+    ItemSelection: [
+        { name: "ChooseRandomRawcode", ret: "int", kind: "Method", parameters: ["itemtype type", "int level", "equipmentType equipment", "itemTag tag", "bool includeInvalidMorphs", "bool includeNonPickRandom"] }
     ],
     InventoryEvents: [
         { name: "EquippedItem", ret: "item", kind: "Method", parameters: [] },
