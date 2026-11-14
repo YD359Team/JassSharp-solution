@@ -42,6 +42,25 @@ int rank = Talents.AbilityRank(hero, talentId);
 
 This calls `BlzResetUnitTalents`. The engine owns the talent allocation and any talent UI. The talent tree is configured in Object Editor through the talent-controller ability and its per-tier ability lists. A selected talent grants an ability; JASS# helpers therefore expose ability-level operations rather than pretending that each talent is a standalone engine object. The helpers do not replace the game's talent UI or allocate talent points themselves. The documented 3.0 implementation has up to six tiers and up to three choices per tier; validate these limits against the target game build before relying on them. Morphing abilities can remove abilities granted by the talent system. The native `UnitMakeAbilityPermanent` is exposed as `Talents.SetAbilityPermanent`; use it for talent abilities that must survive form changes, and verify the behavior in the target game build. There is no dedicated verified `talent selected` event in the current native surface, so do not assume `EVENT_UNIT_HERO_SKILL` reports these selections.
 
+## Ability progression and cooldown control
+
+The existing `Abilities.UnitAbility` wrapper is useful alongside the 3.0 talent and RPG systems:
+
+```csharp
+using Abilities;
+
+UnitAbility ability = new UnitAbility(hero, AbilityId("A001"));
+int rank = ability.Level();
+float baseCooldown = ability.Cooldown(rank - 1);
+float remaining = ability.RemainingCooldown();
+
+ability.StartCooldown(2.5);
+ability.EndCooldown();
+ability.SetEnabled(false, true);
+```
+
+It exposes ability rank, permanence, enabled state, level fields, mana cost and cooldown operations through Warcraft III natives. Treat level indices as zero-based when accessing per-level Object Editor fields.
+
 ## RPG stat-aware healing
 
 ```csharp
