@@ -1038,7 +1038,7 @@ end
 
     private string EmitExpr(Expr e) => e switch
     {
-        NumExpr n => EmitNumber(n.Text),
+        NumExpr n => _lua ? EmitNumber(n.Text) : n.Text,
         StrExpr s => $"\"{Esc(s.Text)}\"",
         InterpolatedExpr interpolated => EmitInterpolated(interpolated),
         RawExpr r => _lua ? Rawcode.Pack(r.Id).ToString() : $"'{r.Id}'",
@@ -1399,7 +1399,7 @@ end
         if (text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) &&
             uint.TryParse(text.AsSpan(2), System.Globalization.NumberStyles.AllowHexSpecifier,
                 System.Globalization.CultureInfo.InvariantCulture, out uint value))
-            return unchecked((int)value).ToString(System.Globalization.CultureInfo.InvariantCulture);
+            return "(" + unchecked((int)value).ToString(System.Globalization.CultureInfo.InvariantCulture) + ")";
 
         return text;
     }
