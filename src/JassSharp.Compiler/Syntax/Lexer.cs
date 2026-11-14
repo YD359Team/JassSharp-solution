@@ -205,6 +205,9 @@ public sealed class Lexer(string source)
             char c = source[_i];
             if (braceDepth == 0)
             {
+                if (!raw && c is ('\n' or '\r'))
+                    throw new ParseException("обычная интерполируемая строка не может содержать перевод строки; используйте $\\\"\\\"\\\"...\\\"\\\"\\\" ", _line, _col);
+
                 if (!raw && c == '\\' && _i + 1 < source.Length)
                 {
                     Advance();
