@@ -14,7 +14,8 @@ namespace FloatingText
         {
             _handle = CreateTextTag();
             _disposed = false;
-            _lifespan = lifespan < 0.0 ? 0.0 : lifespan;
+            _lifespan = lifespan;
+            if (_lifespan < 0.0) { _lifespan = 0.0; }
 
             SetTextTagText(_handle, text, size);
             SetTextTagPos(_handle, x, y, z);
@@ -94,7 +95,8 @@ namespace FloatingText
         public void SetLifespan(float seconds, float fadepoint)
         {
             if (_disposed) { return; }
-            _lifespan = seconds < 0.0 ? 0.0 : seconds;
+            _lifespan = seconds;
+            if (_lifespan < 0.0) { _lifespan = 0.0; }
             SetTextTagPermanent(_handle, false);
             SetTextTagLifespan(_handle, _lifespan);
             SetTextTagFadepoint(_handle, FloatingTextTag.ClampFadepoint(fadepoint, _lifespan));
@@ -103,7 +105,8 @@ namespace FloatingText
         public void SetAge(float seconds)
         {
             if (_disposed) { return; }
-            SetTextTagAge(_handle, seconds < 0.0 ? 0.0 : seconds);
+            if (seconds < 0.0) { seconds = 0.0; }
+            SetTextTagAge(_handle, seconds);
         }
 
         ~FloatingTextTag()
