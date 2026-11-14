@@ -1,0 +1,118 @@
+namespace FloatingText
+{
+    using Warcraft3;
+    using Colors;
+
+    // Owns one texttag handle. Dispose explicitly; Lua GC does not call JASS# destructors.
+    public class FloatingTextTag
+    {
+        private texttag _handle;
+        private bool _disposed;
+        private float _lifespan;
+
+        public FloatingTextTag(string text, float x, float y, float z, float size, float lifespan, float fadepoint)
+        {
+            _handle = CreateTextTag();
+            _disposed = false;
+            _lifespan = lifespan < 0.0 ? 0.0 : lifespan;
+
+            SetTextTagText(_handle, text, size);
+            SetTextTagPos(_handle, x, y, z);
+            SetTextTagPermanent(_handle, false);
+            SetTextTagLifespan(_handle, _lifespan);
+            SetTextTagFadepoint(_handle, FloatingTextTag.ClampFadepoint(fadepoint, _lifespan));
+            SetTextTagVisibility(_handle, true);
+        }
+
+        private static float ClampFadepoint(float value, float lifespan)
+        {
+            if (value < 0.0) { return 0.0; }
+            if (value > lifespan) { return lifespan; }
+            return value;
+        }
+
+        public bool IsDisposed()
+        {
+            return _disposed;
+        }
+
+        public texttag Handle()
+        {
+            if (_disposed) { return null; }
+            return _handle;
+        }
+
+        public void SetText(string value, float size)
+        {
+            if (_disposed) { return; }
+            SetTextTagText(_handle, value, size);
+        }
+
+        public void SetPosition(float x, float y, float z)
+        {
+            if (_disposed) { return; }
+            SetTextTagPos(_handle, x, y, z);
+        }
+
+        public void AttachToUnit(unit target, float zOffset)
+        {
+            if (_disposed) { return; }
+            SetTextTagPosUnit(_handle, target, zOffset);
+        }
+
+        // Native velocity components are forwarded unchanged.
+        public void SetVelocity(float x, float y)
+        {
+            if (_disposed) { return; }
+            SetTextTagVelocity(_handle, x, y);
+        }
+
+        public void SetColor(Color value)
+        {
+            if (_disposed || value == null) { return; }
+            value.ApplyToTextTag(_handle);
+        }
+
+        public void SetVisible(bool visible)
+        {
+            if (_disposed) { return; }
+            SetTextTagVisibility(_handle, visible);
+        }
+
+        public void SetSuspended(bool suspended)
+        {
+            if (_disposed) { return; }
+            SetTextTagSuspended(_handle, suspended);
+        }
+
+        public void SetPermanent(bool permanent)
+        {
+            if (_disposed) { return; }
+            SetTextTagPermanent(_handle, permanent);
+        }
+
+        public void SetLifespan(float seconds, float fadepoint)
+        {
+            if (_disposed) { return; }
+            _lifespan = seconds < 0.0 ? 0.0 : seconds;
+            SetTextTagPermanent(_handle, false);
+            SetTextTagLifespan(_handle, _lifespan);
+            SetTextTagFadepoint(_handle, FloatingTextTag.ClampFadepoint(fadepoint, _lifespan));
+        }
+
+        public void SetAge(float seconds)
+        {
+            if (_disposed) { return; }
+            SetTextTagAge(_handle, seconds < 0.0 ? 0.0 : seconds);
+        }
+
+        ~FloatingTextTag()
+        {
+            if (!_disposed)
+            {
+                DestroyTextTag(_handle);
+                _disposed = true;
+            }
+        }
+    }
+}
