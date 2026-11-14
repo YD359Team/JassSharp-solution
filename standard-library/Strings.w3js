@@ -15,8 +15,8 @@ namespace Strings
             if (startIndex < 0 || length < 0) { error("Substring indexes must be non-negative"); }
             int total = utf8.len(value);
             if (startIndex >= total || length == 0) { return ""; }
-            int endIndex = startIndex + length;
-            if (endIndex > total) { endIndex = total; }
+            int remaining = total - startIndex;
+            int endIndex = length > remaining ? total : startIndex + length;
             int firstByte = utf8.offset(value, startIndex + 1);
             int afterLastByte = utf8.offset(value, endIndex + 1);
             return string.sub(value, firstByte, afterLastByte - 1);
