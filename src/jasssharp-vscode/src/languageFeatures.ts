@@ -136,7 +136,12 @@ const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; ret: string
         { name: "ItemTag", ret: "itemTag", kind: "Method", parameters: ["item value"] }
     ],
     Talents: [
-        { name: "Reset", ret: "void", kind: "Method", parameters: ["unit target"] }
+        { name: "Reset", ret: "void", kind: "Method", parameters: ["unit target"] },
+        { name: "GrantAbility", ret: "bool", kind: "Method", parameters: ["unit target", "int abilityRawcode"] },
+        { name: "RemoveAbility", ret: "bool", kind: "Method", parameters: ["unit target", "int abilityRawcode"] },
+        { name: "AbilityRank", ret: "int", kind: "Method", parameters: ["unit target", "int abilityRawcode"] },
+        { name: "SetAbilityRank", ret: "bool", kind: "Method", parameters: ["unit target", "int abilityRawcode", "int rank"] },
+        { name: "SetAbilityPermanent", ret: "bool", kind: "Method", parameters: ["unit target", "int abilityRawcode", "bool permanent"] }
     ],
     RpgCombat: [
         { name: "Heal", ret: "float", kind: "Method", parameters: ["unit target", "unit source", "float amount", "bool isItem", "bool applyStatBonuses"] }
