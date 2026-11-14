@@ -4,9 +4,6 @@
   "scopeName": "source.jasssharp",
   "patterns": [
     {
-      "include": "#preprocessor"
-    },
-    {
       "include": "#comment"
     },
     {
@@ -53,19 +50,6 @@
     }
   ],
   "repository": {
-    "preprocessor": {
-      "patterns": [
-        {
-          "name": "meta.preprocessor.jasssharp",
-          "match": "^\\s*#(if|else|elseif|endif|define|region|endregion)\\b.*$",
-          "captures": {
-            "1": {
-              "name": "keyword.control.directive.jasssharp"
-            }
-          }
-        }
-      ]
-    },
     "comment": {
       "patterns": [
         {
@@ -130,7 +114,7 @@
     },
     "keyword": {
       "name": "keyword.control.jasssharp",
-      "match": "\\b(namespace|using|class|enum|const|public|private|static|if|else|while|for|foreach|return|break|continue|new|this|in|is|as|get|set)\\b"
+      "match": "\\b(namespace|using|class|enum|const|public|private|static|if|else|do|while|for|foreach|return|break|continue|new|this|in|is|as|get|set)\\b"
     },
     "type": {
       "name": "storage.type.jasssharp",
