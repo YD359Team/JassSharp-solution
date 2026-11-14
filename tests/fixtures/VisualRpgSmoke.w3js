@@ -62,6 +62,9 @@ namespace VisualRpgSmoke
             new Vector3(GetUnitX(hero), GetUnitY(hero), 40.0),
             new Vector3(GetUnitX(target), GetUnitY(target), 40.0),
             true);
+        bolt.Move(
+            new Vector3(GetUnitX(hero), GetUnitY(hero), 40.0),
+            new Vector3(GetUnitX(target), GetUnitY(target), 40.0));
         bolt.Dispose();
 
         UnitInventory inventory = new UnitInventory(hero);
