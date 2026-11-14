@@ -123,6 +123,12 @@ using Warcraft3;
 | `enum`, `usingwc3` | Перечисление и подключение API Warcraft III |
 | `foreach`, `jagged` | Обход коллекций и массивы массивов |
 | `trigger`, `action` | Триггеры и обработчики событий Warcraft III |
+| `timer`, `timerperiodic`, `timercallback` | Одноразовые и периодические таймеры |
+| `groupenum`, `groupcallback` | Перечисление юнитов через `group` / `ForGroup` |
+| `createunit` | Создание юнита по rawcode |
+| `spelltrigger`, `spellcallback` | Регистрация события применения способности и callback |
+| `effectpoint`, `effectattach` | Special effects в точке и на объекте |
+| `unitdamage` | Нанесение урона через `UnitDamageTarget` |
 | `debug`, `print` | Отладочный вывод |
 
 **Важно о точке входа:** префикс `main` вставляет `void OnInit()`, а не объявление `main()`. В режиме `wc3` компилятор сам генерирует Warcraft III-функции `config()` и `main()` и вызывает `OnInit()` из сгенерированной точки входа. Объявлять собственную функцию `main()` не нужно.

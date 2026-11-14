@@ -254,5 +254,148 @@
       "Print(${1:\"message\"});$0"
     ],
     "description": "Вывести отладочное сообщение"
+  },
+  "TimerOneShot": {
+    "prefix": [
+      "timer",
+      "timeronce",
+      "timerstart"
+    ],
+    "body": [
+      "timer ${1:taskTimer} = CreateTimer();",
+      "TimerStart(${1:taskTimer}, ${2:1.0}, false, ${3:OnTimerExpired});",
+      "$0"
+    ],
+    "description": "Создать одноразовый Warcraft III timer и запустить callback. Требуется using Warcraft3;"
+  },
+  "TimerPeriodic": {
+    "prefix": [
+      "timerperiodic",
+      "periodictimer"
+    ],
+    "body": [
+      "timer ${1:periodicTimer} = CreateTimer();",
+      "TimerStart(${1:periodicTimer}, ${2:1.0}, true, ${3:OnPeriodicTimer});",
+      "$0"
+    ],
+    "description": "Создать периодический Warcraft III timer. Требуется using Warcraft3;"
+  },
+  "TimerCallback": {
+    "prefix": [
+      "timercallback",
+      "ontimer"
+    ],
+    "body": [
+      "void ${1:OnTimerExpired}()",
+      "{",
+      "    timer expired = GetExpiredTimer();",
+      "    $0",
+      "    DestroyTimer(expired);",
+      "}"
+    ],
+    "description": "Callback таймера; GetExpiredTimer возвращает сработавший timer. Требуется using Warcraft3;"
+  },
+  "GroupEnumeration": {
+    "prefix": [
+      "groupenum",
+      "enumunitsrange"
+    ],
+    "body": [
+      "group ${1:units} = CreateGroup();",
+      "GroupEnumUnitsInRange(${1:units}, ${2:x}, ${3:y}, ${4:radius}, null);",
+      "ForGroup(${1:units}, ${5:OnEnumUnit});",
+      "DestroyGroup(${1:units});",
+      "$0"
+    ],
+    "description": "Перечислить юнитов в радиусе через group и ForGroup. Требуется using Warcraft3;"
+  },
+  "GroupCallback": {
+    "prefix": [
+      "groupcallback",
+      "onenumunit"
+    ],
+    "body": [
+      "void ${1:OnEnumUnit}()",
+      "{",
+      "    unit ${2:enumUnit} = GetEnumUnit();",
+      "    $0",
+      "}"
+    ],
+    "description": "Callback ForGroup; текущий юнит доступен через GetEnumUnit(). Требуется using Warcraft3;"
+  },
+  "CreateUnit": {
+    "prefix": [
+      "createunit",
+      "spawnunit"
+    ],
+    "body": [
+      "unit ${1:createdUnit} = CreateUnit(Player(${2:0}), '${3:hfoo}', ${4:0.0}, ${5:0.0}, ${6:270.0});",
+      "$0"
+    ],
+    "description": "Создать юнита по rawcode на координатах. Требуется using Warcraft3;"
+  },
+  "SpellEffectTrigger": {
+    "prefix": [
+      "spelltrigger",
+      "spellcast",
+      "spellinit"
+    ],
+    "body": [
+      "trigger ${1:spellTrigger} = CreateTrigger();",
+      "TriggerRegisterPlayerUnitEvent(${1:spellTrigger}, Player(${2:0}), EVENT_PLAYER_UNIT_SPELL_EFFECT, null);",
+      "TriggerAddAction(${1:spellTrigger}, ${3:OnSpellEffect});",
+      "$0"
+    ],
+    "description": "Зарегистрировать callback на событие применения способности игроком. Требуется using Warcraft3;"
+  },
+  "SpellEffectCallback": {
+    "prefix": [
+      "spellcallback",
+      "onspelleffect"
+    ],
+    "body": [
+      "void ${1:OnSpellEffect}()",
+      "{",
+      "    unit caster = GetTriggerUnit();",
+      "    int abilityId = GetSpellAbilityId();",
+      "    float targetX = GetSpellTargetX();",
+      "    float targetY = GetSpellTargetY();",
+      "    $0",
+      "}"
+    ],
+    "description": "Обработчик SPELL_EFFECT с caster, rawcode способности и координатами цели. Требуется using Warcraft3;"
+  },
+  "CreateEffect": {
+    "prefix": [
+      "effectpoint",
+      "specialeffect"
+    ],
+    "body": [
+      "effect ${1:spellEffect} = AddSpecialEffect(${2:\"Abilities\\\\\\\\Spells\\\\\\\\Other\\\\\\\\TalkToMe\\\\\\\\TalkToMe.mdl\"}, ${3:x}, ${4:y});",
+      "$0"
+    ],
+    "description": "Создать special effect в точке. Освобождение effect handle выполняйте через DestroyEffect, когда эффект больше не нужен. Требуется using Warcraft3;"
+  },
+  "AttachEffect": {
+    "prefix": [
+      "effectattach",
+      "attachsfx"
+    ],
+    "body": [
+      "effect ${1:attachedEffect} = AddSpecialEffectTarget(${2:\"Abilities\\\\\\\\Weapons\\\\\\\\\",}, ${3:targetUnit}, ${4:\"origin\"});",
+      "$0"
+    ],
+    "description": "Прикрепить special effect к widget target. Требуется using Warcraft3;"
+  },
+  "DamageTarget": {
+    "prefix": [
+      "unitdamage",
+      "damagetarget"
+    ],
+    "body": [
+      "UnitDamageTarget(${1:sourceUnit}, ${2:targetUnit}, ${3:100.0}, true, false, ATTACK_TYPE_MAGIC, DAMAGE_TYPE_MAGIC, WEAPON_TYPE_WHOKNOWS);",
+      "$0"
+    ],
+    "description": "Нанести урон цели через UnitDamageTarget. Требуется using Warcraft3;"
   }
 }
