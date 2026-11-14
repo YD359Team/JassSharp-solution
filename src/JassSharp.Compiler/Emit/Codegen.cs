@@ -647,7 +647,7 @@ end
             Line($"local {loop.Name} = __collection_load({collectionName}[{indexName}])");
         }
         else if (TryGetGenericArguments(collectionType, out var genericName, out var genericArgs) &&
-                 genericName is "List" or "Queue" or "Stack")
+                 (genericName is "List" or "Queue" or "Stack"))
         {
             string elementType = genericArgs[0];
             if (genericName == "Queue")
@@ -890,10 +890,11 @@ end
         if (receiverType is null)
             return null;
 
-        if (expression.Name == "Count" && IsGenericType(receiverType, "List") ||
-            expression.Name == "Count" && IsGenericType(receiverType, "Queue") ||
-            expression.Name == "Count" && IsGenericType(receiverType, "Stack") ||
-            expression.Name == "Count" && IsGenericType(receiverType, "Dictionary"))
+        if (expression.Name == "Count" &&
+            (IsGenericType(receiverType, "List") ||
+             IsGenericType(receiverType, "Queue") ||
+             IsGenericType(receiverType, "Stack") ||
+             IsGenericType(receiverType, "Dictionary")))
             return "int";
 
         if (TryGetGenericArguments(receiverType, out var genericName, out var genericArgs) &&
