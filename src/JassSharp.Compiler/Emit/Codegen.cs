@@ -865,7 +865,8 @@ end
         _lua && CurrentFieldType(name) is not null;
 
     private static bool IsFloatingLiteral(string text) =>
-        text.Contains('.') || text.Contains('e') || text.Contains('E');
+        !text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) &&
+        (text.Contains('.') || text.Contains('e') || text.Contains('E'));
 
     private string? InferBinaryType(BinaryExpr expression)
     {
