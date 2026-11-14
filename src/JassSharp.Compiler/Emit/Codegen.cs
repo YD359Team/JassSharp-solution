@@ -976,6 +976,19 @@ end
             if (receiverType is null)
                 return null;
 
+            if (TryGetGenericArguments(receiverType, out var collectionName, out var collectionArgs))
+            {
+                if (collectionName == "Queue" && member.Name == "Enqueue") return "void";
+                if (collectionName == "Queue" && (member.Name is "Dequeue" or "Peek")) return collectionArgs[0];
+                if (collectionName == "Stack" && member.Name == "Push") return "void";
+                if (collectionName == "Stack" && (member.Name is "Pop" or "Peek")) return collectionArgs[0];
+                if (collectionName == "List" && (member.Name is "Add" or "Clear")) return "void";
+                if (collectionName == "List" && member.Name == "IndexOf") return "int";
+                if (collectionName == "List" && member.Name == "Remove") return "bool";
+                if (collectionName == "Dictionary" && member.Name == "Add") return "void";
+                if (collectionName == "Dictionary" && (member.Name is "Remove" or "TryAdd" or "TryRemove" or "ContainsKey")) return "bool";
+            }
+
             if (_methods.TryGetValue(receiverType + "." + member.Name, out var method))
                 return method.ReturnType;
 
