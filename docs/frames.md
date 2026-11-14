@@ -71,6 +71,9 @@ The generic `Frame` wrapper exposes the complete low-level API. The following wr
 | `TextFrame` | `TEXT` | Text, font, color, alignment, size |
 | `SliderFrame` | `SLIDER` | Value, range, step size, events |
 | `EditBoxFrame` | `EDITBOX` | Text, focus, text-size limit, events |
+| `CheckBoxFrame` | `CHECKBOX` | Text, enabled/visible state, checked/unchecked events |
+| `PopupFrame` | `POPUPMENU` | Enabled/visible state, selection-changed event |
+| `MenuFrame` | `MENU` | Enabled/visible state, frame events |
 
 Each `Create` factory creates an owned frame. The public constructor accepts a native handle and an explicit ownership flag for interop. Do not create multiple owning wrappers for the same handle. As with `Frame`, call `Dispose()` explicitly; there is no Lua-GC finalization.
 
@@ -107,6 +110,12 @@ event click = panel.RegisterEvent(clickTrigger, FRAMEEVENT_CONTROL_CLICK);
 ```
 
 Inside the trigger action or subscription callback, read the current event context through `FrameEvents.CurrentFrame()`, `CurrentEvent()`, `CurrentValue()`, and `CurrentText()`. These values are meaningful while handling the corresponding frame event; do not cache them as a substitute for event-specific state.
+
+All typed controls expose `Subscribe(frameeventtype, code)`. `TextFrame` now supports subscriptions as well as the interactive controls. `CheckBoxFrame.SubscribeChecked` and `SubscribeUnchecked` are shortcuts for the corresponding checkbox events. Warcraft III exposes checkbox state changes as events, but the native API used by this library does not expose a checked-state getter or setter; the wrapper therefore does not invent `IsChecked` or `SetChecked`.
+
+Use `PopupFrame.SubscribeSelectionChanged` for `FRAMEEVENT_POPUPMENU_ITEM_CHANGED`. Read the selected item index through `FrameEvents.CurrentValue()` inside that callback. `MenuFrame` wraps a native `MENU` frame; menu item construction remains the responsibility of its FDF/template because Warcraft III does not provide a dedicated native item-collection API for it.
+
+Frame event types are not universally valid for every frame type. For example, checkbox events belong to checkbox frames, popup selection changes belong to popup-menu frames, edit-box events belong to edit boxes, and slider value changes belong to sliders. Select events supported by the concrete native frame type.
 
 ## Coordinate conversion
 
