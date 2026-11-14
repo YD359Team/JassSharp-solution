@@ -385,24 +385,30 @@ function readVariables(text: string, classes = readClasses(text), functions = re
     const priorDeclarations = [...result.filter(variable => !parameterOffsets.has(variable.offset)), ...parameterVariables]
         .sort((a, b) => a.offset - b.offset);
 
-    const foreachVarPattern = /\bforeach\s*\(\s*var\s+([A-Za-z_]\w*)\s+in\s+([A-Za-z_]\w*)\s*\)/g;
+    const foreachVarPattern = /\bforeach\s*\(\s*var\s+([A-Za-z_]\w*)\s+in\s+([A-Za-z_]\w*(?:\s*\[[^\]]+\])*)\s*\)/g;
     for (const match of source.matchAll(foreachVarPattern)) {
         const name = match[1];
-        const collectionName = match[2];
+        const collectionExpression = match[2].trim();
         const offset = (match.index ?? 0) + match[0].indexOf(name);
         const ownerFunction = functions.find(fn => fn.bodyStart !== undefined &&
             fn.bodyEnd !== undefined && offset >= fn.bodyStart && offset <= fn.bodyEnd);
         if (!ownerFunction) continue;
 
         const collection = priorDeclarations
-            .filter(variable => variable.name === collectionName && variable.offset < offset &&
+            .filter(variable => variable.name === (/^([A-Za-z_]\w*)/.exec(collectionExpression)?.[1] ?? "") && variable.offset < offset &&
                 (variable.scopeStart === undefined || (variable.scopeStart <= offset && offset <= variable.scopeEnd!)))
             .sort((a, b) => b.offset - a.offset)[0];
+        let collectionType = collection?.type;
+        const collectionIndexCount = (collectionExpression.match(/\[/g) ?? []).length;
+        for (let i = 0; i < collectionIndexCount && collectionType; i++) {
+            if (collectionType.endsWith("[]")) collectionType = collectionType.slice(0, -2);
+            else collectionType = undefined;
+        }
         if (!collection) continue;
 
         let elementType: string | undefined;
-        if (collection.type.endsWith("[]")) elementType = collection.type.slice(0, -2);
-        else if (collection.type === "group" && hasWarcraft3Using(text)) elementType = "unit";
+        if (collectionType?.endsWith("[]")) elementType = collectionType.slice(0, -2);
+        else if (collectionType === "group" && hasWarcraft3Using(text)) elementType = "unit";
         if (!elementType) continue;
 
         const scope = findInnermostBlockScope(text, ownerFunction, offset);
