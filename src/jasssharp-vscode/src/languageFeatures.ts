@@ -273,7 +273,7 @@ function readVariables(text: string, classes = readClasses(text), functions = re
     const parameterVariables: VariableInfo[] = [];
     for (const fn of functions) {
         for (const parameter of fn.parameters) {
-            const match = /^\\s*([A-Za-z_]\\w*)\\s+([A-Za-z_]\\w*)/.exec(parameter);
+            const match = /^\s*([A-Za-z_]\w*)\s+([A-Za-z_]\w*)/.exec(parameter);
             if (!match) continue;
             const fnText = text.slice(fn.offset);
             const paren = fnText.indexOf("(");
@@ -284,7 +284,7 @@ function readVariables(text: string, classes = readClasses(text), functions = re
         }
     }
 
-    const varDeclarations = Array.from(source.matchAll(/\\bvar\\s+([A-Za-z_]\\w*)\\s*=\\s*([^;\\r\\n]+)/g))
+    const varDeclarations = Array.from(source.matchAll(/\bvar\s+([A-Za-z_]\w*)\s*=\s*([^;\r\n]+)/g))
         .map(match => ({
             name: match[1],
             initializer: match[2].trim(),
@@ -307,26 +307,26 @@ function readVariables(text: string, classes = readClasses(text), functions = re
 
         const initializer = declaration.initializer;
         let inferred: string | undefined;
-        const creation = /^new\\s+([A-Za-z_]\\w*)/.exec(initializer);
+        const creation = /^new\s+([A-Za-z_]\w*)/.exec(initializer);
         if (creation) inferred = creation[1];
         else if (/^(?:true|false)$/.test(initializer)) inferred = "bool";
         else if (/^null$/.test(initializer)) inferred = undefined;
         else if (/^["']/.test(initializer)) inferred = "string";
-        else if (/^\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$/.test(initializer))
+        else if (/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(initializer))
             inferred = /[.eE]/.test(initializer) ? "float" : "int";
         else {
-            const identifier = /^([A-Za-z_]\\w*)$/.exec(initializer);
+            const identifier = /^([A-Za-z_]\w*)$/.exec(initializer);
             if (identifier) inferred = knownTypes.get(identifier[1]);
 
             if (!inferred) {
-                const call = /^([A-Za-z_]\\w*)\\s*\\(/.exec(initializer);
+                const call = /^([A-Za-z_]\w*)\s*\(/.exec(initializer);
                 if (call) inferred = functions.find(fn => fn.name === call[1])?.returnType ?? nativeReturnType(call[1]);
             }
 
             if (!inferred && /[+*/%-]/.test(initializer)) {
                 const operands = initializer.split(/[+*/%-]/).map(part => part.trim()).filter(Boolean);
                 const operandTypes = operands.map(part => {
-                    if (/^\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?$/.test(part))
+                    if (/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(part))
                         return /[.eE]/.test(part) ? "float" : "int";
                     return knownTypes.get(part);
                 });
