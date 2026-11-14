@@ -79,17 +79,20 @@ namespace Strings
 
         public static string Trim(string value)
         {
-            return string.gsub(value, "^%s*(.-)%s*$", "%1");
+            string result = string.gsub(value, "^%s*(.-)%s*$", "%1");
+            return result;
         }
 
         public static string TrimStart(string value)
         {
-            return string.gsub(value, "^%s+", "");
+            string result = string.gsub(value, "^%s+", "");
+            return result;
         }
 
         public static string TrimEnd(string value)
         {
-            return string.gsub(value, "%s+$", "");
+            string result = string.gsub(value, "%s+$", "");
+            return result;
         }
 
         public static string ToLower(string value)
