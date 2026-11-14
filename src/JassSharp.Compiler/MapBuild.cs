@@ -302,7 +302,7 @@ static class MapBuild
             {
                 var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
                 var imports = ResolveImports(unit, allUnits);
-                var diagnostics = Checker.Check(unit, file, imports);
+                var diagnostics = Checker.Check(unit, file, imports, implicitWarcraft3: false);
                 foreach (var diagnostic in diagnostics)
                     Console.Error.WriteLine(
                         $"{file}:{diagnostic.Line}:{diagnostic.Col}: {diagnostic.Severity}: {diagnostic.Message}");
