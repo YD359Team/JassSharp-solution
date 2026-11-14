@@ -371,7 +371,7 @@
       "specialeffect"
     ],
     "body": [
-      "effect ${1:spellEffect} = AddSpecialEffect(${2:\"Abilities\\\\\\\\Spells\\\\\\\\Other\\\\\\\\TalkToMe\\\\\\\\TalkToMe.mdl\"}, ${3:x}, ${4:y});",
+      "effect ${1:spellEffect} = AddSpecialEffect(${2:\"Abilities\\\\Spells\\\\Other\\\\Fireball\\\\Fireball.mdl\"}, ${3:x}, ${4:y});",
       "$0"
     ],
     "description": "Создать special effect в точке. Освобождение effect handle выполняйте через DestroyEffect, когда эффект больше не нужен. Требуется using Warcraft3;"
@@ -382,7 +382,7 @@
       "attachsfx"
     ],
     "body": [
-      "effect ${1:attachedEffect} = AddSpecialEffectTarget(${2:\"Abilities\\\\\\\\Weapons\\\\\\\\\",}, ${3:targetUnit}, ${4:\"origin\"});",
+      "effect ${1:attachedEffect} = AddSpecialEffectTarget(${2:\"Abilities\\\\Weapons\\\\AvengerMissile\\\\AvengerMissile.mdl\"}, ${3:targetUnit}, ${4:\"origin\"});",
       "$0"
     ],
     "description": "Прикрепить special effect к widget target. Требуется using Warcraft3;"
