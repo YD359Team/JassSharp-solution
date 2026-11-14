@@ -494,7 +494,7 @@ function collectLiveAssignmentDiagnostics(document: vscode.TextDocument): vscode
     const functions = readFunctions(text, classes);
     const variables = readVariables(text, classes, functions);
     const diagnostics: vscode.Diagnostic[] = [];
-    const assignmentPattern = /\\b([A-Za-z_]\\w*)\\s*(\\+=|-=|\\*=|\\/=|%=|(?<![=!<>])=(?!=))\\s*([^;\\r\\n{}]+)/g;
+    const assignmentPattern = /\b([A-Za-z_]\w*)\s*(\+=|-=|\*=|\/=|%=|(?<![=!<>])=(?!=))\s*([^;\r\n{}]+)/g;
 
     for (const match of source.matchAll(assignmentPattern)) {
         const targetName = match[1];
@@ -522,7 +522,6 @@ function collectLiveAssignmentDiagnostics(document: vscode.TextDocument): vscode
         }
 
         if (!incompatible) continue;
-        const line = document.positionAt(expressionOffset).line;
         const start = document.positionAt(expressionOffset);
         const end = document.positionAt(Math.min(text.length, expressionOffset + Math.max(1, match[3].trim().length)));
         const diagnostic = new vscode.Diagnostic(
