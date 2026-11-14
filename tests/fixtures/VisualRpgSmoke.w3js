@@ -64,7 +64,10 @@ namespace VisualRpgSmoke
         item equippedItem = inventory.EquipmentItem(equipmentSlot);
         bool inBag = inventory.IsInBag(equipment);
         bool equipped = inventory.IsEquipped(equipment);
+        bool anyEquipped = inventory.HasAnyEquippedItem();
         bool hasCategory = inventory.HasEquipmentType(equipmentCategory);
+        int randomEquipmentRawcode = ItemSelection.ChooseRandomRawcode(
+            ITEM_TYPE_PERMANENT, 5, equipmentCategory, itemTagValue, false, false);
         bool canEquip = inventory.CanEquip(equipmentCategory);
         bool emptySlot = inventory.HasEmptySlot(equipmentSlot);
         bool equipResult = inventory.Equip(equipment);
@@ -81,6 +84,7 @@ namespace VisualRpgSmoke
         bool talentPermanent = Talents.SetAbilityPermanent(hero, talentRawcode, true);
         bool talentRemoved = Talents.RemoveAbility(hero, talentRawcode);
         float healed = RpgCombat.Heal(target, hero, 125.0, false, true);
+        float drained = RpgCombat.Heal(target, hero, -25.0, false, true);
         item eventEquipped = InventoryEvents.EquippedItem();
         item eventUnequipped = InventoryEvents.UnequippedItem();
     }
