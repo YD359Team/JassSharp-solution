@@ -341,6 +341,10 @@ public static class Checker
                         if (_currentMethodIsStatic)
                             Add(name.Line, name.Col, "error", $"поле экземпляра {name.Name} недоступно внутри static-метода");
                     }
+                    else if (!TryLookup(name.Name, out _) && IsWarcraftSymbol(name.Name) && !_hasWarcraft3)
+                    {
+                        Add(name.Line, name.Col, "error", $"{name.Name} доступна только после using Warcraft3");
+                    }
                     else if (!TryLookup(name.Name, out _) && !IsKnownSymbol(name.Name))
                     {
                         Add(name.Line, name.Col, "warning", $"неизвестное имя {name.Name}");
@@ -360,7 +364,11 @@ public static class Checker
                             (NativeTable.Constructors.ContainsKey(creation.Type) ||
                              NativeCatalog.Types.Contains(creation.Type))))
                     {
-                        Add(creation.Line, creation.Col, "warning", $"неизвестный тип {creation.Type}");
+                        if (NativeCatalog.Types.Contains(creation.Type) || NativeTable.Constructors.ContainsKey(creation.Type))
+                            Add(creation.Line, creation.Col, "error",
+                                $"тип {creation.Type} доступен только после using Warcraft3");
+                        else
+                            Add(creation.Line, creation.Col, "warning", $"неизвестный тип {creation.Type}");
                     }
 
                     foreach (var argument in creation.Args)

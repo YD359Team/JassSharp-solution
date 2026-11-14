@@ -399,7 +399,7 @@ function readVariables(text: string, classes = readClasses(text), functions = re
 
             if (!inferred) {
                 const call = /^([A-Za-z_]\w*)\s*\(/.exec(initializer);
-                if (call) inferred = functions.find(fn => fn.name === call[1])?.returnType ?? nativeReturnType(call[1]);
+                if (call) inferred = functions.find(fn => fn.name === call[1])?.returnType ?? nativeReturnType(call[1], text);
             }
 
             if (!inferred && /[+*/%-]/.test(initializer)) {
@@ -517,7 +517,7 @@ function inferExpressionType(expression: string, documentText: string, offset: n
     if (!type && segments[0] === "this") type = getCurrentClass(documentText, offset)?.name;
     if (!type) {
         const callName = /^([A-Za-z_]\w*)\s*\(/.exec(segments[0])?.[1];
-        if (callName) type = readFunctions(documentText).find(f => f.name === callName)?.returnType ?? nativeReturnType(callName);
+        if (callName) type = readFunctions(documentText).find(f => f.name === callName)?.returnType ?? nativeReturnType(callName, documentText);
     }
 
     for (let i = 1; i < segments.length && type; i++) {
@@ -590,7 +590,12 @@ function areEditorTypesCompatible(actual: string, expected: string): boolean {
     return expected === "float" && actual === "int";
 }
 
-function nativeReturnType(name: string): string | undefined {
+function hasWarcraft3Using(text: string): boolean {
+    return /\\busing\\s+Warcraft3\\s*;?/i.test(text);
+}
+
+function nativeReturnType(name: string, sourceText?: string): string | undefined {
+    if (sourceText !== undefined && !hasWarcraft3Using(sourceText)) return undefined;
     const native = nativeByName.get(name);
     if (!native) return undefined;
     const arrow = /→\s*([A-Za-z_]\w*)/.exec(native.sig);
@@ -720,7 +725,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
 
                 const classInfo = readClasses(fullText).find(c => c.name === receiverType);
                 const custom = classInfo ? readClassMembers(fullText, classInfo) : [];
-                for (const member of MEMBERS.filter(m => m.type === receiverType)) {
+                for (const member of (hasWarcraft3Using(fullText) ? MEMBERS : []).filter(m => m.type === receiverType)) {
                     const isMethod = member.kind === "Method";
                     addCompletion(items, seen, member.name,
                         isMethod ? vscode.CompletionItemKind.Method : vscode.CompletionItemKind.Property,
@@ -771,13 +776,15 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             for (const cls of classes)
                 addCompletion(items, seen, cls.name, vscode.CompletionItemKind.Class, "JASS# class", range, "01");
 
-            for (const native of NATIVES)
-                addCompletion(items, seen, native.name, vscode.CompletionItemKind.Function,
-                    native.sig, range, "04", new vscode.SnippetString(`${native.name}($0)`), native.doc);
-            for (const constant of CONSTANTS)
-                addCompletion(items, seen, constant, vscode.CompletionItemKind.Constant, "Warcraft III constant", range, "05");
-            for (const type of BUILTIN_TYPES)
-                addCompletion(items, seen, type, vscode.CompletionItemKind.Class, "Warcraft III handle / enum type", range, "06");
+            if (hasWarcraft3Using(fullText)) {
+                for (const native of NATIVES)
+                    addCompletion(items, seen, native.name, vscode.CompletionItemKind.Function,
+                        native.sig, range, "04", new vscode.SnippetString(`${native.name}($0)`), native.doc);
+                for (const constant of CONSTANTS)
+                    addCompletion(items, seen, constant, vscode.CompletionItemKind.Constant, "Warcraft III constant", range, "05");
+                for (const type of BUILTIN_TYPES)
+                    addCompletion(items, seen, type, vscode.CompletionItemKind.Class, "Warcraft III handle / enum type", range, "06");
+            }
             for (const keyword of KEYWORDS)
                 addCompletion(items, seen, keyword, vscode.CompletionItemKind.Keyword, "JASS# keyword", range, "09");
 
@@ -797,8 +804,9 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
 
             const functions = buildFunctionSignatures(document);
             const functionInfo = functions.get(call.name);
-            const native = nativeByName.get(call.name);
-            const member = MEMBERS.find(m => m.name === call.name && m.kind === "Method");
+            const hasWarcraft3 = hasWarcraft3Using(text);
+            const native = hasWarcraft3 ? nativeByName.get(call.name) : undefined;
+            const member = hasWarcraft3 ? MEMBERS.find(m => m.name === call.name && m.kind === "Method") : undefined;
             let label: string;
             let parameters: string[];
             let documentation = "";
@@ -833,11 +841,12 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             const range = document.getWordRangeAtPosition(position);
             if (!range) return undefined;
             const word = document.getText(range);
-            const native = nativeByName.get(word);
-            const functionInfo = buildFunctionSignatures(document).get(word);
-            const constant = constantNames.has(word);
-            const member = MEMBERS.find(m => m.name === word);
             const documentText = document.getText();
+            const hasWarcraft3 = hasWarcraft3Using(documentText);
+            const native = hasWarcraft3 ? nativeByName.get(word) : undefined;
+            const functionInfo = buildFunctionSignatures(document).get(word);
+            const constant = hasWarcraft3 && constantNames.has(word);
+            const member = hasWarcraft3 ? MEMBERS.find(m => m.name === word) : undefined;
             const cls = readClasses(documentText).find(c => c.name === word);
             const variables = visibleVariables(documentText, document.offsetAt(position));
             const variable = variables.filter(v => v.name === word).slice(-1)[0];
@@ -880,8 +889,9 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             const classNames = new Set(classes.map(c => c.name));
             const functionNames = new Set(functions.map(f => f.name));
             const customMembers = classes.flatMap(cls => readClassMembers(text, cls));
-            const memberMethods = new Set([...MEMBERS.filter(m => m.kind === "Method").map(m => m.name), ...customMembers.filter(m => m.kind === "Method").map(m => m.name)]);
-            const memberProperties = new Set([...MEMBERS.filter(m => m.kind !== "Method").map(m => m.name), ...customMembers.filter(m => m.kind === "Property").map(m => m.name)]);
+            const hasWarcraft3 = hasWarcraft3Using(text);
+            const memberMethods = new Set([...(hasWarcraft3 ? MEMBERS.filter(m => m.kind === "Method").map(m => m.name) : []), ...customMembers.filter(m => m.kind === "Method").map(m => m.name)]);
+            const memberProperties = new Set([...(hasWarcraft3 ? MEMBERS.filter(m => m.kind !== "Method").map(m => m.name) : []), ...customMembers.filter(m => m.kind === "Property").map(m => m.name)]);
             const declarationOffsets = new Map<number, { type: string; modifiers: string[] }>();
 
             for (const cls of classes) declarationOffsets.set(text.indexOf(cls.name, cls.start), { type: "class", modifiers: ["declaration"] });
@@ -905,15 +915,16 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
                     modifiers = declaration.modifiers;
                 } else if (classNames.has(token.text)) {
                     type = "class";
-                } else if (PRIMITIVE_TYPES.has(token.text.toLowerCase()) || BUILTIN_TYPES.has(token.text.toLowerCase())) {
+                } else if (PRIMITIVE_TYPES.has(token.text.toLowerCase()) ||
+                    (hasWarcraft3 && BUILTIN_TYPES.has(token.text.toLowerCase()))) {
                     type = "type";
                     modifiers = ["defaultLibrary"];
                 } else if (KEYWORDS.has(token.text)) {
                     type = "keyword";
-                } else if (nativeNames.has(token.text)) {
+                } else if (hasWarcraft3 && nativeNames.has(token.text)) {
                     type = "function";
                     modifiers = ["defaultLibrary"];
-                } else if (constantNames.has(token.text)) {
+                } else if (hasWarcraft3 && constantNames.has(token.text)) {
                     type = "enumMember";
                     modifiers = ["readonly", "defaultLibrary"];
                 } else if (functionNames.has(token.text)) {
