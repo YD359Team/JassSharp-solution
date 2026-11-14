@@ -1,0 +1,9 @@
+namespace ArrayTypeMismatchSmoke
+{
+    public void Verify()
+    {
+        int[] integers = new int[];
+        float[] reals = new float[];
+        integers = reals;
+    }
+}
