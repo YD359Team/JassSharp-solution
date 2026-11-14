@@ -1900,7 +1900,7 @@ export function registerCompletions(context: vscode.ExtensionContext) {
                         if (member.kind === "Method") {
                             const args = member.args ?? [];
                             item.insertText = new vscode.SnippetString(
-                                `${member.name}(${args.map((type, index) => `${type} ${String.fromCharCode(97 + index)}`).join(", ")}$0)`
+                                `${member.name}(${args.map((_, index) => `${index + 1}`).join(", ")}$0)`
                             );
                         }
                         items.push(item);
