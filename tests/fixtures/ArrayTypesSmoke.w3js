@@ -17,6 +17,9 @@ namespace ArrayTypesSmoke
         row[0] = 10;
         source[0] = row;
 
+        var inferredMatrix = new int[][];
+        var inferredRow = inferredMatrix[0];
+
         float[][] weights;
         weights[0] = new float[];
         weights[0][0] = 2.5;
