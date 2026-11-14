@@ -480,6 +480,9 @@ foreach ($fragment in @(
     "BlzUnitEquipItem(self._owner, value)",
     "BlzUnitUnequipItemFromSlot(self._owner, slot)",
     "BlzResetUnitTalents(target)",
+    "UnitAddAbility(target, abilityRawcode)",
+    "SetUnitAbilityLevel(target, abilityRawcode, rank)",
+    "UnitMakeAbilityPermanent(target, permanent, abilityRawcode)",
     "BlzUnitHeal(target, source, amount, isItem, applyStatBonuses)"
 )) {
     if (-not $visualLua.Contains($fragment)) {
