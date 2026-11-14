@@ -401,10 +401,11 @@ public sealed class Parser(List<Token> tokens)
         var expr = ParseExpr();
         if (expr is CallExpr
             {
-                Callee: MemberExpr { Object: NameExpr { Name: "Lua" }, Name: "Raw" },
-                Args.Count: 1
+                Callee: MemberExpr { Object: NameExpr { Name: "Lua" }, Name: "Raw" }
             } rawCall)
         {
+            if (rawCall.Args.Count != 1)
+                throw new ParseException("Lua.Raw ожидает ровно один аргумент", rawCall.Line, rawCall.Col);
             if (rawCall.Args[0] is not StrExpr rawCode)
                 throw new ParseException("Lua.Raw ожидает строковый или многострочный raw-литерал", rawCall.Line, rawCall.Col);
             Accept(";");
