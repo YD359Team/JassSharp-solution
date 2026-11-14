@@ -1925,7 +1925,9 @@ export function registerCompletions(context: vscode.ExtensionContext) {
             for (const t of TYPES) {
                 const i = new vscode.CompletionItem(t, vscode.CompletionItemKind.Class);
                 i.range = range;
-                i.detail = "handle type";
+                i.detail = ["List", "Queue", "Stack", "Dictionary", "KeyValuePair"].includes(t)
+                    ? "generic collection type"
+                    : "Warcraft III handle type";
                 items.push(i);
             }
             for (const c of CONSTANTS) {
