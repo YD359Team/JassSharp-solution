@@ -1,0 +1,7 @@
+namespace LuaRawExpressionRejectedSmoke
+{
+    void Run()
+    {
+        string generated = Lua.Raw("print(1)");
+    }
+}
