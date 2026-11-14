@@ -72,6 +72,8 @@ $requiredFragments = @(
     "function Vector2.__add(arg0, arg1)",
     "__operator_Add_Vector2_Vector2",
     "function Priority.__operator_LessThan_Priority_Priority(left, right)",
+    "self.Stored = Score.new(value)",
+    "return self.Stored:GetValue()",
     "math.sqrt(((self.X * self.X) + (self.Y * self.Y)))",
     "((self.Y * other.Z) - (self.Z * other.Y))",
     "((self.X * other.Y) - (self.Y * other.X))"
