@@ -171,6 +171,29 @@ foreach ($fragment in @(
     }
 }
 
+Write-Host "[5c] Verifying generic collection type safety..."
+$collectionsInvalidFixture = Join-Path $PSScriptRoot "fixtures/CollectionsTypeMismatchSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $collectionsDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $collectionsInvalidFixture 2>&1
+    $collectionsExitCode = $LASTEXITCODE
+    $collectionsText = $collectionsDiagnostics -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $parsedCollectionsDiagnostics = ConvertFrom-Json -InputObject $collectionsText
+}
+catch {
+    throw "Could not parse generic collection diagnostics as JSON. Exit code: $collectionsExitCode. Output: $collectionsText"
+}
+$collectionErrors = @($parsedCollectionsDiagnostics | Where-Object { $_.Severity -eq "error" })
+if ($collectionsExitCode -eq 0 -or $collectionErrors.Count -ne 3) {
+    throw "Generic collection type safety did not reject all three invalid operations. Exit code: $collectionsExitCode. Errors: $($collectionErrors.Count). Output: $collectionsText"
+}
+
 Write-Host "[6/20] Generating Lua and validating 2D geometry..."
 $geometryFixture = Join-Path $PSScriptRoot "fixtures/GeometrySmoke.w3js"
 $geometryBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $geometryFixture --target lua
