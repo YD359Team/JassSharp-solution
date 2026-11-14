@@ -73,6 +73,9 @@ const KEYWORDS = new Set([
 
 const PRIMITIVE_TYPES = new Set(["void", "int", "integer", "float", "real", "bool", "boolean", "string", "code"]);
 const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; ret: string; kind: "Method" | "Property"; parameters: string[] }>> = {
+    Lua: [
+        { name: "Raw", ret: "void", kind: "Method", parameters: ["string code"] }
+    ],
     Strings: [
         { name: "Length", ret: "int", kind: "Method", parameters: ["string value"] },
         { name: "Substring", ret: "string", kind: "Method", parameters: ["string value", "int startIndex", "int length"] },
