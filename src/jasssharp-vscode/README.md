@@ -58,6 +58,29 @@ npm.cmd run package
 
 В headless-режиме не генерируются Warcraft III entry points \`config()\` и \`main()\`, а встроенный \`Print(...)\` транслируется в Lua \`print(...)\`.
 
+## Массивы и foreach
+
+Поддерживаются массивы массивов с сохранением ранга типа:
+
+```csharp
+int[][] matrix = new int[][];
+matrix[0] = new int[];
+matrix[0][1] = 42;
+```
+
+Индексация в исходном коде JASS# нулевая; Lua backend корректирует её при генерации.
+
+Для массивов `foreach` транслируется в индексный цикл:
+
+```csharp
+foreach (var row in matrix)
+{
+    Print(row[0]);
+}
+```
+
+Для Warcraft III `group` используется callback-механизм `ForGroup`, а переменная итерации получает тип `unit`.
+
 ## Модуль Warcraft III
 
 Типы, native-функции, константы и расширенные члены Warcraft III доступны в IntelliSense после явного подключения:
