@@ -286,29 +286,26 @@ public static class Checker
                     CheckExpression(loop.Collection);
                     string? collectionType = InferType(loop.Collection);
                     string? elementType = GetForeachElementType(collectionType);
-                    if (elementType is null)
-                        Add(loop.Line, loop.Col, "error",
-                            $"foreach не поддерживает коллекцию типа {collectionType ?? "?"}; поддерживаются массивы и group с using Warcraft3");
-
                     string itemType = loop.Type;
-                    if (itemType == "var")
+                    if (elementType is null)
                     {
-                        if (elementType is null)
-                        {
+                        if (itemType == "var")
                             Add(loop.Line, loop.Col, "error",
-                                $"не удалось вывести тип элемента foreach для коллекции {InferType(loop.Collection) ?? "?"}");
-                            itemType = "?";
-                        }
+                                $"не удалось вывести тип элемента foreach для коллекции {collectionType ?? "?"}; поддерживаются массивы и group с using Warcraft3");
                         else
-                        {
-                            itemType = elementType;
-                        }
+                            Add(loop.Line, loop.Col, "error",
+                                $"foreach не поддерживает коллекцию типа {collectionType ?? "?"}; поддерживаются массивы и group с using Warcraft3");
+                        itemType = itemType == "var" ? "?" : itemType;
+                    }
+                    else if (itemType == "var")
+                    {
+                        itemType = elementType;
                     }
                     else
                     {
                         if (!IsKnownType(itemType, allowVoid: false))
                             Add(loop.Line, loop.Col, "error", $"неизвестный тип элемента foreach: {itemType}");
-                        if (elementType is not null && !IsCompatible(elementType, itemType))
+                        if (!IsCompatible(elementType, itemType))
                             Add(loop.Line, loop.Col, "error",
                                 $"foreach: ожидался элемент типа {itemType}, коллекция содержит {elementType}");
                     }
