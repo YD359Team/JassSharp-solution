@@ -197,6 +197,33 @@ if ($collectionsExitCode -eq 0 -or $collectionErrors.Count -ne 4) {
     throw "Generic collection type safety did not reject all four invalid type mismatches. Exit code: $collectionsExitCode. Errors: $($collectionErrors.Count). Output: $collectionsText"
 }
 
+Write-Host "[5d] Building interpolation and raw string fixture..."
+$stringsFixture = Join-Path $PSScriptRoot "fixtures/StringsSmoke.w3js"
+$stringsBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $stringsFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "String fixture failed to compile: $($stringsBuildOutput -join [Environment]::NewLine)"
+}
+$stringsLuaPath = Join-Path $PSScriptRoot "fixtures/bin/StringsSmoke.lua"
+if (-not (Test-Path $stringsLuaPath)) {
+    throw "Expected generated strings Lua file was not created: $stringsLuaPath"
+}
+$stringsLua = Get-Content -LiteralPath $stringsLuaPath -Raw
+foreach ($fragment in @(
+    'Product: ',
+    'tostring(((x * y) * z))',
+    'Result=',
+    'enabled=',
+    '{literal} and {',
+    'First line\nSecond line\nThird line',
+    'Product: ',
+    'Enabled: ',
+    'Braces: {literal}'
+)) {
+    if (-not $stringsLua.Contains($fragment)) {
+        throw "Generated strings Lua is missing expected fragment: $fragment"
+    }
+}
+
 Write-Host "[6/20] Generating Lua and validating 2D geometry..."
 $geometryFixture = Join-Path $PSScriptRoot "fixtures/GeometrySmoke.w3js"
 $geometryBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $geometryFixture --target lua
