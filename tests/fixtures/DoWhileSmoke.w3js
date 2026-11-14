@@ -1,0 +1,12 @@
+namespace DoWhileSmoke
+{
+    void Run()
+    {
+        int value = 0;
+        do
+        {
+            value++;
+        }
+        while (value < 3);
+    }
+}
