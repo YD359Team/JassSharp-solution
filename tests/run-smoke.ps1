@@ -116,6 +116,31 @@ if ($LASTEXITCODE -ne 0) {
     throw "Frame standard-library check failed with exit code $LASTEXITCODE"
 }
 
+Write-Host "[5a] Building typed frame controls fixture..."
+$frameControlsFixture = Join-Path $PSScriptRoot "fixtures/FrameControlsSmoke.w3js"
+$frameControlsBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $frameControlsFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Frame controls fixture failed to compile: $($frameControlsBuildOutput -join [Environment]::NewLine)"
+}
+$frameControlsLuaPath = Join-Path $PSScriptRoot "fixtures/bin/FrameControlsSmoke.lua"
+if (-not (Test-Path $frameControlsLuaPath)) {
+    throw "Expected generated frame controls Lua file was not created: $frameControlsLuaPath"
+}
+$frameControlsLua = Get-Content -LiteralPath $frameControlsLuaPath -Raw
+foreach ($fragment in @(
+    '"CHECKBOX"',
+    '"POPUPMENU"',
+    '"MENU"',
+    'FRAMEEVENT_CHECKBOX_CHECKED',
+    'FRAMEEVENT_CHECKBOX_UNCHECKED',
+    'FRAMEEVENT_POPUPMENU_ITEM_CHANGED',
+    'function TextFrame:Subscribe'
+)) {
+    if (-not $frameControlsLua.Contains($fragment)) {
+        throw "Generated frame controls Lua is missing expected fragment: $fragment"
+    }
+}
+
 Write-Host "[6/20] Generating Lua and validating 2D geometry..."
 $geometryFixture = Join-Path $PSScriptRoot "fixtures/GeometrySmoke.w3js"
 $geometryBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $geometryFixture --target lua
