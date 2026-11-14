@@ -85,7 +85,7 @@ foreach (var pair in scores)
 - `ContainsKey(key)` checks for a key.
 - The indexer reads or replaces a value. Reading a missing key throws a runtime error; assigning a missing key creates an entry.
 - `Count` returns the number of entries.
-- `foreach` visits key/value pairs. Dictionary iteration order is unspecified.
+- `foreach` visits key/value pairs. Dictionary iteration order is unspecified. The inferred element type is `KeyValuePair<TKey, TValue>`; its `Key` and `Value` members are read-only. You can also declare that type explicitly in the loop variable. It is not directly constructible.
 
 JASS# currently has no `out` parameters, so `TryRemove` returns only a boolean; read the value through the indexer before removing it when it is needed.
 
