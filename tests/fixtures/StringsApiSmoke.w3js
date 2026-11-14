@@ -5,6 +5,8 @@ namespace StringsApiSmoke
     void Run()
     {
         string source = "AéBC";
+        int codePointLength = Strings.Length(source);
+        int propertyLength = source.Length;
         string middle = Strings.Substring(source, 1, 2);
         int first = Strings.IndexOf(source, "é");
         int last = Strings.LastIndexOf("one two one", "one");
