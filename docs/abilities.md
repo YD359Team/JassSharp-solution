@@ -38,12 +38,13 @@ The constructor accepts the owning `unit` and an integer ability rawcode. Use Wa
 | `RemainingCooldown()` | Reads the current remaining cooldown |
 | `StartCooldown(seconds)` / `EndCooldown()` | Starts or ends this ability's cooldown |
 | `ManaCost(level)` | Reads mana cost for a 1-based ability level |
+| `BooleanField(field)` / `SetBooleanField(field, value)` | Reads or writes a boolean ability field using `abilitybooleanfield` |
 | `IntegerField(field)` / `SetIntegerField(field, value)` | Reads or writes an integer ability field using `abilityintegerfield` |
 | `RealField(field)` / `SetRealField(field, value)` | Reads or writes a real ability field using `abilityrealfield` |
 | `StringField(field)` / `SetStringField(field, value)` | Reads or writes a string ability field using `abilitystringfield` |
 | `Handle()` | Returns the borrowed native `ability` handle for advanced native API calls |
 
-Cooldown duration is expressed in game seconds. Negative cooldown durations are clamped to zero. Level arguments to `Cooldown` and `ManaCost` are clamped to at least one.
+Cooldown duration is expressed in game seconds. Negative cooldown durations are clamped to zero. The level arguments to `Cooldown` and `ManaCost` use Warcraft III's zero-based indexing and are clamped to at least zero. This differs from `GetUnitAbilityLevel`, which reports the unit's ability level starting at one.
 
 ## Ownership and lifetime
 

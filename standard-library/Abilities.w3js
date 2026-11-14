@@ -64,7 +64,7 @@ namespace Abilities
 
         public float Cooldown(int level)
         {
-            if (level < 1) { level = 1; }
+            if (level < 0) { level = 0; }
             return BlzGetUnitAbilityCooldown(_owner, _rawcode, level);
         }
 
@@ -90,6 +90,16 @@ namespace Abilities
         }
 
         // Ability field access is typed by Warcraft III's field handle enums.
+        public bool BooleanField(abilitybooleanfield field)
+        {
+            return BlzGetAbilityBooleanField(Handle(), field);
+        }
+
+        public bool SetBooleanField(abilitybooleanfield field, bool value)
+        {
+            return BlzSetAbilityBooleanField(Handle(), field, value);
+        }
+
         // These methods forward to the native API; field validity is the caller's responsibility.
         public int IntegerField(abilityintegerfield field)
         {

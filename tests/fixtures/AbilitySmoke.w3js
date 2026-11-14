@@ -19,8 +19,11 @@ namespace AbilitySmoke
         firebolt.SetEnabled(false, false);
         firebolt.SetEnabled(true, false);
 
-        float cooldown = firebolt.Cooldown(1);
-        int manaCost = firebolt.ManaCost(1);
+        float cooldown = firebolt.Cooldown(0);
+        float nextLevelCooldown = firebolt.Cooldown(1);
+        int manaCost = firebolt.ManaCost(0);
+        int nextLevelManaCost = firebolt.ManaCost(1);
+        bool booleanField = firebolt.BooleanField(ABILITY_BF_HERO);
         firebolt.StartCooldown(2.5);
         float remaining = firebolt.RemainingCooldown();
         firebolt.EndCooldown();

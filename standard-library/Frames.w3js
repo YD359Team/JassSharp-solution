@@ -267,10 +267,10 @@ namespace Frames
             BlzTextAreaFrameSetAutoScroll(_handle, enabled);
         }
 
-        public void SetSpriteAnimation(int animation, int rarity)
+        public void SetSpriteAnimation(int animation, int flags)
         {
             if (_disposed) { return; }
-            BlzFrameSetSpriteAnimate(_handle, animation, rarity);
+            BlzFrameSetSpriteAnimate(_handle, animation, flags);
         }
 
         public void SetVertexColor(int color)
