@@ -4,7 +4,7 @@ JASS# supports ordinary string literals, raw multiline string literals and inter
 
 ## Ordinary strings
 
-Use double quotes. Escape sequences include `\n`, `\r`, `\t`, `\0`, `\\"` and `\\\\`.
+Use double quotes. Escape sequences include `\n`, `\r`, `\t`, `\0`, `\"` and `\\`.
 
 ```csharp
 string message = "First line\nSecond line";
