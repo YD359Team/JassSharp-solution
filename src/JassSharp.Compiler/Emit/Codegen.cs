@@ -10,6 +10,7 @@ public sealed class Codegen
     private readonly HashSet<string> _classes;
     private List<string> _lines = [];
     private int _indent;
+    private int _foreachCounter;
     private Dictionary<string, string> _locals = new(StringComparer.Ordinal);
     private string? _className;
     private bool _currentMethodIsStatic;
@@ -399,6 +400,7 @@ end
                     IfStmt i => $"{i.Cond.Line}:{i.Cond.Col}",
                     WhileStmt w => $"{w.Cond.Line}:{w.Cond.Col}",
                     ForStmt f => f.Init is VarStmt vs ? $"{vs.Line}:{vs.Col}" : "for",
+                    ForeachStmt f => $"{f.Line}:{f.Col}",
                     _ => "?"
                 };
                 var msg = $"[trace] {loc}";
@@ -486,6 +488,9 @@ end
                         Line("endloop");
                     }
                     break;
+                case ForeachStmt f:
+                    EmitForeach(f, trace);
+                    break;
                 case ForStmt f:
                     if (_lua)
                     {
@@ -510,6 +515,50 @@ end
                     break;
             }
         }
+    }
+
+    private void EmitForeach(ForeachStmt loop, bool trace)
+    {
+        string collectionType = InferType(loop.Collection) ?? throw new InvalidOperationException(
+            $"Не удалось определить тип коллекции foreach в строке {loop.Line}");
+        string collection = EmitExpr(loop.Collection);
+        var savedLocals = _locals;
+        _locals = new Dictionary<string, string>(savedLocals, StringComparer.Ordinal);
+
+        if (collectionType == "group")
+        {
+            _locals[loop.Name] = "unit";
+            Line($"ForGroup({collection}, function()");
+            _indent++;
+            Line($"local {loop.Name} = GetEnumUnit()");
+            EmitStmts(loop.Body, trace);
+            _indent--;
+            Line("end)");
+            _locals = savedLocals;
+            return;
+        }
+
+        string elementType;
+        if (collectionType.EndsWith("[]", StringComparison.Ordinal))
+            elementType = collectionType[..^2];
+        else if (collectionType == "List")
+            elementType = loop.Type == "var" ? "?" : loop.Type;
+        else
+            throw new NotSupportedException(
+                $"foreach does not support collection type '{collectionType}' (line {loop.Line})");
+
+        int id = ++_foreachCounter;
+        string collectionName = $"__foreachCollection{id}";
+        string indexName = $"__foreachIndex{id}";
+        Line($"local {collectionName} = {collection}");
+        Line($"for {indexName} = 1, #{collectionName} do");
+        _indent++;
+        _locals[loop.Name] = elementType;
+        Line($"local {loop.Name} = {collectionName}[{indexName}]");
+        EmitStmts(loop.Body, trace);
+        _indent--;
+        Line("end");
+        _locals = savedLocals;
     }
 
     private bool TryEmitInline(Expr e)
