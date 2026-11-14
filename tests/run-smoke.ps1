@@ -167,7 +167,7 @@ if (-not $warcraftLua.Contains("CreateGroup()") -or $warcraftLua.Contains("funct
     throw "Explicit Warcraft3 module did not compile to standalone Lua as expected."
 }
 
-Write-Host "[10/10] Verifying jagged array parsing, typing, and Lua indexing..."
+Write-Host "[10/12] Verifying jagged array parsing, typing, and Lua indexing..."
 $arrayFixture = Join-Path $PSScriptRoot "fixtures/ArrayTypesSmoke.w3js"
 $arrayBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $arrayFixture --target lua
 if ($LASTEXITCODE -ne 0) {
@@ -196,7 +196,7 @@ foreach ($fragment in $arrayFragments) {
     }
 }
 
-Write-Host "[11/11] Verifying incompatible array element types are rejected..."
+Write-Host "[11/12] Verifying incompatible array element types are rejected..."
 $arrayMismatchFixture = Join-Path $PSScriptRoot "fixtures/ArrayTypeMismatchSmoke.w3js"
 $arrayMismatchOutput = dotnet run --configuration Release --no-build --project $project -- check $arrayMismatchFixture 2>&1
 if ($LASTEXITCODE -eq 0) {
