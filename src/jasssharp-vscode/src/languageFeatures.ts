@@ -305,7 +305,9 @@ function readVariables(text: string, classes = readClasses(text), functions = re
         const name = match[2];
         const offset = (match.index ?? 0) + match[0].lastIndexOf(name);
         if (DECLARATION_STOPWORDS.has(type) || name === "this" || name === "true" || name === "false") continue;
-        if (!PRIMITIVE_TYPES.has(type.toLowerCase()) && !BUILTIN_TYPES.has(type.toLowerCase()) && !classNames.has(type) && !/^[A-Z]/.test(type)) continue;
+        if (!PRIMITIVE_TYPES.has(type.toLowerCase()) &&
+            !(hasWarcraft3Using(text) && BUILTIN_TYPES.has(type.toLowerCase())) &&
+            !classNames.has(type) && !/^[A-Z]/.test(type)) continue;
         result.push({ name, type, offset, isParameter: false });
     }
 
@@ -512,7 +514,8 @@ function inferExpressionType(expression: string, documentText: string, offset: n
 
     const segments = expr.split(".");
     let type = latestVariableType(segments[0], documentText, offset);
-    if (!type && (BUILTIN_TYPES.has(segments[0].toLowerCase()) || readClasses(documentText).some(c => c.name === segments[0])))
+    if (!type && ((hasWarcraft3Using(documentText) && BUILTIN_TYPES.has(segments[0].toLowerCase())) ||
+        readClasses(documentText).some(c => c.name === segments[0])))
         type = segments[0];
     if (!type && segments[0] === "this") type = getCurrentClass(documentText, offset)?.name;
     if (!type) {
@@ -522,7 +525,9 @@ function inferExpressionType(expression: string, documentText: string, offset: n
 
     for (let i = 1; i < segments.length && type; i++) {
         const memberName = segments[i].replace(/\(.*$/, "");
-        const nativeMember = MEMBERS.find(m => m.type === type && m.name === memberName);
+        const nativeMember = hasWarcraft3Using(documentText)
+            ? MEMBERS.find(m => m.type === type && m.name === memberName)
+            : undefined;
         if (nativeMember) {
             type = nativeMember.ret;
             continue;
