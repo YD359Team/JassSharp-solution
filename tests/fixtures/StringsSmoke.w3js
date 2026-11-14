@@ -1,0 +1,30 @@
+namespace StringsSmoke
+{
+    public void Interpolation()
+    {
+        int x = 2;
+        int y = 3;
+        int z = 4;
+        bool enabled = true;
+
+        string basic = $"Product: {x * y * z}";
+        string mixed = $"Result={x + y}; enabled={enabled}";
+        string escapedBraces = $"{{literal}} and {{{x}}}";
+        string multiline = """
+            First line
+            Second line
+            Third line
+            """;
+        string multilineInterpolated = $"""
+            Product: {x * y * z}
+            Enabled: {enabled}
+            Braces: {{literal}}
+            """;
+
+        Print(basic);
+        Print(mixed);
+        Print(escapedBraces);
+        Print(multiline);
+        Print(multilineInterpolated);
+    }
+}
