@@ -1,0 +1,36 @@
+namespace GroupSmoke
+{
+    using Groups;
+    using Warcraft3;
+
+    public void OnInit()
+    {
+        UnitGroup units = new UnitGroup();
+
+        bool added = units.Add(GetTriggerUnit());
+        int count = units.Count();
+        unit first = units.First();
+
+        units.ForEach(() =>
+        {
+            unit current = GetEnumUnit();
+            KillUnit(current);
+        });
+
+        bool removed = units.Remove(first);
+        units.Clear();
+
+        bool disposedBefore = units.IsDisposed();
+        units.Dispose();
+        bool disposedAfter = units.IsDisposed();
+
+        bool addAfterDispose = units.Add(first);
+        int countAfterDispose = units.Count();
+        units.Clear();
+        units.ForEach(() =>
+        {
+            KillUnit(GetEnumUnit());
+        });
+        units.Dispose();
+    }
+}

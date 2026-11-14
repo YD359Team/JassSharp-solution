@@ -1,0 +1,71 @@
+namespace Groups
+{
+    using Warcraft3;
+
+    // Owns one native Warcraft III group. Units in the group remain externally owned.
+    public class UnitGroup
+    {
+        private group _handle;
+        private bool _disposed;
+
+        public UnitGroup()
+        {
+            _handle = CreateGroup();
+            _disposed = false;
+        }
+
+        public bool IsDisposed()
+        {
+            return _disposed;
+        }
+
+        // Returns the native GroupAddUnit result.
+        public bool Add(unit value)
+        {
+            if (_disposed) { return false; }
+            return GroupAddUnit(_handle, value);
+        }
+
+        // Returns the native GroupRemoveUnit result.
+        public bool Remove(unit value)
+        {
+            if (_disposed) { return false; }
+            return GroupRemoveUnit(_handle, value);
+        }
+
+        public void Clear()
+        {
+            if (_disposed) { return; }
+            GroupClear(_handle);
+        }
+
+        public int Count()
+        {
+            if (_disposed) { return 0; }
+            return BlzGroupGetSize(_handle);
+        }
+
+        // Returns an arbitrary member; group ordering is not guaranteed.
+        public unit First()
+        {
+            if (_disposed) { return null; }
+            return FirstOfGroup(_handle);
+        }
+
+        // Executes callback once per member. Use GetEnumUnit() inside the callback.
+        public void ForEach(code callback)
+        {
+            if (_disposed) { return; }
+            ForGroup(_handle, callback);
+        }
+
+        ~UnitGroup()
+        {
+            if (!_disposed)
+            {
+                DestroyGroup(_handle);
+                _disposed = true;
+            }
+        }
+    }
+}
