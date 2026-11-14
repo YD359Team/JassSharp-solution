@@ -24,6 +24,8 @@ interface FunctionInfo {
     signature: string;
     offset: number;
     isMethod: boolean;
+    bodyStart?: number;
+    bodyEnd?: number;
 }
 
 interface VariableInfo {
@@ -31,6 +33,8 @@ interface VariableInfo {
     type: string;
     offset: number;
     isParameter: boolean;
+    scopeStart?: number;
+    scopeEnd?: number;
 }
 
 interface ClassInfo {
@@ -242,13 +246,18 @@ function readFunctions(text: string, classes = readClasses(text)): FunctionInfo[
         const nameOffset = start + match[0].lastIndexOf(name);
         const parameters = splitParameters(match[3]);
         const owner = classes.find(c => nameOffset >= c.bodyStart && nameOffset <= c.bodyEnd);
+        const signatureEnd = start + match[0].length;
+        const openingBrace = source.indexOf("{", signatureEnd);
+        const hasBody = openingBrace >= 0 && source.slice(signatureEnd, openingBrace).trim() === "";
         result.push({
             name,
             returnType,
             parameters,
             signature: `${returnType} ${name}(${parameters.join(", ")})`,
             offset: nameOffset,
-            isMethod: !!owner
+            isMethod: !!owner,
+            bodyStart: hasBody ? openingBrace + 1 : undefined,
+            bodyEnd: hasBody ? findMatchingBrace(text, openingBrace) : undefined
         });
     }
 
@@ -272,6 +281,7 @@ function readVariables(text: string, classes = readClasses(text), functions = re
 
     const parameterVariables: VariableInfo[] = [];
     for (const fn of functions) {
+        if (fn.bodyStart === undefined || fn.bodyEnd === undefined) continue;
         for (const parameter of fn.parameters) {
             const match = /^\s*([A-Za-z_]\w*)\s+([A-Za-z_]\w*)/.exec(parameter);
             if (!match) continue;
@@ -280,7 +290,25 @@ function readVariables(text: string, classes = readClasses(text), functions = re
             const parameterTextOffset = fnText.slice(paren + 1).indexOf(parameter);
             if (paren < 0 || parameterTextOffset < 0) continue;
             const paramOffset = fn.offset + paren + 1 + parameterTextOffset + parameter.indexOf(match[2]);
-            parameterVariables.push({ name: match[2], type: match[1], offset: paramOffset, isParameter: true });
+            parameterVariables.push({
+                name: match[2], type: match[1], offset: paramOffset, isParameter: true,
+                scopeStart: fn.bodyStart, scopeEnd: fn.bodyEnd
+            });
+        }
+    }
+
+    const parameterOffsets = new Set(parameterVariables.map(variable => variable.offset));
+    for (const variable of result) {
+        if (parameterOffsets.has(variable.offset)) continue;
+        const ownerFunction = functions.find(fn => fn.bodyStart !== undefined &&
+            fn.bodyEnd !== undefined && variable.offset >= fn.bodyStart && variable.offset <= fn.bodyEnd);
+        const ownerClass = classes.find(cls => variable.offset >= cls.bodyStart && variable.offset <= cls.bodyEnd);
+        if (ownerFunction) {
+            variable.scopeStart = ownerFunction.bodyStart;
+            variable.scopeEnd = ownerFunction.bodyEnd;
+        } else if (ownerClass) {
+            variable.scopeStart = ownerClass.bodyStart;
+            variable.scopeEnd = ownerClass.bodyEnd;
         }
     }
 
@@ -292,18 +320,23 @@ function readVariables(text: string, classes = readClasses(text), functions = re
         }))
         .sort((a, b) => a.offset - b.offset);
 
-    // Infer declarations in source order. A declaration below the current one must
-    // never participate in its initializer's type inference.
-    const priorDeclarations = [...result, ...parameterVariables].sort((a, b) => a.offset - b.offset);
-    const knownTypes = new Map<string, string>();
-    let declarationIndex = 0;
+    const priorDeclarations = [...result.filter(variable => !parameterOffsets.has(variable.offset)), ...parameterVariables]
+        .sort((a, b) => a.offset - b.offset);
 
     for (const declaration of varDeclarations) {
-        while (declarationIndex < priorDeclarations.length &&
-            priorDeclarations[declarationIndex].offset < declaration.offset) {
-            const prior = priorDeclarations[declarationIndex++];
-            knownTypes.set(prior.name, prior.type);
-        }
+        const ownerFunction = functions.find(fn => fn.bodyStart !== undefined &&
+            fn.bodyEnd !== undefined && declaration.offset >= fn.bodyStart && declaration.offset <= fn.bodyEnd);
+        const ownerClass = classes.find(cls => declaration.offset >= cls.bodyStart && declaration.offset <= cls.bodyEnd);
+        const scopeStart = ownerFunction?.bodyStart ?? ownerClass?.bodyStart;
+        const scopeEnd = ownerFunction?.bodyEnd ?? ownerClass?.bodyEnd;
+        const visibleDeclarations = priorDeclarations.filter(prior => {
+            if (prior.offset >= declaration.offset) return false;
+            if (prior.scopeStart === undefined) return true;
+            if (ownerFunction && prior.scopeStart === ownerFunction.bodyStart) return true;
+            return !!ownerClass && prior.scopeStart === ownerClass.bodyStart && prior.scopeEnd === ownerClass.bodyEnd;
+        });
+        const knownTypes = new Map<string, string>();
+        for (const prior of visibleDeclarations) knownTypes.set(prior.name, prior.type);
 
         const initializer = declaration.initializer;
         let inferred: string | undefined;
@@ -338,8 +371,10 @@ function readVariables(text: string, classes = readClasses(text), functions = re
         }
 
         if (inferred) {
-            result.push({ name: declaration.name, type: inferred, offset: declaration.offset, isParameter: false });
-            knownTypes.set(declaration.name, inferred);
+            result.push({
+                name: declaration.name, type: inferred, offset: declaration.offset, isParameter: false,
+                scopeStart, scopeEnd
+            });
         }
     }
 
