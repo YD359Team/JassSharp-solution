@@ -72,21 +72,21 @@ const KEYWORDS = new Set([
 ]);
 
 const PRIMITIVE_TYPES = new Set(["void", "int", "integer", "float", "real", "bool", "boolean", "string", "code"]);
-const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; type: string; kind: "Method" | "Property"; parameters: string[] }>> = {
+const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; ret: string; kind: "Method" | "Property"; parameters: string[] }>> = {
     Strings: [
-        { name: "Length", type: "int", kind: "Method", parameters: ["string value"] },
-        { name: "Substring", type: "string", kind: "Method", parameters: ["string value", "int startIndex", "int length"] },
-        { name: "Replace", type: "string", kind: "Method", parameters: ["string value", "string oldValue", "string newValue"] },
-        { name: "IndexOf", type: "int", kind: "Method", parameters: ["string value", "string searchValue"] },
-        { name: "LastIndexOf", type: "int", kind: "Method", parameters: ["string value", "string searchValue"] },
-        { name: "Contains", type: "bool", kind: "Method", parameters: ["string value", "string searchValue"] },
-        { name: "Trim", type: "string", kind: "Method", parameters: ["string value"] },
-        { name: "TrimStart", type: "string", kind: "Method", parameters: ["string value"] },
-        { name: "TrimEnd", type: "string", kind: "Method", parameters: ["string value"] },
-        { name: "ToLower", type: "string", kind: "Method", parameters: ["string value"] },
-        { name: "ToUpper", type: "string", kind: "Method", parameters: ["string value"] },
-        { name: "Split", type: "string[]", kind: "Method", parameters: ["string value", "string separator"] },
-        { name: "Join", type: "string", kind: "Method", parameters: ["string separator", "string[] values"] }
+        { name: "Length", ret: "int", kind: "Method", parameters: ["string value"] },
+        { name: "Substring", ret: "string", kind: "Method", parameters: ["string value", "int startIndex", "int length"] },
+        { name: "Replace", ret: "string", kind: "Method", parameters: ["string value", "string oldValue", "string newValue"] },
+        { name: "IndexOf", ret: "int", kind: "Method", parameters: ["string value", "string searchValue"] },
+        { name: "LastIndexOf", ret: "int", kind: "Method", parameters: ["string value", "string searchValue"] },
+        { name: "Contains", ret: "bool", kind: "Method", parameters: ["string value", "string searchValue"] },
+        { name: "Trim", ret: "string", kind: "Method", parameters: ["string value"] },
+        { name: "TrimStart", ret: "string", kind: "Method", parameters: ["string value"] },
+        { name: "TrimEnd", ret: "string", kind: "Method", parameters: ["string value"] },
+        { name: "ToLower", ret: "string", kind: "Method", parameters: ["string value"] },
+        { name: "ToUpper", ret: "string", kind: "Method", parameters: ["string value"] },
+        { name: "Split", ret: "string[]", kind: "Method", parameters: ["string value", "string separator"] },
+        { name: "Join", ret: "string", kind: "Method", parameters: ["string separator", "string[] values"] }
     ]
 };
 
@@ -555,7 +555,7 @@ function readClassMembers(text: string, classInfo: ClassInfo): Array<{ name: str
     for (const match of body.matchAll(destructor)) {
         const matchOffset = match.index ?? 0;
         if (depthAt[matchOffset] === 0 && match[1] === classInfo.name) {
-            result.push({ name: "Dispose", type: "void", kind: "Method", parameters: [] });
+            result.push({ name: "Dispose", ret: "void", kind: "Method", parameters: [] });
         }
     }
     const re = /\b(?:public\s+|private\s+|static\s+|const\s+)*([A-Za-z_]\w*)\s+([A-Za-z_]\w*)\s*(\(([^()]*)\))?/g;
