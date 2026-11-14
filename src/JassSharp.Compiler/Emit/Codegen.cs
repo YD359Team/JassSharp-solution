@@ -812,9 +812,7 @@ end
         BinaryExpr b => InferBinaryType(b),
         MemberExpr m => InferMemberType(m),
         CallExpr c => InferCallType(c),
-        IndexExpr ix when InferType(ix.Object) == "string" => "string",
-        IndexExpr ix when InferType(ix.Object) is { } arrayType &&
-            arrayType.EndsWith("[]", StringComparison.Ordinal) => arrayType[..^2],
+        IndexExpr ix => InferIndexType(ix),
         _ => null
     };
 
@@ -857,6 +855,21 @@ end
         if (leftType == "int" && rightType == "int")
             return "int";
 
+        return null;
+    }
+
+    private string? InferIndexType(IndexExpr expression)
+    {
+        string? indexedType = InferType(expression.Object);
+        if (indexedType == "string")
+            return "string";
+        if (indexedType is not null && indexedType.EndsWith("[]", StringComparison.Ordinal))
+            return indexedType[..^2];
+        if (indexedType is not null && TryGetGenericArguments(indexedType, out var collectionName, out var arguments))
+        {
+            if (collectionName == "List") return arguments[0];
+            if (collectionName == "Dictionary") return arguments[1];
+        }
         return null;
     }
 
