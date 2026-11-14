@@ -51,6 +51,19 @@ interface LexToken {
     end: number;
 }
 
+const BITWISE_OPERATORS = [
+    { token: "<<", detail: "Bitwise left shift (32-bit int)", documentation: "Shifts the 32-bit integer left; vacant low bits are filled with zeroes." },
+    { token: ">>", detail: "Logical right shift (32-bit int)", documentation: "Shifts the 32-bit integer right; vacant high bits are filled with zeroes." },
+    { token: "&", detail: "Bitwise AND (int, int)", documentation: "Returns one where both operand bits are one." },
+    { token: "^", detail: "Bitwise XOR (int, int)", documentation: "Returns one where operand bits differ. Compiles to Lua's native tilde operator." },
+    { token: "|", detail: "Bitwise OR (int, int)", documentation: "Returns one where at least one operand bit is one." },
+    { token: "<<=", detail: "Compound left shift assignment", documentation: "Equivalent to value = value << amount." },
+    { token: ">>=", detail: "Compound right shift assignment", documentation: "Equivalent to value = value >> amount." },
+    { token: "&=", detail: "Compound AND assignment", documentation: "Equivalent to value = value & mask." },
+    { token: "^=", detail: "Compound XOR assignment", documentation: "Equivalent to value = value ^ mask." },
+    { token: "|=", detail: "Compound OR assignment", documentation: "Equivalent to value = value | mask." }
+] as const;
+
 const KEYWORDS = new Set([
     "namespace", "using", "class", "enum", "const", "public", "private", "static",
     "void", "int", "integer", "float", "real", "bool", "boolean", "string", "code",
@@ -899,6 +912,9 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
                 for (const type of BUILTIN_TYPES)
                     addCompletion(items, seen, type, vscode.CompletionItemKind.Class, "Warcraft III handle / enum type", range, "06");
             }
+            for (const operator of BITWISE_OPERATORS)
+                addCompletion(items, seen, operator.token, vscode.CompletionItemKind.Operator,
+                    operator.detail, range, "08", new vscode.SnippetString(`${operator.token} $0`), operator.documentation);
             for (const keyword of KEYWORDS)
                 addCompletion(items, seen, keyword, vscode.CompletionItemKind.Keyword, "JASS# keyword", range, "09");
 
