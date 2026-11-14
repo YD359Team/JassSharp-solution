@@ -41,7 +41,7 @@ static class MapBuild
                 return Fail($"unsupported mode '{mode}'. Supported modes are 'wc3' and 'headless'.");
 
             if (mode == "headless")
-                return BuildHeadless(project, root, workRoot);
+                return BuildHeadless(project, root, workRoot, launch);
 
             string mapValue = root.GetProperty("map").GetString() ?? "map";
             string target = root.TryGetProperty("target", out JsonElement targetElement)
@@ -247,8 +247,15 @@ static class MapBuild
         }
     }
 
-    private static int BuildHeadless(string project, JsonElement root, string workRoot)
+    private static int BuildHeadless(string project, JsonElement root, string workRoot, bool launch)
     {
+        if (launch)
+            return Fail("headless mode only generates Lua and cannot run a Warcraft III map");
+
+        string target = GetString(root, "target")?.Trim().ToLowerInvariant() ?? "lua";
+        if (target != "lua")
+            return Fail($"unsupported target '{target}'. Headless mode supports only Lua.");
+
         string? entry = GetString(root, "entry");
         string? output = GetString(root, "output");
         string sourceDirectory = Path.Combine(project, "src");
