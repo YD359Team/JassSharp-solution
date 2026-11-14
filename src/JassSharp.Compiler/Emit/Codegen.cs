@@ -916,8 +916,16 @@ end
             var recv = EmitExpr(mem.Object);
             var args = c.Args.Select((a, i) => CodeArg(mem.Name, i, a)).ToList();
             if (prop?.Kind == MemberKind.Method) return Apply(prop.Read, recv, args);
-            if (mem.Object is NameExpr staticOwner && !_locals.ContainsKey(staticOwner.Name))
+
+            bool isDeclaredStaticMethod =
+                rt is not null &&
+                _methods.TryGetValue(rt + "." + mem.Name, out var declaredMethod) &&
+                declaredMethod.IsStatic;
+
+            if (isDeclaredStaticMethod ||
+                (mem.Object is NameExpr staticOwner && !_locals.ContainsKey(staticOwner.Name)))
                 return $"{recv}.{mem.Name}({string.Join(", ", args)})";
+
             if (_lua)
                 return $"{recv}:{mem.Name}({string.Join(", ", args)})";
             return $"{recv}.{mem.Name}({string.Join(", ", args)})";
