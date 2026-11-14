@@ -112,6 +112,72 @@ function __list_indexof(t, v)
     end
     return -1
 end
+
+function __queue_new()
+    return { _items = {}, _first = 1, _last = 0 }
+end
+function __queue_count(q)
+    return q._last - q._first + 1
+end
+function __queue_enqueue(q, value)
+    q._last = q._last + 1
+    q._items[q._last] = value
+end
+function __queue_dequeue(q)
+    if __queue_count(q) <= 0 then error("Queue is empty") end
+    local value = q._items[q._first]
+    q._items[q._first] = nil
+    q._first = q._first + 1
+    if q._first > q._last then q._first = 1; q._last = 0 end
+    return value
+end
+function __queue_peek(q)
+    if __queue_count(q) <= 0 then error("Queue is empty") end
+    return q._items[q._first]
+end
+
+function __stack_new()
+    return { _items = {} }
+end
+function __stack_push(s, value)
+    table.insert(s._items, value)
+end
+function __stack_pop(s)
+    if #s._items == 0 then error("Stack is empty") end
+    return table.remove(s._items)
+end
+function __stack_peek(s)
+    if #s._items == 0 then error("Stack is empty") end
+    return s._items[#s._items]
+end
+
+function __dictionary_new()
+    return { _items = {}, _count = 0 }
+end
+function __dictionary_add(d, key, value)
+    if key == nil then error("Dictionary key cannot be nil") end
+    if d._items[key] ~= nil then error("An item with the same key already exists") end
+    d._items[key] = value
+    d._count = d._count + 1
+end
+function __dictionary_remove(d, key)
+    if d._items[key] == nil then return false end
+    d._items[key] = nil
+    d._count = d._count - 1
+    return true
+end
+function __dictionary_tryadd(d, key, value)
+    if key == nil or d._items[key] ~= nil then return false end
+    d._items[key] = value
+    d._count = d._count + 1
+    return true
+end
+function __dictionary_tryremove(d, key)
+    return __dictionary_remove(d, key)
+end
+function __dictionary_containskey(d, key)
+    return d._items[key] ~= nil
+end
 ");
         }
         else
@@ -542,21 +608,51 @@ end
             return;
         }
 
-        string elementType;
+        int id = ++_foreachCounter;
+        string collectionName = $"__foreachCollection{id}";
+        string indexName = $"__foreachIndex{id}";
+        string valueName = $"__foreachValue{id}";
+        Line($"local {collectionName} = {collection}");
+
         if (collectionType.EndsWith("[]", StringComparison.Ordinal))
-            elementType = collectionType[..^2];
+        {
+            string elementType = collectionType[..^2];
+            Line($"for {indexName} = 1, #{collectionName} do");
+            _indent++;
+            _locals[loop.Name] = elementType;
+            Line($"local {loop.Name} = {collectionName}[{indexName}]");
+        }
+        else if (TryGetGenericArguments(collectionType, out var genericName, out var genericArgs) &&
+                 genericName is "List" or "Queue" or "Stack")
+        {
+            string elementType = genericArgs[0];
+            if (genericName == "Queue")
+                Line($"for {indexName} = {collectionName}._first, {collectionName}._last do");
+            else if (genericName == "Stack")
+                Line($"for {indexName} = #{collectionName}._items, 1, -1 do");
+            else
+                Line($"for {indexName} = 1, #{collectionName} do");
+            _indent++;
+            _locals[loop.Name] = elementType;
+            Line(genericName == "Queue"
+                ? $"local {loop.Name} = {collectionName}._items[{indexName}]"
+                : genericName == "Stack"
+                    ? $"local {loop.Name} = {collectionName}._items[{indexName}]"
+                    : $"local {loop.Name} = {collectionName}[{indexName}]");
+        }
+        else if (TryGetGenericArguments(collectionType, out genericName, out genericArgs) &&
+                 genericName == "Dictionary")
+        {
+            string pairType = $"KeyValuePair<{genericArgs[0]},{genericArgs[1]}>";
+            Line($"for {indexName}, {valueName} in pairs({collectionName}._items) do");
+            _indent++;
+            _locals[loop.Name] = pairType;
+            Line($"local {loop.Name} = {{ Key = {indexName}, Value = {valueName} }}");
+        }
         else
             throw new NotSupportedException(
                 $"foreach does not support collection type '{collectionType}' (line {loop.Line})");
 
-        int id = ++_foreachCounter;
-        string collectionName = $"__foreachCollection{id}";
-        string indexName = $"__foreachIndex{id}";
-        Line($"local {collectionName} = {collection}");
-        Line($"for {indexName} = 1, #{collectionName} do");
-        _indent++;
-        _locals[loop.Name] = elementType;
-        Line($"local {loop.Name} = {collectionName}[{indexName}]");
         EmitStmts(loop.Body, trace);
         _indent--;
         Line("end");
@@ -881,7 +977,10 @@ end
 
         NewExpr n when n.Type.EndsWith("[]", StringComparison.Ordinal) && _lua => "{}",
 
-        NewExpr n when n.Type == "List" && _lua => "{}",
+        NewExpr n when _lua && IsGenericType(n.Type, "List") => "{}",
+        NewExpr n when _lua && IsGenericType(n.Type, "Queue") => "__queue_new()",
+        NewExpr n when _lua && IsGenericType(n.Type, "Stack") => "__stack_new()",
+        NewExpr n when _lua && IsGenericType(n.Type, "Dictionary") => "__dictionary_new()",
 
         NewExpr n when NativeTable.Constructors.TryGetValue(n.Type, out var ctor) =>
             $"{ctor}({string.Join(", ", n.Args.Select(EmitExpr))})",
@@ -927,14 +1026,26 @@ end
 
     private string EmitMember(MemberExpr m)
     {
+        var receiverType = RecvType(m.Object);
+        var receiver = EmitExpr(m.Object);
+        if (m.Name == "Count" && receiverType is not null &&
+            TryGetGenericArguments(receiverType, out var collectionName, out _))
+        {
+            return collectionName switch
+            {
+                "Queue" => $"__queue_count({receiver})",
+                "Stack" => $"#{receiver}._items",
+                "Dictionary" => $"{receiver}._count",
+                "List" => $"#{receiver}",
+                _ => $"{receiver}.Count"
+            };
+        }
+
         if (m.Name == "Length")
         {
-            var expr = EmitExpr(m.Object);
-            var t = RecvType(m.Object);
-            if (t == "string")
-                return $"string.len({expr})";
-            // array / List
-            return $"#{expr}";
+            if (receiverType == "string")
+                return $"string.len({receiver})";
+            return $"#{receiver}";
         }
 
         // Built-in J.Units.XXX / J.Skills.XXX rawcode constants
@@ -966,18 +1077,47 @@ end
 
     private string EmitCall(CallExpr c)
     {
-        // List methods
-        if (c.Callee is MemberExpr listMem && RecvType(listMem.Object) == "List")
+        // Built-in generic collection operations.
+        if (c.Callee is MemberExpr collectionMember &&
+            RecvType(collectionMember.Object) is { } collectionType &&
+            TryGetGenericArguments(collectionType, out var collectionName, out _))
         {
-            var listRecv = EmitExpr(listMem.Object);
-            var listArgs = c.Args.Select(EmitExpr).ToList();
-            return listMem.Name switch
+            var collection = EmitExpr(collectionMember.Object);
+            var args = c.Args.Select(EmitExpr).ToList();
+            return collectionName switch
             {
-                "Add" => $"table.insert({listRecv}, {listArgs[0]})",
-                "Remove" => $"__list_remove({listRecv}, {listArgs[0]})",
-                "IndexOf" => $"__list_indexof({listRecv}, {listArgs[0]})",
-                "Clear" => $"for __i = #{listRecv}, 1, -1 do {listRecv}[__i] = nil end",
-                _ => throw new NotSupportedException($"List.{listMem.Name}")
+                "List" => collectionMember.Name switch
+                {
+                    "Add" => $"table.insert({collection}, {args[0]})",
+                    "Remove" => $"__list_remove({collection}, {args[0]})",
+                    "IndexOf" => $"__list_indexof({collection}, {args[0]})",
+                    "Clear" => $"for __i = #{collection}, 1, -1 do {collection}[__i] = nil end",
+                    _ => throw new NotSupportedException($"List.{collectionMember.Name}")
+                },
+                "Queue" => collectionMember.Name switch
+                {
+                    "Enqueue" => $"__queue_enqueue({collection}, {args[0]})",
+                    "Dequeue" => $"__queue_dequeue({collection})",
+                    "Peek" => $"__queue_peek({collection})",
+                    _ => throw new NotSupportedException($"Queue.{collectionMember.Name}")
+                },
+                "Stack" => collectionMember.Name switch
+                {
+                    "Push" => $"__stack_push({collection}, {args[0]})",
+                    "Pop" => $"__stack_pop({collection})",
+                    "Peek" => $"__stack_peek({collection})",
+                    _ => throw new NotSupportedException($"Stack.{collectionMember.Name}")
+                },
+                "Dictionary" => collectionMember.Name switch
+                {
+                    "Add" => $"__dictionary_add({collection}, {args[0]}, {args[1]})",
+                    "Remove" => $"__dictionary_remove({collection}, {args[0]})",
+                    "TryAdd" => $"__dictionary_tryadd({collection}, {args[0]}, {args[1]})",
+                    "TryRemove" => $"__dictionary_tryremove({collection}, {args[0]})",
+                    "ContainsKey" => $"__dictionary_containskey({collection}, {args[0]})",
+                    _ => throw new NotSupportedException($"Dictionary.{collectionMember.Name}")
+                },
+                _ => throw new NotSupportedException($"Collection {collectionName}")
             };
         }
 
@@ -1067,6 +1207,13 @@ end
             return $"string.sub({obj}, {idxStr} + 1, {idxStr} + 1)";
         }
 
+        // Dictionary keys are not zero-based sequence indices.
+        if (t is not null && IsGenericType(t, "Dictionary"))
+        {
+            var key = EmitExpr(ix.Index);
+            return $"{obj}._items[{key}]";
+        }
+
         // array / List
         if (ix.Index is FromEndExpr fe)
         {
@@ -1111,6 +1258,35 @@ end
         }
 
         return $"{tpl}({string.Join(", ", new[] { recv }.Concat(args))})";
+    }
+
+    private static bool IsGenericType(string type, string name) =>
+        TryGetGenericArguments(type, out var genericName, out _) && genericName == name;
+
+    private static bool TryGetGenericArguments(string type, out string genericName, out List<string> arguments)
+    {
+        genericName = string.Empty;
+        arguments = [];
+        int open = type.IndexOf('<');
+        if (open <= 0 || !type.EndsWith(">", StringComparison.Ordinal))
+            return false;
+
+        genericName = type[..open];
+        string content = type[(open + 1)..^1];
+        int depth = 0;
+        int start = 0;
+        for (int i = 0; i < content.Length; i++)
+        {
+            if (content[i] == '<') depth++;
+            else if (content[i] == '>') depth--;
+            else if (content[i] == ',' && depth == 0)
+            {
+                arguments.Add(content[start..i]);
+                start = i + 1;
+            }
+        }
+        arguments.Add(content[start..]);
+        return arguments.All(argument => argument.Length > 0);
     }
 
     private string Op(string op) => op switch
