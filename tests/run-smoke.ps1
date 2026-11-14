@@ -244,7 +244,7 @@ $destructorLuaPath = Join-Path $PSScriptRoot "fixtures/bin/DestructorSmoke.lua"
 $destructorLua = Get-Content -LiteralPath $destructorLuaPath -Raw
 if (-not $destructorLua.Contains("function TemporaryResource:Dispose()") -or
     -not $destructorLua.Contains("resource:Dispose()") -or
-    -not $destructorLua.Contains('print("resource released")')) {
+    -not $destructorLua.Contains('BJDebugMsg("resource released")')) {
     throw "Destructor was not emitted as a manually callable Dispose method."
 }
 if ($destructorLua.Contains("TemporaryResource.__gc") -or $destructorLua.Contains("newproxy")) {

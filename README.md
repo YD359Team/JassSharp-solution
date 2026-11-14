@@ -151,6 +151,10 @@ Smoke-сценарии компилятора запускаются из кор
 ```csharp
 public class TemporaryResource
 {
+    public TemporaryResource()
+    {
+    }
+
     ~TemporaryResource()
     {
         // Освобождение ресурсов Warcraft III
