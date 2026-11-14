@@ -14,7 +14,7 @@ namespace ForeachSmoke
     {
         foreach (var unit in units)
         {
-            unit.Kill();
+            KillUnit(unit);
         }
     }
 }
