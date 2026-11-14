@@ -413,6 +413,12 @@ public static class Checker
                     break;
 
                 case NewExpr creation:
+                    if (TryGetGenericArguments(creation.Type, out var constructedCollection, out _) &&
+                        constructedCollection is "List" or "Queue" or "Stack" or "Dictionary" or "KeyValuePair" &&
+                        creation.Args.Count != 0)
+                        Add(creation.Line, creation.Col, "error",
+                            $"{constructedCollection} does not accept constructor arguments");
+
                     if (!IsKnownType(creation.Type, allowVoid: false))
                     {
                         string baseType = StripArrayRanks(creation.Type);
