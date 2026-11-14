@@ -479,7 +479,7 @@ end
     {
         foreach (var s in ss)
         {
-            if (trace && s is not CondStmt)
+            if (trace)
             {
                 var loc = s switch
                 {
@@ -491,6 +491,8 @@ end
                     WhileStmt w => $"{w.Cond.Line}:{w.Cond.Col}",
                     ForStmt f => f.Init is VarStmt vs ? $"{vs.Line}:{vs.Col}" : "for",
                     ForeachStmt foreachLoop => $"{foreachLoop.Line}:{foreachLoop.Col}",
+                    DoWhileStmt loop => $"{loop.Line}:{loop.Col}",
+                    RawLuaStmt raw => $"{raw.Line}:{raw.Col}",
                     _ => "?"
                 };
                 var msg = $"[trace] {loc}";
@@ -500,14 +502,6 @@ end
             }
             switch (s)
             {
-                case CondStmt c:
-                    var match = (c.Target.Equals("LUA", StringComparison.OrdinalIgnoreCase) && _lua) ||
-                                (c.Target.Equals("VJASS", StringComparison.OrdinalIgnoreCase) && !_lua);
-                    if (match)
-                        EmitStmts(c.Then, trace);
-                    else if (c.Else is not null)
-                        EmitStmts(c.Else, trace);
-                    break;
                 case VarStmt v:
                     var inferredType = v.Type == "var" && v.Init is not null
                         ? InferType(v.Init) ?? throw new InvalidOperationException($"Не удалось вывести тип переменной {v.Name}")
@@ -560,23 +554,22 @@ end
                     Line(_lua ? "end" : "endif");
                     break;
                 case WhileStmt w:
-                    if (_lua)
-                    {
-                        Line($"while {EmitExpr(w.Cond)} do");
-                        _indent++;
-                        EmitStmts(w.Body, trace);
-                        _indent--;
-                        Line("end");
-                    }
-                    else
-                    {
-                        Line("loop");
-                        _indent++;
-                        Line($"exitwhen not ({EmitExpr(w.Cond)})");
-                        EmitStmts(w.Body, trace);
-                        _indent--;
-                        Line("endloop");
-                    }
+                    Line($"while {EmitExpr(w.Cond)} do");
+                    _indent++;
+                    EmitStmts(w.Body, trace);
+                    _indent--;
+                    Line("end");
+                    break;
+                case DoWhileStmt loop:
+                    Line("repeat");
+                    _indent++;
+                    EmitStmts(loop.Body, trace);
+                    _indent--;
+                    Line($"until not ({EmitExpr(loop.Cond)})");
+                    break;
+                case RawLuaStmt raw:
+                    foreach (var rawLine in raw.Code.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
+                        Line(rawLine);
                     break;
                 case ForeachStmt foreachLoop:
                     EmitForeach(foreachLoop, trace);
