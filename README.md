@@ -25,7 +25,7 @@ Lua — единственный backend JASS#. Условная компиля�
 - `standard-library` — исходники стандартной библиотеки, включая `Math`, `Strings` и обёртки над Warcraft III Frame API. Документация по строкам: `docs/strings.md`; по математике и векторам: `docs/operators-and-math.md`; по 2D-геометрии: `docs/geometry.md`; по таймерам Warcraft III: `docs/timers.md`; по группам юнитов: `docs/groups.md`; по способностям: `docs/abilities.md`; по Frame API: `docs/frames.md`.
 - `samples` — демонстрационные проекты.
 - `tests` — smoke fixtures и сценарии проверки компилятора.
-- `docs` — дополнительные заметки по языку, включая [строковые операции](docs/strings.md) и [встраивание Lua](docs/lua-interop.md).
+- `docs` — дополнительные заметки по языку, включая [строковые операции](docs/strings.md) и [встраивание Lua](docs/lua-interop.md). Поддерживаются циклы `while`, `do while`, `for` и `foreach`; Lua-specific блоки описаны в [Lua interop](docs/lua-interop.md).
 
 ## Сборка компилятора
 
