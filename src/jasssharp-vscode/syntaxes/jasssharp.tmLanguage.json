@@ -125,7 +125,7 @@
     },
     "type": {
       "name": "storage.type.jasssharp",
-      "match": "\\b(void|int|float|bool|string|List)\\b"
+      "match": "\\b(void|int|float|bool|string|List|Queue|Stack|Dictionary|KeyValuePair)\\b"
     },
     "constant": {
       "patterns": [
