@@ -782,7 +782,7 @@ end
     }
 
     private bool IsStringish(Expr e) =>
-        e is StrExpr or InterpolatedExpr ||
+        InferType(e) == "string" ||
         (e is BinaryExpr b && b.Op == "+" && (IsStringish(b.Left) || IsStringish(b.Right)));
 
     private string Concat(Expr left, Expr right)
