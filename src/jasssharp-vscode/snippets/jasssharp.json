@@ -397,5 +397,101 @@
       "$0"
     ],
     "description": "Нанести урон цели через UnitDamageTarget. Требуется using Warcraft3;"
+  },
+  "SpellClass": {
+    "prefix": [
+      "spellclass",
+      "spelltype",
+      "spell"
+    ],
+    "body": [
+      "public class ${1:Fireball}",
+      "{",
+      "    unit Caster;",
+      "    float Damage;",
+      "",
+      "    public ${1:Fireball}(unit caster)",
+      "    {",
+      "        this.Caster = caster;",
+      "        this.Damage = ${2:100.0};",
+      "    }",
+      "",
+      "    public void Cast(float targetX, float targetY)",
+      "    {",
+      "        $0",
+      "    }",
+      "}"
+    ],
+    "description": "Каркас класса способности с caster, damage, конструктором и методом Cast"
+  },
+  "SpellEffectHandler": {
+    "prefix": [
+      "spellhandler",
+      "spelloncast",
+      "onspell"
+    ],
+    "body": [
+      "void ${1:OnSpellEffect}()",
+      "{",
+      "    unit caster = GetTriggerUnit();",
+      "    if (GetSpellAbilityId() == ${2:FireballId})",
+      "    {",
+      "        ${3:Fireball} spell = new ${3:Fireball}(caster);",
+      "        spell.Cast(GetSpellTargetX(), GetSpellTargetY());",
+      "    }",
+      "}"
+    ],
+    "description": "Обработчик события применения способности с проверкой rawcode и вызовом spell-класса"
+  },
+  "SpellModule": {
+    "prefix": [
+      "spellmodule",
+      "spelltemplate",
+      "spellsystem"
+    ],
+    "body": [
+      "namespace ${1:MyMap}.Spells",
+      "{",
+      "    using Warcraft3;",
+      "",
+      "    const int ${2:FireballId} = '${3:A000}';",
+      "",
+      "    public class ${4:Fireball}",
+      "    {",
+      "        unit Caster;",
+      "        float Damage;",
+      "",
+      "        public ${4:Fireball}(unit caster)",
+      "        {",
+      "            this.Caster = caster;",
+      "            this.Damage = ${5:100.0};",
+      "        }",
+      "",
+      "        public void Cast(float targetX, float targetY)",
+      "        {",
+      "            effect sfx = AddSpecialEffect(${6:\"Abilities\\\\\\\\Spells\\\\\\\\Other\\\\\\\\Fireball\\\\\\\\Fireball.mdl\"}, targetX, targetY);",
+      "            DestroyEffect(sfx);",
+      "        }",
+      "    }",
+      "",
+      "    void ${7:OnSpellEffect}()",
+      "    {",
+      "        unit caster = GetTriggerUnit();",
+      "        if (GetSpellAbilityId() == ${2:FireballId})",
+      "        {",
+      "            ${4:Fireball} spell = new ${4:Fireball}(caster);",
+      "            spell.Cast(GetSpellTargetX(), GetSpellTargetY());",
+      "        }",
+      "    }",
+      "",
+      "    void OnInit()",
+      "    {",
+      "        trigger spellTrigger = CreateTrigger();",
+      "        TriggerRegisterPlayerUnitEvent(spellTrigger, Player(${8:0}), EVENT_PLAYER_UNIT_SPELL_EFFECT, null);",
+      "        TriggerAddAction(spellTrigger, ${7:OnSpellEffect});",
+      "    }",
+      "}"
+    ],
+    "description": "Полный модуль одной способности: rawcode, spell-класс, обработчик SPELL_EFFECT и регистрация триггера"
   }
 }

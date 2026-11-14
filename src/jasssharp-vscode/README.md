@@ -129,6 +129,9 @@ using Warcraft3;
 | `spelltrigger`, `spellcallback` | Регистрация события применения способности и callback |
 | `effectpoint`, `effectattach` | Special effects в точке и на объекте |
 | `unitdamage` | Нанесение урона через `UnitDamageTarget` |
+| `spellclass` | Класс способности с `Caster`, `Damage` и `Cast()` |
+| `spellhandler` | Обработчик применения способности с проверкой rawcode |
+| `spellmodule` | Полный модуль способности: класс, обработчик и регистрация события |
 | `debug`, `print` | Отладочный вывод |
 
 **Важно о точке входа:** префикс `main` вставляет `void OnInit()`, а не объявление `main()`. В режиме `wc3` компилятор сам генерирует Warcraft III-функции `config()` и `main()` и вызывает `OnInit()` из сгенерированной точки входа. Объявлять собственную функцию `main()` не нужно.
