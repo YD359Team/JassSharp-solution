@@ -97,7 +97,18 @@ public sealed class Codegen
                 EmitLuaEntry(hasInit);
 
             Line(@"
+local __collection_null = {}
+local function __collection_store(value)
+    if value == nil then return __collection_null end
+    return value
+end
+local function __collection_load(value)
+    if value == __collection_null then return nil end
+    return value
+end
+
 function __list_remove(t, v)
+    v = __collection_store(v)
     for i = 1, #t do
         if t[i] == v then
             table.remove(t, i)
@@ -107,6 +118,7 @@ function __list_remove(t, v)
     return false
 end
 function __list_indexof(t, v)
+    v = __collection_store(v)
     for i = 1, #t do
         if t[i] == v then return i - 1 end
     end
@@ -121,11 +133,11 @@ function __queue_count(q)
 end
 function __queue_enqueue(q, value)
     q._last = q._last + 1
-    q._items[q._last] = value
+    q._items[q._last] = __collection_store(value)
 end
 function __queue_dequeue(q)
     if __queue_count(q) <= 0 then error("Queue is empty") end
-    local value = q._items[q._first]
+    local value = __collection_load(q._items[q._first])
     q._items[q._first] = nil
     q._first = q._first + 1
     if q._first > q._last then q._first = 1; q._last = 0 end
@@ -133,22 +145,22 @@ function __queue_dequeue(q)
 end
 function __queue_peek(q)
     if __queue_count(q) <= 0 then error("Queue is empty") end
-    return q._items[q._first]
+    return __collection_load(q._items[q._first])
 end
 
 function __stack_new()
     return { _items = {} }
 end
 function __stack_push(s, value)
-    table.insert(s._items, value)
+    table.insert(s._items, __collection_store(value))
 end
 function __stack_pop(s)
     if #s._items == 0 then error("Stack is empty") end
-    return table.remove(s._items)
+    return __collection_load(table.remove(s._items))
 end
 function __stack_peek(s)
     if #s._items == 0 then error("Stack is empty") end
-    return s._items[#s._items]
+    return __collection_load(s._items[#s._items])
 end
 
 function __dictionary_new()
@@ -164,7 +176,7 @@ function __dictionary_add(d, key, value)
     if key == nil then error("Dictionary key cannot be nil") end
     if value == nil then error("Dictionary value cannot be nil") end
     if rawget(d._items, key) ~= nil then error("An item with the same key already exists") end
-    d._items[key] = value
+    d._items[key] = __collection_store(value)
     d._count = d._count + 1
 end
 function __dictionary_remove(d, key)
@@ -174,8 +186,8 @@ function __dictionary_remove(d, key)
     return true
 end
 function __dictionary_tryadd(d, key, value)
-    if key == nil or value == nil or rawget(d._items, key) ~= nil then return false end
-    d._items[key] = value
+    if key == nil or rawget(d._items, key) ~= nil then return false end
+    d._items[key] = __collection_store(value)
     d._count = d._count + 1
     return true
 end
@@ -184,9 +196,8 @@ function __dictionary_tryremove(d, key)
 end
 function __dictionary_set(d, key, value)
     if key == nil then error("Dictionary key cannot be nil") end
-    if value == nil then error("Dictionary value cannot be nil") end
     if rawget(d._items, key) == nil then d._count = d._count + 1 end
-    d._items[key] = value
+    d._items[key] = __collection_store(value)
 end
 function __dictionary_containskey(d, key)
     return rawget(d._items, key) ~= nil
@@ -633,7 +644,7 @@ end
             Line($"for {indexName} = 1, #{collectionName} do");
             _indent++;
             _locals[loop.Name] = elementType;
-            Line($"local {loop.Name} = {collectionName}[{indexName}]");
+            Line($"local {loop.Name} = __collection_load({collectionName}[{indexName}])");
         }
         else if (TryGetGenericArguments(collectionType, out var genericName, out var genericArgs) &&
                  genericName is "List" or "Queue" or "Stack")
@@ -648,10 +659,10 @@ end
             _indent++;
             _locals[loop.Name] = elementType;
             Line(genericName == "Queue"
-                ? $"local {loop.Name} = {collectionName}._items[{indexName}]"
+                ? $"local {loop.Name} = __collection_load({collectionName}._items[{indexName}])"
                 : genericName == "Stack"
-                    ? $"local {loop.Name} = {collectionName}._items[{indexName}]"
-                    : $"local {loop.Name} = {collectionName}[{indexName}]");
+                    ? $"local {loop.Name} = __collection_load({collectionName}._items[{indexName}])"
+                    : $"local {loop.Name} = __collection_load({collectionName}[{indexName}])");
         }
         else if (TryGetGenericArguments(collectionType, out genericName, out genericArgs) &&
                  genericName == "Dictionary")
@@ -1132,7 +1143,7 @@ end
             {
                 "List" => collectionMember.Name switch
                 {
-                    "Add" => $"table.insert({collection}, {args[0]})",
+                    "Add" => $"table.insert({collection}, __collection_store({args[0]}))",
                     "Remove" => $"__list_remove({collection}, {args[0]})",
                     "IndexOf" => $"__list_indexof({collection}, {args[0]})",
                     "Clear" => $"for __i = #{collection}, 1, -1 do {collection}[__i] = nil end",
@@ -1255,7 +1266,7 @@ end
         if (t is not null && IsGenericType(t, "Dictionary"))
         {
             var key = EmitExpr(ix.Index);
-            return $"{obj}._items[{key}]";
+            return $"__collection_load({obj}._items[{key}])";
         }
 
         // array / List
