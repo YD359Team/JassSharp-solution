@@ -78,6 +78,8 @@ const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; ret: string
     ],
     Color: [
         { name: "FromBytes", ret: "Color", kind: "Method", parameters: ["int red", "int green", "int blue", "int alpha"] },
+        { name: "FromRgb", ret: "Color", kind: "Method", parameters: ["int red", "int green", "int blue"] },
+        { name: "FromArgb", ret: "Color", kind: "Method", parameters: ["int argb"] },
         { name: "FromPercent", ret: "Color", kind: "Method", parameters: ["float red", "float green", "float blue", "float alpha"] },
         { name: "White", ret: "Color", kind: "Method", parameters: [] },
         { name: "Black", ret: "Color", kind: "Method", parameters: [] },
@@ -88,6 +90,8 @@ const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; ret: string
         { name: "ApplyPlayerColorToUnit", ret: "void", kind: "Method", parameters: ["unit target", "playercolor color"] },
         { name: "ApplyPlayerColorToItem", ret: "void", kind: "Method", parameters: ["item target", "playercolor color"] },
         { name: "ApplyPlayerColorToEffect", ret: "void", kind: "Method", parameters: ["effect target", "player owner"] },
+        { name: "WithAlpha", ret: "Color", kind: "Method", parameters: ["float alpha"] },
+        { name: "Lerp", ret: "Color", kind: "Method", parameters: ["Color other", "float amount"] },
         { name: "RedByte", ret: "int", kind: "Method", parameters: [] },
         { name: "GreenByte", ret: "int", kind: "Method", parameters: [] },
         { name: "BlueByte", ret: "int", kind: "Method", parameters: [] },
