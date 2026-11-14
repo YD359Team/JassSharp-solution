@@ -32,5 +32,6 @@
   </Folder>
   <Folder Name="/Элементы решения/">
     <File Path="build.bat" />
+    <File Path="README.md" />
   </Folder>
 </Solution>
