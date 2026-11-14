@@ -38,6 +38,7 @@ foreach ($fragment in @(
     "local shiftedLeft = (1 << 5)",
     "local shiftedRight = (32 >> 2)",
     "local allBits = (-1)",
+    "local deadBeef = (-559038737)",
     "local signBit = (-2147483647 - 1)",
     "local minValue = (-2147483647 - 1)",
     "local precedence = (1 | (2 ~ (3 & (4 << 1))))",
