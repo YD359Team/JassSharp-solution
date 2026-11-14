@@ -50,19 +50,14 @@ namespace Lightning
             return value.ApplyToLightning(_handle);
         }
 
-        // Explicitly releases the native lightning handle. Safe to call more than once.
-        public void Dispose()
+        // JASS# compiles this destructor into an explicit Dispose() method.
+        // Lua garbage collection does not invoke it automatically.
+        ~LightningEffect()
         {
             if (_disposed) { return; }
             DestroyLightning(_handle);
             _handle = null;
             _disposed = true;
-        }
-
-        // Destructors are explicit in JASS#; Lua garbage collection does not call this.
-        ~LightningEffect()
-        {
-            Dispose();
         }
     }
 }
