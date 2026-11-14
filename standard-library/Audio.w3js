@@ -1,0 +1,15 @@
+namespace Audio
+{
+    using Warcraft3;
+
+    public class AudioSettings
+    {
+        // Warcraft III thematic music volume uses the native 0..127 scale.
+        public static void SetThematicMusicVolume(int volume)
+        {
+            if (volume < 0) { volume = 0; }
+            if (volume > 127) { volume = 127; }
+            BlzSetThematicMusicAbsoluteVolume(volume);
+        }
+    }
+}
