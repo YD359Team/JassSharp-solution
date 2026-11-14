@@ -45,11 +45,35 @@ if ($invalidBuildExitCode -eq 0) {
 }
 
 Write-Host "[4/7] Verifying strict assignment compatibility..."
-$typeDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $typeFixture 2>&1
-$typeExitCode = $LASTEXITCODE
-$typeText = $typeDiagnostics -join "`n"
-if ($typeExitCode -eq 0 -or -not $typeText.Contains("несовместимое присваивание") -or -not $typeText.Contains("ожидался тип int, получен float")) {
-    throw "Strict assignment compatibility was not enforced. Exit code: $typeExitCode. Output: $typeText"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    # Native stderr can become a terminating PowerShell error under Stop.
+    $ErrorActionPreference = "Continue"
+    $typeDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $typeFixture 2>&1
+    $typeExitCode = $LASTEXITCODE
+    $typeText = $typeDiagnostics -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+
+# The compiler emits JSON with escaped Unicode. Parse it so assertions operate
+# on decoded diagnostic messages instead of their serialized representation.
+try {
+    $parsedTypeDiagnostics = ConvertFrom-Json -InputObject $typeText
+}
+catch {
+    throw "Could not parse type-safety diagnostics as JSON. Exit code: $typeExitCode. Output: $typeText"
+}
+
+$typeMessages = @($parsedTypeDiagnostics | ForEach-Object { $_.Message })
+$hasFloatToIntError = $typeMessages | Where-Object { $_ -like "*несовместимое присваивание: ожидался тип int, получен float*" }
+$hasBoolToIntError = $typeMessages | Where-Object { $_ -like "*несовместимое присваивание: ожидался тип int, получен bool*" }
+$hasVarReassignmentError = $typeMessages | Where-Object { $_ -like "*несовместимое присваивание: ожидался тип int, получен float*" }
+$hasVarInitializerError = $typeMessages | Where-Object { $_ -like "*переменная var missingInitializer должна иметь выражение инициализации*" }
+
+if ($typeExitCode -eq 0 -or -not $hasFloatToIntError -or -not $hasBoolToIntError -or -not $hasVarReassignmentError -or -not $hasVarInitializerError) {
+    throw "Strict assignment compatibility was not enforced with all expected diagnostics. Exit code: $typeExitCode. Output: $typeText"
 }
 
 Write-Host "[5/7] Checking the operator/Math fixture..."
