@@ -12,13 +12,13 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host "[2/4] Checking the operator/Math fixture..."
-dotnet run --no-build --project $project -- check $fixture
+dotnet run --configuration Release --no-build --project $project -- check $fixture
 if ($LASTEXITCODE -ne 0) {
     throw "Fixture check failed with exit code $LASTEXITCODE"
 }
 
 Write-Host "[3/4] Generating Lua..."
-dotnet run --no-build --project $project -- build $fixture
+dotnet run --configuration Release --no-build --project $project -- build $fixture
 if ($LASTEXITCODE -ne 0) {
     throw "Fixture build failed with exit code $LASTEXITCODE"
 }
