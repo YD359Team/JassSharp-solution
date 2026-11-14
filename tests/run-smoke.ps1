@@ -533,11 +533,30 @@ $frameFragments = @(
     "BlzFrameToPixelX(",
     "BlzFrameToPixelY(",
     "function Frame:Dispose()",
+    "BlzFrameClick(_handle)",
+        "BlzFrameSetText(_handle, value)",
+        "BlzFrameSetValue(_handle, value)",
+        "BlzFrameSetMinMaxValue(_handle, minimum, maximum)",
+        "BlzFrameSetFocus(_handle, value)",
+        "BlzTriggerRegisterFrameEvent(_trigger, frame, eventType)",
+        "TriggerAddAction(_trigger, callback)",
+        "TriggerRemoveAction(_trigger, _action)",
+        "DestroyTrigger(_trigger)",
+        "function FrameEventSubscription:Dispose()",
+        "function ButtonFrame:Dispose()",
+        "function TextFrame:Dispose()",
+        "function SliderFrame:Dispose()",
+        "function EditBoxFrame:Dispose()",
     "BlzDestroyFrame(self._handle)"
 )
 foreach ($fragment in $frameFragments) {
     if (-not $frameLua.Contains($fragment)) {
         throw "Generated frame Lua is missing expected fragment: $fragment"
+    }
+}
+foreach ($className in @("ButtonFrame", "TextFrame", "SliderFrame", "EditBoxFrame", "FrameEventSubscription")) {
+    if ($frameLua.Contains("function " + $className + ".__gc")) {
+        throw "$className must use explicit disposal and must not generate Lua garbage-collection finalizers."
     }
 }
 if ($frameLua.Contains("function Frame.__gc") -or $frameLua.Contains("newproxy")) {

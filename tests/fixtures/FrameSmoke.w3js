@@ -8,6 +8,41 @@ namespace FrameSmoke
         bool tocLoaded = Frame.LoadTOC("war3mapImported\\UI.toc");
 
         Frame root = Frame.FromOrigin(ORIGIN_FRAME_GAME_UI, 0);
+        ButtonFrame button = ButtonFrame.Create("JassSharpButton", root.Handle(), "ScriptDialogButton", 0);
+        button.SetText("Run");
+        button.SetEnabled(true);
+        bool buttonEnabled = button.IsEnabled();
+        FrameEventSubscription buttonClick = button.Subscribe(FRAMEEVENT_CONTROL_CLICK, () =>
+        {
+            string clickedText = FrameEvents.CurrentText();
+            framehandle clickedFrame = FrameEvents.CurrentFrame();
+        });
+
+        TextFrame label = TextFrame.Create("JassSharpLabel", root.Handle(), "", 0);
+        label.SetText("Status");
+        label.SetFont("Fonts\\FRIZQT__.TTF", 0.012, 0);
+        label.SetTextColor(0xFFFFFFFF);
+        label.SetTextAlignment(TEXT_JUSTIFY_MIDDLE, TEXT_JUSTIFY_CENTER);
+
+        SliderFrame slider = SliderFrame.Create("JassSharpSlider", root.Handle(), "", 0);
+        slider.SetRange(0.0, 100.0);
+        slider.SetStepSize(1.0);
+        slider.SetValue(25.0);
+        float sliderValue = slider.Value();
+        FrameEventSubscription sliderChanged = slider.Subscribe(FRAMEEVENT_SLIDER_VALUE_CHANGED, () =>
+        {
+            float changedValue = FrameEvents.CurrentValue();
+        });
+
+        EditBoxFrame editBox = EditBoxFrame.Create("JassSharpEditBox", root.Handle(), "", 0);
+        editBox.SetText("Player name");
+        editBox.SetTextSizeLimit(64);
+        editBox.SetFocus(false);
+        FrameEventSubscription editChanged = editBox.Subscribe(FRAMEEVENT_EDITBOX_TEXT_CHANGED, () =>
+        {
+            string editedText = FrameEvents.CurrentText();
+        });
+
         Frame panel = Frame.Create("Frame", root.Handle(), 0, 0);
         Frame simple = Frame.CreateSimple("SimpleFrame", root.Handle(), 0);
         Frame typed = Frame.CreateByType("BACKDROP", "JassSharpBackdrop", root.Handle(), "", 0);
@@ -80,6 +115,13 @@ namespace FrameSmoke
         panel.Dispose();
 
         // Borrowed wrappers may be disposed without destroying the game-owned frames.
+        buttonClick.Dispose();
+        sliderChanged.Dispose();
+        editChanged.Dispose();
+        button.Dispose();
+        label.Dispose();
+        slider.Dispose();
+        editBox.Dispose();
         root.Dispose();
         named.Dispose();
         simple.Dispose();

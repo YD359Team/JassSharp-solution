@@ -61,16 +61,52 @@ The public constructor `Frame(framehandle, ownsHandle)` is intended for advanced
 
 `Handle()`, `Parent()`, and `Child(index)` return borrowed native handles. They do not transfer ownership. `Child(index)` uses the native zero-based child index and returns null for a negative or out-of-range index.
 
+## Typed controls
+
+The generic `Frame` wrapper exposes the complete low-level API. The following wrappers provide smaller APIs for common frame types:
+
+| Wrapper | Native type | Main operations |
+|---|---|---|
+| `ButtonFrame` | `BUTTON` | Text, enabled/visible state, click, events |
+| `TextFrame` | `TEXT` | Text, font, color, alignment, size |
+| `SliderFrame` | `SLIDER` | Value, range, step size, events |
+| `EditBoxFrame` | `EDITBOX` | Text, focus, text-size limit, events |
+
+Each `Create` factory creates an owned frame. The public constructor accepts a native handle and an explicit ownership flag for interop. Do not create multiple owning wrappers for the same handle. As with `Frame`, call `Dispose()` explicitly; there is no Lua-GC finalization.
+
+Example:
+
+```csharp
+ButtonFrame button = ButtonFrame.Create(
+    "MyButton",
+    parent,
+    "ScriptDialogButton",
+    0);
+
+button.SetText("Apply");
+FrameEventSubscription click = button.Subscribe(
+    FRAMEEVENT_CONTROL_CLICK,
+    () =>
+    {
+        // Read frame-event context here.
+        framehandle source = FrameEvents.CurrentFrame();
+    });
+
+// Release the event subscription before destroying its UI.
+click.Dispose();
+button.Dispose();
+```
+
 ## Events
 
-Register a native frame event on a trigger, then configure the trigger's actions as usual:
+For low-level integration, register a native frame event on a trigger, then configure the trigger's actions as usual. For a self-contained subscription, use `Frame.Subscribe` or a typed wrapper's `Subscribe` method. It creates and owns a trigger and trigger action, invoking the supplied `code` callback for the event:
 
 ```csharp
 trigger clickTrigger = CreateTrigger();
 event click = panel.RegisterEvent(clickTrigger, FRAMEEVENT_CONTROL_CLICK);
 ```
 
-Inside the trigger action, read the current event context through `FrameEvents.CurrentFrame()`, `CurrentEvent()`, `CurrentValue()`, and `CurrentText()`. These values are meaningful while handling the corresponding frame event; do not cache them as a substitute for event-specific state.
+Inside the trigger action or subscription callback, read the current event context through `FrameEvents.CurrentFrame()`, `CurrentEvent()`, `CurrentValue()`, and `CurrentText()`. These values are meaningful while handling the corresponding frame event; do not cache them as a substitute for event-specific state.
 
 ## Coordinate conversion
 
@@ -80,7 +116,7 @@ Inside the trigger action, read the current event context through `FrameEvents.C
 
 Each wrapper tracks whether it owns its native handle. `Dispose()` destroys the native frame only for owning wrappers. For borrowed wrappers it merely marks that wrapper as disposed. Disposal is idempotent; methods called after disposal become no-ops or return neutral values. The destructor is manual and is not invoked by Lua garbage collection.
 
-Destroying a parent frame may invalidate child handles. Do not continue using wrappers for descendants after their native parent has been destroyed. Likewise, do not destroy a handle through both an owning wrapper and a direct native call.
+Destroying a parent frame may invalidate child handles. Dispose event subscriptions before destroying their associated frames so no trigger action remains registered for a UI object that no longer exists. Do not continue using wrappers for descendants after their native parent has been destroyed. Likewise, do not destroy a handle through both an owning wrapper and a direct native call.
 
 Frame UI is client-local. Create and mutate frames only in the appropriate local-player context (normally guarded by `GetLocalPlayer() == GetTriggerPlayer()` or the corresponding local UI condition). Do not put gameplay state changes inside a local-only UI branch: that can desynchronize the game simulation.
 
