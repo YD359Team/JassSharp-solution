@@ -591,7 +591,7 @@ function areEditorTypesCompatible(actual: string, expected: string): boolean {
 }
 
 function hasWarcraft3Using(text: string): boolean {
-    return /\\busing\\s+Warcraft3\\s*;?/i.test(text);
+    return /\busing\s+Warcraft3\s*;?/i.test(text);
 }
 
 function nativeReturnType(name: string, sourceText?: string): string | undefined {
