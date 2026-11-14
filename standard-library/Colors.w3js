@@ -1,0 +1,172 @@
+namespace Colors
+{
+    using Warcraft3;
+
+    // Canonical Color channels are normalized floats in [0, 1].
+    // Warcraft natives use several incompatible representations; conversion is explicit.
+
+    public class Color
+    {
+        public float R;
+        public float G;
+        public float B;
+        public float A;
+
+        public Color(float red, float green, float blue, float alpha)
+        {
+            this.R = Color.Clamp01(red);
+            this.G = Color.Clamp01(green);
+            this.B = Color.Clamp01(blue);
+            this.A = Color.Clamp01(alpha);
+        }
+
+        private static float Clamp01(float value)
+        {
+            if (value < 0.0) { return 0.0; }
+            if (value > 1.0) { return 1.0; }
+            return value;
+        }
+
+        private static int ClampByte(int value)
+        {
+            if (value < 0) { return 0; }
+            if (value > 255) { return 255; }
+            return value;
+        }
+
+        private static int ToByte(float value)
+        {
+            return R2I(Color.Clamp01(value) * 255.0 + 0.5);
+        }
+
+        private static string HexDigit(int value)
+        {
+            return string.sub("0123456789ABCDEF", value + 1, value + 1);
+        }
+
+        private static string HexByte(int value)
+        {
+            int high = R2I(value / 16.0);
+            int low = value - high * 16;
+            return Color.HexDigit(high) + Color.HexDigit(low);
+        }
+
+        public static Color FromBytes(int red, int green, int blue, int alpha)
+        {
+            return new Color(
+                Color.ClampByte(red) / 255.0,
+                Color.ClampByte(green) / 255.0,
+                Color.ClampByte(blue) / 255.0,
+                Color.ClampByte(alpha) / 255.0);
+        }
+
+        // Percent channels are in the inclusive range 0..100.
+        public static Color FromPercent(float red, float green, float blue, float alpha)
+        {
+            return new Color(red / 100.0, green / 100.0, blue / 100.0, alpha / 100.0);
+        }
+
+        public static Color White()
+        {
+            return new Color(1.0, 1.0, 1.0, 1.0);
+        }
+
+        public static Color Black()
+        {
+            return new Color(0.0, 0.0, 0.0, 1.0);
+        }
+
+        public static Color Red()
+        {
+            return new Color(1.0, 0.0, 0.0, 1.0);
+        }
+
+        public static Color Green()
+        {
+            return new Color(0.0, 1.0, 0.0, 1.0);
+        }
+
+        public static Color Blue()
+        {
+            return new Color(0.0, 0.0, 1.0, 1.0);
+        }
+
+        public static Color Transparent()
+        {
+            return new Color(0.0, 0.0, 0.0, 0.0);
+        }
+
+        public int RedByte() { return Color.ToByte(R); }
+        public int GreenByte() { return Color.ToByte(G); }
+        public int BlueByte() { return Color.ToByte(B); }
+        public int AlphaByte() { return Color.ToByte(A); }
+
+        // Warcraft frame color integers use 0xAARRGGBB.
+        public int ToArgb()
+        {
+            return (AlphaByte() << 24) | (RedByte() << 16) | (GreenByte() << 8) | BlueByte();
+        }
+
+        // Warcraft in-game text markup uses |cAARRGGBB...|r.
+        public string ToMarkup()
+        {
+            return "|c" + Color.HexByte(AlphaByte()) + Color.HexByte(RedByte()) +
+                Color.HexByte(GreenByte()) + Color.HexByte(BlueByte());
+        }
+
+        public string WrapText(string value)
+        {
+            return ToMarkup() + value + "|r";
+        }
+
+        public void ApplyToUnitVertexColor(unit target)
+        {
+            SetUnitVertexColor(target, RedByte(), GreenByte(), BlueByte(), AlphaByte());
+        }
+
+        public void ApplyToEffect(effect target)
+        {
+            BlzSetSpecialEffectColor(target, RedByte(), GreenByte(), BlueByte());
+            BlzSetSpecialEffectAlpha(target, AlphaByte());
+        }
+
+        // Lightning natives expect normalized real channels, not 0..255 integers.
+        public bool ApplyToLightning(lightning target)
+        {
+            return SetLightningColor(target, R, G, B, A);
+        }
+
+        // Text tags expect integer channels in the range 0..255.
+        public void ApplyToTextTag(texttag target)
+        {
+            SetTextTagColor(target, RedByte(), GreenByte(), BlueByte(), AlphaByte());
+        }
+
+        // Frame text and vertex color natives expect packed 0xAARRGGBB.
+        public void ApplyToFrameText(framehandle target)
+        {
+            BlzFrameSetTextColor(target, ToArgb());
+        }
+
+        public void ApplyToFrameVertex(framehandle target)
+        {
+            BlzFrameSetVertexColor(target, ToArgb());
+        }
+
+        // Warcraft playercolor is a distinct handle type, not an RGB tuple.
+        public static void ApplyPlayerColorToUnit(unit target, playercolor color)
+        {
+            SetUnitColor(target, color);
+        }
+
+        public static void ApplyPlayerColorToItem(item target, playercolor color)
+        {
+            BlzSetItemColor(target, color);
+        }
+
+        public static void ApplyPlayerColorToEffect(effect target, player owner)
+        {
+            BlzSetSpecialEffectColorByPlayer(target, owner);
+        }
+    }
+}
