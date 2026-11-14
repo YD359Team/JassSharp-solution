@@ -87,7 +87,7 @@ public sealed class Lexer(string source)
                 continue;
             }
             var two = _i + 1 < source.Length ? source.Substring(_i, 2) : "";
-            if (two is "==" or "!=" or "<=" or ">=" or "&&" or "||" or "+=" or "-=" or "*=" or "/=" or "%=" or "++" or "--" or "=>" or "<<" or ">>" or "&=" or "|=" or "^=" or "<<=" or ">>=")
+            if (two is "==" or "!=" or "<=" or ">=" or "&&" or "||" or "+=" or "-=" or "*=" or "/=" or "%=" or "++" or "--" or "=>" or "<<" or ">>" or "&=" or "|=" or "^=")
             {
                 if ((two is "<<" or ">>") && Peek(2) == '=')
                 {
@@ -134,7 +134,9 @@ public sealed class Lexer(string source)
             builder.Append(source[_i]);
             Advance();
         }
-        if (_i < source.Length) Advance();
+        if (_i >= source.Length)
+            throw new ParseException("незакрытый rawcode-литерал", _line, _col);
+        Advance();
         return builder.ToString();
     }
 
@@ -143,6 +145,8 @@ public sealed class Lexer(string source)
         var builder = new StringBuilder();
         while (_i < source.Length && source[_i] != '"')
         {
+            if (source[_i] is '\n' or '\r')
+                throw new ParseException("обычная строка не может содержать перевод строки; используйте raw-строку в тройных кавычках", _line, _col);
             if (source[_i] == '\\' && _i + 1 < source.Length)
             {
                 Advance();
@@ -165,7 +169,9 @@ public sealed class Lexer(string source)
                 Advance();
             }
         }
-        if (_i < source.Length) Advance();
+        if (_i >= source.Length)
+            throw new ParseException("незакрытая строка", _line, _col);
+        Advance();
         return builder.ToString();
     }
 
@@ -174,8 +180,10 @@ public sealed class Lexer(string source)
         var start = _i;
         while (_i < source.Length && !(source[_i] == '"' && Peek(1) == '"' && Peek(2) == '"'))
             Advance();
+        if (_i >= source.Length)
+            throw new ParseException("незакрытая raw-строка", _line, _col);
         var value = source[start.._i];
-        if (_i < source.Length) { Advance(); Advance(); Advance(); }
+        Advance(); Advance(); Advance();
         return TrimRawIndentation(value);
     }
 
