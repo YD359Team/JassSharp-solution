@@ -2,6 +2,7 @@ namespace BitwiseSmoke
 {
     public void OnInit()
     {
+        int abc = 0xABC;
         int flags = 0x0000000F;
         int mask = 0x00000003;
         int combined = flags | mask;
