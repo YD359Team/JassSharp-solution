@@ -203,26 +203,6 @@ function __dictionary_containskey(d, key)
 end
 ");
         }
-        else
-        {
-            Line($"library {unit.Name}{(hasInit ? " initializer OnInit" : "")}");
-            if (unit.Consts.Count > 0 || unit.Fields.Count > 0)
-            {
-                Line("globals");
-                _indent = 1;
-                foreach (var c in unit.Consts)
-                    Line($"constant {MapType(c.Type)} {c.Name} = {EmitExpr(c.Value)}");
-                foreach (var en in unit.Enums) EmitEnum(en);
-                foreach (var f in unit.Fields)
-                    Line(f.IsArray ? $"{MapType(f.Type)} array {f.Name}" : $"{MapType(f.Type)} {f.Name}");
-                _indent = 0;
-                Line("endglobals");
-                Line("");
-            }
-            foreach (var cls in unit.Classes) EmitClassVj(cls);
-            foreach (var fn in unit.Functions) EmitFnVj(fn, method: false);
-            Line("endlibrary");
-        }
         return string.Join("\n", _lines) + "\n";
     }
 
@@ -247,31 +227,6 @@ end
         }
 
         Line("end");
-    }
-
-    private void EmitClassVj(ClassDecl cls)
-    {
-        _className = cls.Name;
-        Line($"struct {cls.Name}");
-        _indent++;
-        foreach (var f in cls.Fields) Line($"{MapType(f.Type)} {f.Name}");
-        if (cls.Ctor is not null)
-        {
-            _currentMethodIsStatic = false;
-            _locals = cls.Ctor.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
-            Line($"static method create takes {Params(cls.Ctor)} returns {cls.Name}");
-            _indent++;
-            Line($"local {cls.Name} this = {cls.Name}.allocate()");
-            EmitStmts(cls.Ctor.Body.Where(s => s is not ReturnStmt).ToList());
-            Line("return this");
-            _indent--;
-            Line("endmethod");
-        }
-        foreach (var m in cls.Methods) EmitFnVj(m, method: true);
-        _indent--;
-        Line("endstruct");
-        Line("");
-        _className = null;
     }
 
     private void EmitClassLua(ClassDecl cls)
@@ -437,18 +392,6 @@ end
             Line("endfunction");
         }
         Line("");
-    }
-
-    private void EmitFnVj(FnDecl fn, bool method)
-    {
-        _locals = fn.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
-        var ps = Params(fn);
-        if (method) Line($"method {fn.Name} takes {ps} returns {MapType(fn.ReturnType)}");
-        else Line($"function {fn.Name} takes {ps} returns {MapType(fn.ReturnType)}");
-        _indent++;
-        EmitStmts(fn.Body, fn.Attributes?.Contains("Trace") == true);
-        _indent--;
-        Line(method ? "endmethod" : "endfunction");
     }
 
     private string? _namespaceName;
