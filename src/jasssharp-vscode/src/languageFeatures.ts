@@ -291,6 +291,31 @@ function findInnermostBlockScope(
         }
     }
 
+    const forPattern = /\\bfor\\s*\\(/g;
+    for (const match of source.matchAll(forPattern)) {
+        const loopStart = bodyStart + (match.index ?? 0);
+        const openParen = loopStart + match[0].lastIndexOf("(");
+        let depth = 0;
+        let closeParen = -1;
+        for (let i = openParen; i < source.length; i++) {
+            if (source[i] === "(") depth++;
+            else if (source[i] === ")" && --depth === 0) {
+                closeParen = bodyStart + i;
+                break;
+            }
+        }
+        if (closeParen < 0 || offset < loopStart || offset > closeParen) continue;
+
+        const blockOpen = source.indexOf("{", closeParen - bodyStart);
+        if (blockOpen < 0) continue;
+        const absoluteBlockOpen = bodyStart + blockOpen;
+        const blockClose = findMatchingBrace(text, absoluteBlockOpen);
+        if (blockClose < 0) continue;
+
+        if (blockClose - loopStart < best.end - best.start)
+            best = { start: loopStart, end: blockClose - 1 };
+    }
+
     return best;
 }
 
