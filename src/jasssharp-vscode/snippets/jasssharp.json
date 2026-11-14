@@ -7,27 +7,149 @@
       "    $0",
       "}"
     ],
-    "description": "Создать namespace"
+    "description": "Создать пространство имён"
+  },
+  "WarcraftNamespace": {
+    "prefix": [
+      "wc3namespace",
+      "namespacewc3"
+    ],
+    "body": [
+      "namespace ${1:MyMap}",
+      "{",
+      "    using Warcraft3;",
+      "",
+      "    $0",
+      "}"
+    ],
+    "description": "Пространство имён с подключённым API Warcraft III"
   },
   "Class": {
     "prefix": "class",
     "body": [
-      "class ${1:Name}",
+      "public class ${1:MyClass}",
       "{",
       "    $0",
       "}"
     ],
-    "description": "Создать класс"
+    "description": "Объявить класс"
+  },
+  "ClassWithConstructor": {
+    "prefix": [
+      "classctor",
+      "classfull"
+    ],
+    "body": [
+      "public class ${1:MyClass}",
+      "{",
+      "    public ${1:MyClass}(${2})",
+      "    {",
+      "        $0",
+      "    }",
+      "}"
+    ],
+    "description": "Объявить класс с конструктором"
+  },
+  "Constructor": {
+    "prefix": [
+      "ctor",
+      "constructor"
+    ],
+    "body": [
+      "public ${1:MyClass}(${2})",
+      "{",
+      "    $0",
+      "}"
+    ],
+    "description": "Конструктор класса"
+  },
+  "Destructor": {
+    "prefix": [
+      "dtor",
+      "destructor"
+    ],
+    "body": [
+      "~${1:MyClass}()",
+      "{",
+      "    $0",
+      "}"
+    ],
+    "description": "Ручной деструктор, вызываемый через Dispose()"
+  },
+  "Method": {
+    "prefix": [
+      "method",
+      "func",
+      "function"
+    ],
+    "body": [
+      "public ${1:void} ${2:MethodName}(${3})",
+      "{",
+      "    $0",
+      "}"
+    ],
+    "description": "Объявить метод экземпляра"
+  },
+  "StaticMethod": {
+    "prefix": [
+      "staticmethod",
+      "staticmethod"
+    ],
+    "body": [
+      "public static ${1:void} ${2:MethodName}(${3})",
+      "{",
+      "    $0",
+      "}"
+    ],
+    "description": "Объявить статический метод"
   },
   "Function": {
-    "prefix": "function",
+    "prefix": [
+      "function",
+      "fn"
+    ],
     "body": [
-      "${1:void} ${2:Name}(${3})",
+      "${1:void} ${2:FunctionName}(${3})",
       "{",
       "    $0",
       "}"
     ],
-    "description": "Объявить функцию или метод"
+    "description": "Объявить функцию в namespace"
+  },
+  "WarcraftEntryPoint": {
+    "prefix": [
+      "main",
+      "entry",
+      "oninit"
+    ],
+    "body": [
+      "void OnInit()",
+      "{",
+      "    $0",
+      "}"
+    ],
+    "description": "Точка входа пользовательской логики Warcraft III. Компилятор сам генерирует config() и main()."
+  },
+  "Enum": {
+    "prefix": "enum",
+    "body": [
+      "public enum ${1:MyEnum}",
+      "{",
+      "    ${2:First},",
+      "    ${3:Second}",
+      "}"
+    ],
+    "description": "Объявить перечисление"
+  },
+  "UsingWarcraft3": {
+    "prefix": [
+      "usingwc3",
+      "warcraft3"
+    ],
+    "body": [
+      "using Warcraft3;"
+    ],
+    "description": "Подключить модуль API Warcraft III"
   },
   "If": {
     "prefix": "if",
@@ -40,7 +162,10 @@
     "description": "Условный блок"
   },
   "IfElse": {
-    "prefix": "ife",
+    "prefix": [
+      "ife",
+      "ifelse"
+    ],
     "body": [
       "if (${1:condition})",
       "{",
@@ -71,31 +196,62 @@
       "    $0",
       "}"
     ],
-    "description": "Цикл for"
+    "description": "Индексный цикл"
   },
-  "OnInit": {
-    "prefix": "oninit",
+  "Foreach": {
+    "prefix": [
+      "foreach",
+      "forEach"
+    ],
     "body": [
-      "void OnInit()",
+      "foreach (var ${1:item} in ${2:items})",
       "{",
       "    $0",
       "}"
     ],
-    "description": "Точка входа OnInit"
+    "description": "Обход массива или Warcraft III group"
+  },
+  "JaggedArray": {
+    "prefix": [
+      "jagged",
+      "array2d"
+    ],
+    "body": [
+      "${1:int}[][] ${2:matrix} = new ${1:int}[][];",
+      "$0"
+    ],
+    "description": "Объявить массив массивов"
   },
   "Trigger": {
     "prefix": "trigger",
     "body": [
       "trigger ${1:t} = new trigger();",
       "${1:t}.RegisterAnyUnitEvent(${2:EVENT_PLAYER_UNIT_SPELL_EFFECT});",
-      "${1:t}.AddAction(${3:OnAction});"
+      "${1:t}.AddAction(${3:OnAction});$0"
     ],
-    "description": "Создать триггер и зарегистрировать обработчик"
+    "description": "Создать Warcraft III trigger и зарегистрировать обработчик"
+  },
+  "TriggerAction": {
+    "prefix": [
+      "triggeraction",
+      "action"
+    ],
+    "body": [
+      "void ${1:OnAction}()",
+      "{",
+      "    unit ${2:caster} = GetTriggerUnit();",
+      "    $0",
+      "}"
+    ],
+    "description": "Обработчик действия Warcraft III trigger"
   },
   "DebugMessage": {
-    "prefix": "debug",
+    "prefix": [
+      "debug",
+      "print"
+    ],
     "body": [
-      "BJDebugMsg(${1:\"message\"});$0"
+      "Print(${1:\"message\"});$0"
     ],
     "description": "Вывести отладочное сообщение"
   }
