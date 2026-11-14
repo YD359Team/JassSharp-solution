@@ -385,7 +385,7 @@ function readVariables(text: string, classes = readClasses(text), functions = re
     const priorDeclarations = [...result.filter(variable => !parameterOffsets.has(variable.offset)), ...parameterVariables]
         .sort((a, b) => a.offset - b.offset);
 
-    const foreachVarPattern = /\\bforeach\\s*\\(\\s*var\\s+([A-Za-z_]\\w*)\\s+in\\s+([A-Za-z_]\\w*)\\s*\\)/g;
+    const foreachVarPattern = /\bforeach\s*\(\s*var\s+([A-Za-z_]\w*)\s+in\s+([A-Za-z_]\w*)\s*\)/g;
     for (const match of source.matchAll(foreachVarPattern)) {
         const name = match[1];
         const collectionName = match[2];
@@ -396,7 +396,7 @@ function readVariables(text: string, classes = readClasses(text), functions = re
 
         const collection = priorDeclarations
             .filter(variable => variable.name === collectionName && variable.offset < offset &&
-                variable.scopeStart !== undefined && variable.scopeStart <= offset && offset <= variable.scopeEnd!)
+                (variable.scopeStart === undefined || (variable.scopeStart <= offset && offset <= variable.scopeEnd!)))
             .sort((a, b) => b.offset - a.offset)[0];
         if (!collection) continue;
 
