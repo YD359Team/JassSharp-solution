@@ -1,0 +1,72 @@
+namespace Lightning
+{
+    using Warcraft3;
+    using Math;
+    using Colors;
+
+    // Owns one native lightning handle.
+    public class LightningEffect
+    {
+        private lightning _handle;
+        private bool _disposed;
+        private bool _checkVisibility;
+
+        public LightningEffect(string codeName, bool checkVisibility, Vector3 start, Vector3 end)
+        {
+            _checkVisibility = checkVisibility;
+            _handle = AddLightningEx(
+                codeName,
+                checkVisibility,
+                start.X, start.Y, start.Z,
+                end.X, end.Y, end.Z);
+            _disposed = false;
+        }
+
+        public bool IsDisposed()
+        {
+            return _disposed;
+        }
+
+        public lightning Handle()
+        {
+            if (_disposed) { return null; }
+            return _handle;
+        }
+
+        public bool Move(Vector3 start, Vector3 end)
+        {
+            if (_disposed) { return false; }
+            return MoveLightningEx(
+                _handle,
+                _checkVisibility,
+                start.X, start.Y, start.Z,
+                end.X, end.Y, end.Z);
+        }
+
+        public bool Move(Vector3 start, Vector3 end, bool checkVisibility)
+        {
+            if (_disposed) { return false; }
+            _checkVisibility = checkVisibility;
+            return MoveLightningEx(
+                _handle,
+                checkVisibility,
+                start.X, start.Y, start.Z,
+                end.X, end.Y, end.Z);
+        }
+
+        public bool SetColor(Color value)
+        {
+            if (_disposed || value == null) { return false; }
+            return value.ApplyToLightning(_handle);
+        }
+
+        ~LightningEffect()
+        {
+            if (!_disposed)
+            {
+                DestroyLightning(_handle);
+                _disposed = true;
+            }
+        }
+    }
+}
