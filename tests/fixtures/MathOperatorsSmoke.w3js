@@ -16,9 +16,29 @@ namespace MathOperatorsSmoke
             return new Score(value);
         }
 
+        public float GetValue()
+        {
+            return Value;
+        }
+
         public static Score operator +(Score left, Score right)
         {
             return new Score(left.Value + right.Value);
+        }
+    }
+
+    public class ScoreHolder
+    {
+        public Score Stored;
+
+        public ScoreHolder(float value)
+        {
+            Stored = new Score(value);
+        }
+
+        public float ReadStored()
+        {
+            return Stored.GetValue();
         }
     }
 
@@ -42,6 +62,9 @@ namespace MathOperatorsSmoke
         Score firstScore = Score.FromValue(10.0);
         Score secondScore = new Score(5.0);
         Score totalScore = firstScore + secondScore;
+
+        ScoreHolder holder = new ScoreHolder(42.0);
+        float storedValue = holder.ReadStored();
 
         Priority low = new Priority(1);
         Priority high = new Priority(2);
