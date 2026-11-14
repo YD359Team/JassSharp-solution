@@ -82,13 +82,13 @@ namespace Inventory
         // The item argument is an item handle, not a bag/equipment slot index.
         public equipmentType ItemEquipmentType(item value)
         {
-            if (value == null) { return ConvertEquipmentType(0); }
+            if (value == null) { return null; }
             return BlzGetItemEquipmentType(value);
         }
 
         public itemTag ItemTag(item value)
         {
-            if (value == null) { return ConvertItemTag(0); }
+            if (value == null) { return null; }
             return BlzGetItemTag(value);
         }
     }
