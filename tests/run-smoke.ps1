@@ -33,6 +33,8 @@ if ($misuseExitCode -eq 0 -or -not $hasErrorSeverity -or -not $hasStaticCallErro
 Write-Host "[3/15] Verifying build rejects semantic errors..."
 $previousErrorActionPreference = $ErrorActionPreference
 try {
+    # PowerShell can promote native stderr output to a terminating error when
+    # ErrorActionPreference is Stop, even when a non-zero exit code is expected.
     $ErrorActionPreference = "Continue"
     $invalidBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $invalidFixture 2>&1
     $invalidBuildExitCode = $LASTEXITCODE
@@ -48,6 +50,7 @@ if ($invalidBuildExitCode -eq 0) {
 Write-Host "[4/15] Verifying strict assignment compatibility..."
 $previousErrorActionPreference = $ErrorActionPreference
 try {
+    # Native stderr can become a terminating PowerShell error under Stop.
     $ErrorActionPreference = "Continue"
     $typeDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $typeFixture 2>&1
     $typeExitCode = $LASTEXITCODE
@@ -57,6 +60,8 @@ finally {
     $ErrorActionPreference = $previousErrorActionPreference
 }
 
+# The compiler emits JSON with escaped Unicode. Parse it so assertions operate
+# on decoded diagnostic messages instead of their serialized representation.
 try {
     $parsedTypeDiagnostics = ConvertFrom-Json -InputObject $typeText
 }
@@ -69,6 +74,10 @@ $errorLines = @($typeErrors | ForEach-Object { [int]$_.Line } | Sort-Object)
 $actualErrorLines = $errorLines -join ","
 $expectedErrorLines = "7,8,10,11"
 
+# Keep this assertion ASCII-only: Windows PowerShell 5.1 may decode a UTF-8
+# script without BOM using the active ANSI code page, corrupting Cyrillic text.
+# These four source lines correspond to float->int, bool->int, var reassignment,
+# and var without an initializer, respectively.
 if ($typeExitCode -eq 0 -or $typeErrors.Count -ne 4 -or $actualErrorLines -ne $expectedErrorLines) {
     throw "Strict assignment compatibility was not enforced at all expected source locations. Exit code: $typeExitCode. Error lines: $actualErrorLines. Output: $typeText"
 }
@@ -147,7 +156,7 @@ $headlessLua = Get-Content -LiteralPath $headlessOutput -Raw
 $forbiddenHeadlessFragments = @("function config()", "function main()", "InitBlizzard()", "if not BJDebugMsg")
 foreach ($fragment in $forbiddenHeadlessFragments) {
     if ($headlessLua.Contains($fragment)) {
-        throw "Headless mode unexpectedly contains Warcraft runtime fragment: $fragment"
+        throw "Headless Lua unexpectedly contains Warcraft runtime fragment: $fragment"
     }
 }
 if (-not $headlessLua.Contains('print("headless mode")')) {
@@ -267,6 +276,7 @@ $invalidDestructorFixtures = @(
 )
 $previousErrorActionPreference = $ErrorActionPreference
 try {
+    # Invalid compiler input is expected to produce a non-zero native exit code.
     $ErrorActionPreference = "Continue"
     foreach ($invalidCase in $invalidDestructorFixtures) {
         $invalidDestructorPath = Join-Path $PSScriptRoot ("fixtures/" + $invalidCase.Path)

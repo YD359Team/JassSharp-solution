@@ -55,7 +55,7 @@ Methods:
 - `Dot(other)`
 - `Distance(other)`
 - `Lerp(other, t)`
-- `Vector3.Cross(other))
+- `Vector3.Cross(other)`
 
 Supported operators include addition, subtraction, unary negation, scalar multiplication, division by a scalar, and value equality/inequality. Scalar multiplication is supported in both operand orders. Division by zero follows the generated Lua numeric semantics; callers should guard a zero divisor.
 
