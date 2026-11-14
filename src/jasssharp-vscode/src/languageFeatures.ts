@@ -54,7 +54,7 @@ interface LexToken {
 const KEYWORDS = new Set([
     "namespace", "using", "class", "enum", "const", "public", "private", "static",
     "void", "int", "integer", "float", "real", "bool", "boolean", "string", "code",
-    "new", "this", "if", "else", "while", "for", "return", "break", "continue",
+    "new", "this", "if", "else", "while", "for", "foreach", "return", "break", "continue",
     "true", "false", "null", "var", "in", "is", "as", "get", "set"
 ]);
 
@@ -291,8 +291,8 @@ function findInnermostBlockScope(
         }
     }
 
-    const forPattern = /\bfor\s*\(/g;
-    for (const match of source.matchAll(forPattern)) {
+    const loopPattern = /\b(?:for|foreach)\s*\(/g;
+    for (const match of source.matchAll(loopPattern)) {
         const loopStart = bodyStart + (match.index ?? 0);
         const openParen = loopStart + match[0].lastIndexOf("(");
         let depth = 0;
@@ -323,7 +323,7 @@ function readVariables(text: string, classes = readClasses(text), functions = re
     const result: VariableInfo[] = [];
     const source = maskNonCode(text);
     const classNames = new Set(classes.map(c => c.name));
-    const typePattern = /\b([A-Za-z_]\w*(?:\[\])*)\s+([A-Za-z_]\w*)\s*(?==|;|,|\))/g;
+    const typePattern = /\b([A-Za-z_]\w*(?:\[\])*)\s+([A-Za-z_]\w*)\s*(?==|;|,|\)|\bin\b)/g;
 
     for (const match of source.matchAll(typePattern)) {
         const type = match[1];
@@ -384,6 +384,36 @@ function readVariables(text: string, classes = readClasses(text), functions = re
 
     const priorDeclarations = [...result.filter(variable => !parameterOffsets.has(variable.offset)), ...parameterVariables]
         .sort((a, b) => a.offset - b.offset);
+
+    const foreachVarPattern = /\\bforeach\\s*\\(\\s*var\\s+([A-Za-z_]\\w*)\\s+in\\s+([A-Za-z_]\\w*)\\s*\\)/g;
+    for (const match of source.matchAll(foreachVarPattern)) {
+        const name = match[1];
+        const collectionName = match[2];
+        const offset = (match.index ?? 0) + match[0].indexOf(name);
+        const ownerFunction = functions.find(fn => fn.bodyStart !== undefined &&
+            fn.bodyEnd !== undefined && offset >= fn.bodyStart && offset <= fn.bodyEnd);
+        if (!ownerFunction) continue;
+
+        const collection = priorDeclarations
+            .filter(variable => variable.name === collectionName && variable.offset < offset &&
+                variable.scopeStart !== undefined && variable.scopeStart <= offset && offset <= variable.scopeEnd!)
+            .sort((a, b) => b.offset - a.offset)[0];
+        if (!collection) continue;
+
+        let elementType: string | undefined;
+        if (collection.type.endsWith("[]")) elementType = collection.type.slice(0, -2);
+        else if (collection.type === "group" && hasWarcraft3Using(text)) elementType = "unit";
+        if (!elementType) continue;
+
+        const scope = findInnermostBlockScope(text, ownerFunction, offset);
+        const variable: VariableInfo = {
+            name, type: elementType, offset, isParameter: false,
+            scopeStart: scope.start, scopeEnd: scope.end
+        };
+        result.push(variable);
+        priorDeclarations.push(variable);
+        priorDeclarations.sort((a, b) => a.offset - b.offset);
+    }
 
     for (const declaration of varDeclarations) {
         const ownerFunction = functions.find(fn => fn.bodyStart !== undefined &&

@@ -400,7 +400,7 @@ end
                     IfStmt i => $"{i.Cond.Line}:{i.Cond.Col}",
                     WhileStmt w => $"{w.Cond.Line}:{w.Cond.Col}",
                     ForStmt f => f.Init is VarStmt vs ? $"{vs.Line}:{vs.Col}" : "for",
-                    ForeachStmt f => $"{f.Line}:{f.Col}",
+                    ForeachStmt foreachLoop => $"{foreachLoop.Line}:{foreachLoop.Col}",
                     _ => "?"
                 };
                 var msg = $"[trace] {loc}";
@@ -488,8 +488,8 @@ end
                         Line("endloop");
                     }
                     break;
-                case ForeachStmt f:
-                    EmitForeach(f, trace);
+                case ForeachStmt foreachLoop:
+                    EmitForeach(foreachLoop, trace);
                     break;
                 case ForStmt f:
                     if (_lua)
