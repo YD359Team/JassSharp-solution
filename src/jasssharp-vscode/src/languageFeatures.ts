@@ -154,6 +154,16 @@ const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; ret: string
     ItemSelection: [
         { name: "ChooseRandomRawcode", ret: "int", kind: "Method", parameters: ["itemtype type", "int level", "equipmentType equipment", "itemTag tag", "bool includeInvalidMorphs", "bool includeNonPickRandom"] }
     ],
+    SpecialEffects: [
+        { name: "Remove", ret: "void", kind: "Method", parameters: ["effect value"] }
+    ],
+    CameraSettings: [
+        { name: "SetHotkeyTargetLockAllowed", ret: "void", kind: "Method", parameters: ["bool allowed"] },
+        { name: "IsHotkeyTargetLockAllowed", ret: "bool", kind: "Method", parameters: [] }
+    ],
+    AudioSettings: [
+        { name: "SetThematicMusicVolume", ret: "void", kind: "Method", parameters: ["int volume"] }
+    ],
     InventoryEvents: [
         { name: "EquippedItem", ret: "item", kind: "Method", parameters: [] },
         { name: "UnequippedItem", ret: "item", kind: "Method", parameters: [] }
