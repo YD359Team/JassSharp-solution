@@ -162,9 +162,12 @@ foreach ($fragment in @(
     '__dictionary_add(scores, "Player1", 100)',
     '__dictionary_tryadd(scores, "Player2", 200)',
     '__dictionary_tryremove(scores, "Player2")',
+    '__dictionary_set(scores, "Player1", 150)',
+    '__collection_store(nil)',
+    '__collection_load(',
     'pairs(__foreachCollection',
     'Key = __foreachIndex',
-    'Value = __foreachValue'
+    'Value = __collection_load(__foreachValue'
 )) {
     if (-not $collectionsLua.Contains($fragment)) {
         throw "Generated collections Lua is missing expected fragment: $fragment"
