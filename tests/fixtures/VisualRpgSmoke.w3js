@@ -13,6 +13,7 @@ namespace VisualRpgSmoke
     void Run(
         unit hero,
         unit target,
+        destructable scenery,
         player owner,
         playercolor teamColor,
         item equipment,
@@ -36,6 +37,7 @@ namespace VisualRpgSmoke
         accent.ApplyToFrameVertex(frame);
         Color.ApplyPlayerColorToUnit(hero, teamColor);
         Color.ApplyPlayerColorToItem(equipment, teamColor);
+        Color.ApplyPlayerColorToDestructable(scenery, teamColor);
         Color.ApplyPlayerColorToEffect(specialEffect, owner);
 
         FloatingTextTag popup = new FloatingTextTag(
