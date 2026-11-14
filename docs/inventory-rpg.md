@@ -31,9 +31,16 @@ The wrapper exposes bag lookup, equipment lookup, equip/unequip, equipment-type 
 
 ```csharp
 Talents.Reset(hero);
+
+// Talent choices represented by abilities:
+int talentId = AbilityId("A0T1");
+Talents.GrantAbility(hero, talentId);
+Talents.SetAbilityRank(hero, talentId, 2);
+Talents.SetAbilityPermanent(hero, talentId, true);
+int rank = Talents.AbilityRank(hero, talentId);
 ```
 
-This calls `BlzResetUnitTalents`. The engine owns the talent allocation and any talent UI; JASS# does not invent a separate talent-point model.
+This calls `BlzResetUnitTalents`. The engine owns the talent allocation and any talent UI. Since authored talent choices are represented by abilities in Warcraft III's data model, `GrantAbility`, `RemoveAbility`, `AbilityRank`, `SetAbilityRank`, and `SetAbilityPermanent` provide typed convenience operations over the existing unit-ability natives. These helpers do not replace the game's talent UI or allocate talent points themselves.
 
 ## RPG stat-aware healing
 
