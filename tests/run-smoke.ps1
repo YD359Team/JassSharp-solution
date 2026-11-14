@@ -4,6 +4,7 @@ $repoRoot = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $repoRoot "src/JassSharp.Compiler/JassSharp.Compiler.csproj"
 $fixture = Join-Path $PSScriptRoot "fixtures/MathOperatorsSmoke.w3js"
 $invalidFixture = Join-Path $PSScriptRoot "fixtures/StaticMethodMisuse.w3js"
+$mathLibrary = Join-Path $repoRoot "standard-library/Math.w3js"
 $output = Join-Path $PSScriptRoot "fixtures/bin/MathOperatorsSmoke.lua"
 
 Write-Host "[1/6] Building compiler..."
@@ -37,6 +38,11 @@ if ($LASTEXITCODE -ne 0) {
     throw "Fixture check failed with exit code $LASTEXITCODE"
 }
 
+dotnet run --configuration Release --no-build --project $project -- check $mathLibrary
+if ($LASTEXITCODE -ne 0) {
+    throw "Standard library check failed with exit code $LASTEXITCODE"
+}
+
 Write-Host "[5/6] Generating Lua..."
 dotnet run --configuration Release --no-build --project $project -- build $fixture
 if ($LASTEXITCODE -ne 0) {
@@ -54,6 +60,7 @@ $requiredFragments = @(
     "Score.FromValue(10.0)",
     "function Vector2.__add(arg0, arg1)",
     "__operator_Add_Vector2_Vector2",
+    "function Priority.__operator_LessThan_Priority_Priority(left, right)",
     "math.sqrt(self.X * self.X + self.Y * self.Y)",
     "self.Y * self.Z - self.Z * self.Y",
     "self.X * self.Y - self.Y * self.X"
