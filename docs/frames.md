@@ -52,7 +52,7 @@ The public constructor `Frame(framehandle, ownsHandle)` is intended for advanced
 - Dimensions and controls: `SetSize`, `Width`, `Height`, `SetValue`, `Value`, `SetMinMaxValue`, `SetStepSize`, `SetAutoScroll`.
 - Hierarchy: `ChildrenCount`, `Child`, `Name`, `Handle`.
 
-`SetAlpha` clamps its input to the native 0–255 range. `SetTextSizeLimit`, `SetLevel`, and `SetStepSize` clamp negative inputs to zero. `SetMinMaxValue` raises the maximum to the minimum if the supplied range is inverted. Other values are forwarded to Warcraft III unchanged.
+`SetAlpha` clamps its input to the native 0–255 range. `SetTextSizeLimit`, `SetLevel`, and `SetStepSize` clamp negative inputs to zero. `SetMinMaxValue` raises the maximum to the minimum if the supplied range is inverted. Other values are forwarded to Warcraft III unchanged. Control-specific methods must be used only with compatible frame types: for example, `SetValue` and `SetMinMaxValue` are intended for value controls, while `SetAutoScroll` is intended for text-area frames. The wrapper does not query or validate the native frame type.
 
 `Handle()`, `Parent()`, and `Child(index)` return borrowed native handles. They do not transfer ownership. `Child(index)` uses the native zero-based child index and returns null for a negative or out-of-range index.
 
