@@ -802,7 +802,7 @@ function parameterNames(parameters: string[]): string[] {
     });
 }
 
-function parseOpenCall(text: string, offset: number): { name: string; argumentIndex: number } | undefined {
+function parseOpenCall(text: string, offset: number): { name: string; owner?: string; argumentIndex: number } | undefined {
     const stack: Array<{ start: number; commas: number }> = [];
     let state: "normal" | "string" | "char" | "lineComment" | "blockComment" = "normal";
     let escaped = false;
@@ -831,7 +831,12 @@ function parseOpenCall(text: string, offset: number): { name: string; argumentIn
     const before = text.slice(0, open.start).trimEnd();
     const match = /([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)$/.exec(before);
     if (!match) return undefined;
-    return { name: match[1].split(".").pop()!, argumentIndex: open.commas };
+    const segments = match[1].split(".");
+    return {
+        name: segments[segments.length - 1],
+        owner: segments.length > 1 ? segments[segments.length - 2] : undefined,
+        argumentIndex: open.commas
+    };
 }
 
 function buildFunctionSignatures(document: vscode.TextDocument): Map<string, FunctionInfo> {
@@ -959,6 +964,9 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             const hasWarcraft3 = hasWarcraft3Using(text);
             const native = hasWarcraft3 ? nativeByName.get(call.name) : undefined;
             const member = hasWarcraft3 ? MEMBERS.find(m => m.name === call.name && m.kind === "Method") : undefined;
+            const standardMember = call.owner
+                ? STANDARD_LIBRARY_MEMBERS[call.owner]?.find(m => m.name === call.name && m.kind === "Method")
+                : undefined;
             let label: string;
             let parameters: string[];
             let documentation = "";
@@ -973,6 +981,10 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             } else if (member) {
                 label = `${member.name}(...) : ${member.ret}`;
                 parameters = [];
+            } else if (standardMember && call.owner) {
+                label = `${call.owner}.${standardMember.name}(${standardMember.parameters.join(", ")}) : ${standardMember.ret}`;
+                parameters = standardMember.parameters;
+                documentation = "JASS# standard-library method";
             } else {
                 return undefined;
             }
@@ -999,6 +1011,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             const functionInfo = buildFunctionSignatures(document).get(word);
             const constant = hasWarcraft3 && constantNames.has(word);
             const member = hasWarcraft3 ? MEMBERS.find(m => m.name === word) : undefined;
+            const standardMember = Object.values(STANDARD_LIBRARY_MEMBERS).flat().find(m => m.name === word);
             const cls = readClasses(documentText).find(c => c.name === word);
             const variables = visibleVariables(documentText, document.offsetAt(position));
             const variable = variables.filter(v => v.name === word).slice(-1)[0];
@@ -1008,6 +1021,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             if (native) { code = native.sig; description = native.doc; }
             else if (functionInfo) { code = functionInfo.signature; description = `Возвращаемый тип: ${functionInfo.returnType}`; }
             else if (member) { code = `${member.type}.${member.name} : ${member.ret}`; description = member.kind === "Method" ? "Нативный метод JASS#" : "Нативное свойство JASS#"; }
+            else if (standardMember) { code = `${standardMember.name}(${standardMember.parameters.join(", ")}) : ${standardMember.ret}`; description = "Метод стандартной библиотеки JASS#"; }
             else if (cls) { code = `class ${cls.name}`; description = "Класс текущего исходного файла"; }
             else if (constant) { code = word; description = "Константа Warcraft III"; }
             else if (variable) { code = `${variable.type} ${variable.name}`; description = variable.isParameter ? "Параметр" : "Локальная переменная / поле"; }
