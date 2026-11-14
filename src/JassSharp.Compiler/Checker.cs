@@ -413,9 +413,9 @@ public static class Checker
                             Add(number.Line, number.Col, "error", "hex-литерал выходит за пределы 32-битного значения");
                     }
                     else if (!number.Text.Contains('.') && !number.Text.Contains('e') && !number.Text.Contains('E') &&
-                             long.TryParse(number.Text, System.Globalization.NumberStyles.None,
-                                 System.Globalization.CultureInfo.InvariantCulture, out long integerValue) &&
-                             integerValue > int.MaxValue)
+                             (!long.TryParse(number.Text, System.Globalization.NumberStyles.None,
+                                  System.Globalization.CultureInfo.InvariantCulture, out long integerValue) ||
+                              integerValue > int.MaxValue))
                     {
                         Add(number.Line, number.Col, "error", "целочисленный литерал выходит за пределы int32");
                     }
