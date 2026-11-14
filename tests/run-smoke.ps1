@@ -151,8 +151,8 @@ if (-not (Test-Path $timerLuaPath)) {
 $timerLua = Get-Content -LiteralPath $timerLuaPath -Raw
 $timerFragments = @(
     "CreateTimer()",
-    "TimerStart(self._handle, math.max(timeout, 0.0), false, callback)",
-    "TimerStart(self._handle, math.max(timeout, 0.0), true, callback)",
+    "TimerStart(self._handle, Math.Max(timeout, 0.0), false, callback)",
+    "TimerStart(self._handle, Math.Max(timeout, 0.0), true, callback)",
     "PauseTimer(self._handle)",
     "ResumeTimer(self._handle)",
     "TimerGetElapsed(self._handle)",
