@@ -405,6 +405,12 @@ public static class Checker
                     }
                     break;
 
+                case InterpolatedExpr interpolated:
+                    foreach (var part in interpolated.Parts)
+                        if (part.Expression is not null)
+                            CheckExpression(part.Expression);
+                    break;
+
                 case ThisExpr self:
                     if (_currentClass is null)
                         Add(self.Line, self.Col, "error", "this доступен только внутри метода или конструктора");
@@ -646,6 +652,7 @@ public static class Checker
                 case BoolExpr:
                     return "bool";
                 case StrExpr:
+                case InterpolatedExpr:
                     return "string";
                 case RawExpr:
                     return "int";
