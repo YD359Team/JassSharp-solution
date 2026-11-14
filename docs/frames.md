@@ -6,8 +6,11 @@ The compiler embeds `standard-library/Frames.w3js`. Import `Frames` and `Warcraf
 using Frames;
 using Warcraft3;
 
-public void OnInit()
+public void ShowPlayerUI(player targetPlayer)
 {
+    // Frame UI is local to the client that owns targetPlayer.
+    if (GetLocalPlayer() != targetPlayer) { return; }
+
     Frame root = Frame.FromOrigin(ORIGIN_FRAME_GAME_UI, 0);
     Frame panel = Frame.Create("Frame", root.Handle(), 0, 0);
 

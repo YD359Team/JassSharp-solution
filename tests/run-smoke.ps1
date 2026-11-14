@@ -480,6 +480,10 @@ if (-not (Test-Path $frameLuaPath)) {
 $frameLua = Get-Content -LiteralPath $frameLuaPath -Raw
 $frameFragments = @(
     "BlzLoadTOCFile(",
+    "BlzHideOriginFrames(",
+    "BlzGetHUDScale(",
+    "BlzGetLocalClientWidth(",
+    "BlzGetLocalClientHeight(",
     "BlzCreateFrame(",
     "BlzCreateSimpleFrame(",
     "BlzCreateFrameByType(",
