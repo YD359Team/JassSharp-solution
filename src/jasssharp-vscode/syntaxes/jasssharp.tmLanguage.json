@@ -121,35 +121,22 @@
     },
     "keyword": {
       "name": "keyword.control.jasssharp",
-      "match": "\\b(namespace|using|class|enum|const|public|private|static|if|else|while|for|return|break|continue|new|this|in|is|as|get|set)\\b"
+      "match": "\\b(namespace|using|class|enum|const|public|private|static|if|else|while|for|foreach|return|break|continue|new|this|in|is|as|get|set)\\b"
     },
     "type": {
       "name": "storage.type.jasssharp",
-      "match": "\\b(void|int|integer|float|real|bool|boolean|string|code|ability|agent|buff|button|camerafield|camerasetup|destructable|dialog|effect|event|force|group|handle|hashtable|image|item|leaderboard|lightning|location|multiboard|player|quest|race|rect|region|sound|texttag|timer|trigger|unit|widget|framehandle|fogmodifier|ubersplat|weathereffect)\\b"
+      "match": "\\b(void|int|float|bool|string|List)\\b"
     },
     "constant": {
       "patterns": [
         {
           "name": "constant.language.jasssharp",
           "match": "\\b(true|false|null)\\b"
-        },
-        {
-          "name": "constant.other.jasssharp",
-          "match": "\\b[A-Z][A-Z0-9_]{2,}\\b"
         }
       ]
     },
     "function": {
-      "patterns": [
-        {
-          "name": "support.function.library.jasssharp",
-          "match": "\\b(Get|Set|Blz|Create|Trigger|Add|Remove|Kill|Issue|Display|BJ)[A-Z]\\w*\\b"
-        },
-        {
-          "name": "support.function.jasssharp",
-          "match": "\\b[A-Za-z_]\\w*(?=\\s*\\()"
-        }
-      ]
+      "patterns": []
     },
     "number": {
       "name": "constant.numeric.jasssharp",
