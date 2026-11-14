@@ -16,9 +16,18 @@ Write-Host "[2/5] Verifying invalid static method calls are rejected..."
 $misuseDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $invalidFixture 2>&1
 $misuseExitCode = $LASTEXITCODE
 $misuseText = $misuseDiagnostics -join "`n"
-if ($misuseExitCode -eq 0 -or
-    -not $misuseText.Contains("статический метод") -or
-    -not $misuseText.Contains("нестатический метод")) {
+try {
+    $parsedDiagnostics = $misuseText | ConvertFrom-Json
+}
+catch {
+    throw "Could not parse checker diagnostics as JSON. Output: $misuseText"
+}
+
+$errorMessages = @($parsedDiagnostics | Where-Object { $_.Severity -eq "error" } | ForEach-Object { $_.Message })
+$hasStaticCallError = @($errorMessages | Where-Object { $_ -like "*статический метод*" }).Count -gt 0
+$hasInstanceCallError = @($errorMessages | Where-Object { $_ -like "*нестатический метод*" }).Count -gt 0
+
+if ($misuseExitCode -eq 0 -or -not $hasStaticCallError -or -not $hasInstanceCallError) {
     throw "Static method misuse was not rejected with both expected diagnostics. Output: $misuseText"
 }
 
