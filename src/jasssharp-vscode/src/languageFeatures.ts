@@ -398,7 +398,7 @@ function readVariables(text: string, classes = readClasses(text), functions = re
             .filter(variable => variable.name === (/^([A-Za-z_]\w*)/.exec(collectionExpression)?.[1] ?? "") && variable.offset < offset &&
                 (variable.scopeStart === undefined || (variable.scopeStart <= offset && offset <= variable.scopeEnd!)))
             .sort((a, b) => b.offset - a.offset)[0];
-        let collectionType = collection?.type;
+        let collectionType: string | undefined = collection?.type;
         const collectionIndexCount = (collectionExpression.match(/\[/g) ?? []).length;
         for (let i = 0; i < collectionIndexCount && collectionType; i++) {
             if (collectionType.endsWith("[]")) collectionType = collectionType.slice(0, -2);
@@ -550,7 +550,7 @@ function isVariableVisibleAt(
         variable.offset <= currentFunction.bodyEnd! &&
         variable.scopeStart >= currentFunction.bodyStart! &&
         variable.scopeEnd! <= currentFunction.bodyEnd! &&
-        variable.scopeStart <= offset && offset <= variable.scopeEnd) return true;
+        variable.scopeStart <= offset && variable.scopeEnd !== undefined && offset <= variable.scopeEnd) return true;
     return !!currentClass && variable.scopeStart === currentClass.bodyStart &&
         variable.scopeEnd === currentClass.bodyEnd;
 }
@@ -1061,7 +1061,13 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
 
                 if (type) {
                     const start = document.positionAt(token.start);
-                    builder.push(start.line, start.character, token.end - token.start, type, modifiers);
+                    const tokenTypeIndex = semanticLegend.tokenTypes.indexOf(type);
+                    if (tokenTypeIndex < 0) continue;
+                    const tokenModifierMask = modifiers.reduce((mask, modifier) => {
+                        const modifierIndex = semanticLegend.tokenModifiers.indexOf(modifier);
+                        return modifierIndex < 0 ? mask : mask | (1 << modifierIndex);
+                    }, 0);
+                    builder.push(start.line, start.character, token.end - token.start, tokenTypeIndex, tokenModifierMask);
                 }
             }
             return builder.build();
