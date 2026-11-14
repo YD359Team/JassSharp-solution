@@ -219,7 +219,7 @@ foreach ($fragment in @(
     'Enabled: ',
     'Braces: {literal}',
     'Line one\\nLine two\\tindented',
-    'C:\\\\temp\\\\file'
+    'C:\\temp\\file'
 )) {
     if (-not $stringsLua.Contains($fragment)) {
         throw "Generated strings Lua is missing expected fragment: $fragment"
