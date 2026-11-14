@@ -358,7 +358,7 @@ foreach ($fragment in @(
     "function Strings.ToUpper(value)",
     "function Strings.Split(value, separator)",
     "function Strings.Join(separator, values)",
-    "utf8.offset(value, startIndex + 1)"
+    "utf8.offset(value, (startIndex + 1))"
 )) {
     if (-not $stringsApiLua.Contains($fragment)) {
         throw "Generated Strings API Lua is missing expected fragment: $fragment"
