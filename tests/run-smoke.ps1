@@ -6,7 +6,7 @@ $fixture = Join-Path $PSScriptRoot "fixtures/MathOperatorsSmoke.w3js"
 $invalidFixture = Join-Path $PSScriptRoot "fixtures/StaticMethodMisuse.w3js"
 $output = Join-Path $PSScriptRoot "fixtures/bin/MathOperatorsSmoke.lua"
 
-Write-Host "[1/4] Building compiler..."
+Write-Host "[1/5] Building compiler..."
 dotnet build $project -c Release
 if ($LASTEXITCODE -ne 0) {
     throw "Compiler build failed with exit code $LASTEXITCODE"
