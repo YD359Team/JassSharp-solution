@@ -1058,7 +1058,7 @@ public static class Checker
                    (_hasWarcraft3 && NativeCatalog.Natives.Contains(name)) ||
                    (_hasWarcraft3 && NativeCatalog.Constants.Contains(name)) ||
                    (_hasWarcraft3 && NativeSigs.Map.ContainsKey(name)) ||
-                   name is "J" or "math" or "string" or "table" or "Print";
+                   name is "J" or "math" or "string" or "table" or "utf8" or "error" or "Print";
         }
 
         private void PushScope() => _scopes.Add(new Dictionary<string, string>(StringComparer.Ordinal));
