@@ -1,0 +1,85 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: jasssharp-release-${{ github.event.release.tag_name || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-package:
+    name: Validate and package VS Code extension
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 11.0.x
+
+      - name: Run compiler smoke tests
+        shell: pwsh
+        run: ./tests/run-smoke.ps1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/jasssharp-vscode/package-lock.json
+
+      - name: Install extension dependencies
+        working-directory: src/jasssharp-vscode
+        shell: pwsh
+        run: npm.cmd ci
+
+      - name: Set extension version from release tag
+        if: github.event_name == 'release'
+        working-directory: src/jasssharp-vscode
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          $version = $env:RELEASE_TAG -replace '^v', ''
+          if ($version -notmatch '^\d+\.\d+\.\d+([-.+][0-9A-Za-z.-]+)?$') {
+              throw "Release tag '$($env:RELEASE_TAG)' must contain a semantic version, for example v0.2.0."
+          }
+
+          npm.cmd version $version --no-git-tag-version --allow-same-version
+          if ($LASTEXITCODE -ne 0) {
+              throw "Could not set VS Code extension version to $version."
+          }
+
+      - name: Compile and package VSIX
+        working-directory: src/jasssharp-vscode
+        shell: pwsh
+        run: |
+          npm.cmd run package
+          if ($LASTEXITCODE -ne 0) {
+              throw "VS Code extension packaging failed."
+          }
+
+      - name: Upload VSIX build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: jasssharp-vsix
+          path: src/jasssharp-vscode/*.vsix
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Attach VSIX to GitHub Release
+        if: github.event_name == 'release'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.release.tag_name }}
+          files: src/jasssharp-vscode/*.vsix
+          fail_on_unmatched_files: true
