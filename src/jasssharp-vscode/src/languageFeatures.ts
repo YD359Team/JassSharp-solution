@@ -323,16 +323,17 @@ function readVariables(text: string, classes = readClasses(text), functions = re
     const result: VariableInfo[] = [];
     const source = maskNonCode(text);
     const classNames = new Set(classes.map(c => c.name));
-    const typePattern = /\b([A-Za-z_]\w*)\s+([A-Za-z_]\w*)\s*(?==|;|,|\))/g;
+    const typePattern = /\b([A-Za-z_]\w*(?:\[\])*)\s+([A-Za-z_]\w*)\s*(?==|;|,|\))/g;
 
     for (const match of source.matchAll(typePattern)) {
         const type = match[1];
         const name = match[2];
         const offset = (match.index ?? 0) + match[0].lastIndexOf(name);
         if (DECLARATION_STOPWORDS.has(type) || name === "this" || name === "true" || name === "false") continue;
-        if (!PRIMITIVE_TYPES.has(type.toLowerCase()) &&
-            !(hasWarcraft3Using(text) && BUILTIN_TYPES.has(type.toLowerCase())) &&
-            !classNames.has(type) && !/^[A-Z]/.test(type)) continue;
+        const baseType = type.replace(/(?:\[\])+$/, "");
+        if (!PRIMITIVE_TYPES.has(baseType.toLowerCase()) &&
+            !(hasWarcraft3Using(text) && BUILTIN_TYPES.has(baseType.toLowerCase())) &&
+            !classNames.has(baseType) && !/^[A-Z]/.test(baseType)) continue;
         result.push({ name, type, offset, isParameter: false });
     }
 
@@ -340,7 +341,7 @@ function readVariables(text: string, classes = readClasses(text), functions = re
     for (const fn of functions) {
         if (fn.bodyStart === undefined || fn.bodyEnd === undefined) continue;
         for (const parameter of fn.parameters) {
-            const match = /^\s*([A-Za-z_]\w*)\s+([A-Za-z_]\w*)/.exec(parameter);
+            const match = /^\s*([A-Za-z_]\w*(?:\[\])*)\s+([A-Za-z_]\w*)/.exec(parameter);
             if (!match) continue;
             const fnText = text.slice(fn.offset);
             const paren = fnText.indexOf("(");
@@ -531,11 +532,25 @@ function inferExpressionType(expression: string, documentText: string, offset: n
     const expr = expression.trim().replace(/^\(+|\)+$/g, "");
     if (!expr) return undefined;
     if (expr === "this") return getCurrentClass(documentText, offset)?.name;
+    const newArray = /^new\s+([A-Za-z_]\w*(?:\[\])+)$/.exec(expr);
+    if (newArray) return newArray[1];
     if (/^new\s+([A-Za-z_]\w*)/.test(expr)) return /^new\s+([A-Za-z_]\w*)/.exec(expr)?.[1];
     if (/^\d+\.\d/.test(expr)) return "float";
     if (/^\d/.test(expr)) return "int";
     if (/^"/.test(expr)) return "string";
     if (/^(true|false)$/.test(expr)) return "bool";
+
+    const indexedExpression = /^([A-Za-z_]\w*)((?:\s*\[[^\]]+\])+)$/.exec(expr);
+    if (indexedExpression) {
+        let indexedType = latestVariableType(indexedExpression[1], documentText, offset);
+        const indexCount = (indexedExpression[2].match(/\[/g) ?? []).length;
+        for (let i = 0; i < indexCount && indexedType; i++) {
+            if (indexedType === "string") continue;
+            if (indexedType.endsWith("[]")) indexedType = indexedType.slice(0, -2);
+            else return undefined;
+        }
+        return indexedType;
+    }
 
     const segments = expr.split(".");
     let type = latestVariableType(segments[0], documentText, offset);
