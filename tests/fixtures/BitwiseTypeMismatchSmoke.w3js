@@ -6,5 +6,7 @@ namespace BitwiseTypeMismatchSmoke
         int invalidBitwise = floating & 1;
         int invalidHex = 0x100000000;
         int invalidDecimal = 2147483648;
+        float invalidFloat = 1e100;
+        float underflowFloat = 1e-50;
     }
 }
