@@ -414,7 +414,10 @@ public static class Checker
 
                 case NewExpr creation:
                     if (TryGetGenericArguments(creation.Type, out var constructedCollection, out _) &&
-                        (constructedCollection is "List" or "Queue" or "Stack" or "Dictionary" or "KeyValuePair") &&
+                        constructedCollection == "KeyValuePair")
+                        Add(creation.Line, creation.Col, "error", "KeyValuePair can only be obtained by iterating a Dictionary");
+                    else if (TryGetGenericArguments(creation.Type, out constructedCollection, out _) &&
+                        (constructedCollection is "List" or "Queue" or "Stack" or "Dictionary") &&
                         creation.Args.Count != 0)
                         Add(creation.Line, creation.Col, "error",
                             $"{constructedCollection} does not accept constructor arguments");
@@ -461,7 +464,9 @@ public static class Checker
                         dictionaryName == "Dictionary")
                     {
                         var keyType = InferType(index.Index);
-                        if (keyType is not null && !IsCompatible(keyType, dictionaryArgs[0]))
+                        if (keyType == "null")
+                            Add(index.Index.Line, index.Index.Col, "error", "ключ Dictionary не может быть null");
+                        else if (keyType is not null && !IsCompatible(keyType, dictionaryArgs[0]))
                             Add(index.Index.Line, index.Index.Col, "error",
                                 $"ключ Dictionary: ожидался тип {dictionaryArgs[0]}, получен {keyType}");
                     }
@@ -953,7 +958,9 @@ public static class Checker
             {
                 CheckExpression(args[i]);
                 string? actual = InferType(args[i]);
-                if (actual is not null && !IsCompatible(actual, expected[i]))
+                if (collectionName == "Dictionary" && i == 0 && actual == "null")
+                    Add(args[i].Line, args[i].Col, "error", "ключ Dictionary не может быть null");
+                else if (actual is not null && !IsCompatible(actual, expected[i]))
                     Add(args[i].Line, args[i].Col, "error",
                         $"{collectionName}.{member.Name}: аргумент {i + 1}: ожидался тип {expected[i]}, получен {actual}");
             }
