@@ -194,6 +194,11 @@ namespace Colors
             BlzSetItemColor(target, color);
         }
 
+        public static void ApplyPlayerColorToDestructable(destructable target, playercolor color)
+        {
+            SetDestructableColor(target, color);
+        }
+
         public static void ApplyPlayerColorToEffect(effect target, player owner)
         {
             BlzSetSpecialEffectColorByPlayer(target, owner);
