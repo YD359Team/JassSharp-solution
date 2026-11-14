@@ -132,7 +132,7 @@ foreach ($fragment in $geometryFragments) {
     }
 }
 
-Write-Host "[8/16] Generating Math/vector Lua..."
+Write-Host "[7/16] Generating Math/vector Lua..."
 dotnet run --configuration Release --no-build --project $project -- build $fixture
 if ($LASTEXITCODE -ne 0) {
     throw "Fixture build failed with exit code $LASTEXITCODE"
