@@ -443,6 +443,22 @@ public sealed class Parser(List<Token> tokens)
             Accept(";");
             return new AssignStmt(expr, new BinaryExpr("%", expr, v));
         }
+        foreach (var (assignmentOperator, binaryOperator) in new[]
+        {
+            ("<<=", "<<"),
+            (">>=", ">>"),
+            ("|=", "|"),
+            ("&=", "&"),
+            ("^=", "^")
+        })
+        {
+            if (!Accept(assignmentOperator))
+                continue;
+
+            var value = ParseExpr();
+            Accept(";");
+            return new AssignStmt(expr, new BinaryExpr(binaryOperator, expr, value));
+        }
         if (Accept("++"))
             return new AssignStmt(expr, new BinaryExpr("+", expr, new NumExpr("1")));
         if (Accept("--"))
@@ -545,9 +561,13 @@ public sealed class Parser(List<Token> tokens)
         return new InterpolatedExpr(parts, token.Line, token.Col);
     }
     private Expr ParseOr() { var l = ParseAnd(); while (Accept("||")) l = new BinaryExpr("||", l, ParseAnd()); return l; }
-    private Expr ParseAnd() { var l = ParseEq(); while (Accept("&&")) l = new BinaryExpr("&&", l, ParseEq()); return l; }
+    private Expr ParseAnd() { var l = ParseBitOr(); while (Accept("&&")) l = new BinaryExpr("&&", l, ParseBitOr()); return l; }
+    private Expr ParseBitOr() { var l = ParseBitXor(); while (Accept("|")) l = new BinaryExpr("|", l, ParseBitXor()); return l; }
+    private Expr ParseBitXor() { var l = ParseBitAnd(); while (Accept("^")) l = new BinaryExpr("^", l, ParseBitAnd()); return l; }
+    private Expr ParseBitAnd() { var l = ParseEq(); while (Accept("&")) l = new BinaryExpr("&", l, ParseEq()); return l; }
     private Expr ParseEq() { var l = ParseRel(); while (true) { if (Accept("==")) l = new BinaryExpr("==", l, ParseRel()); else if (Accept("!=")) l = new BinaryExpr("!=", l, ParseRel()); else break; } return l; }
-    private Expr ParseRel() { var l = ParseAdd(); while (Check("<") || Check(">") || Check("<=") || Check(">=")) { var op = Eat(TokKind.Sym).Text; l = new BinaryExpr(op, l, ParseAdd()); } return l; }
+    private Expr ParseRel() { var l = ParseShift(); while (Check("<") || Check(">") || Check("<=") || Check(">=")) { var op = Eat(TokKind.Sym).Text; l = new BinaryExpr(op, l, ParseShift()); } return l; }
+    private Expr ParseShift() { var l = ParseAdd(); while (Check("<<") || Check(">>")) { var op = Eat(TokKind.Sym).Text; l = new BinaryExpr(op, l, ParseAdd()); } return l; }
     private Expr ParseAdd() { var l = ParseMul(); while (true) { if (Accept("+")) l = new BinaryExpr("+", l, ParseMul()); else if (Accept("-")) l = new BinaryExpr("-", l, ParseMul()); else break; } return l; }
     private Expr ParseMul() { var l = ParseUnary(); while (true) { if (Accept("*")) l = new BinaryExpr("*", l, ParseUnary()); else if (Accept("/")) l = new BinaryExpr("/", l, ParseUnary()); else if (Accept("%")) l = new BinaryExpr("%", l, ParseUnary()); else break; } return l; }
     private Expr ParseUnary() { if (Accept("!")) return new UnaryExpr("!", ParseUnary()); if (Accept("-")) return new UnaryExpr("-", ParseUnary()); return ParsePost(); }
