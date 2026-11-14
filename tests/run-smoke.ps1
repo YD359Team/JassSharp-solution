@@ -62,9 +62,9 @@ $requiredFragments = @(
     "function Vector2.__add(arg0, arg1)",
     "__operator_Add_Vector2_Vector2",
     "function Priority.__operator_LessThan_Priority_Priority(left, right)",
-    "math.sqrt(self.X * self.X + self.Y * self.Y)",
-    "self.Y * self.Z - self.Z * self.Y",
-    "self.X * self.Y - self.Y * self.X"
+    "math.sqrt(((self.X * self.X) + (self.Y * self.Y)))",
+    "((self.Y * other.Z) - (self.Z * other.Y))",
+    "((self.X * other.Y) - (self.Y * other.X))"
 )
 
 foreach ($fragment in $requiredFragments) {
