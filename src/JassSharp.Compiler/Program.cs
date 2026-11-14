@@ -163,6 +163,12 @@ try
     var projectDirectory = FindProjectDirectory(file);
     var allUnits = MapBuild.LoadProject(projectDirectory);
     var imports = MapBuild.ResolveImports(unit, allUnits);
+    var diagnostics = Checker.Check(unit, file, imports);
+    foreach (var diagnostic in diagnostics)
+        Console.Error.WriteLine($"{diagnostic.Line}:{diagnostic.Col}: {diagnostic.Severity}: {diagnostic.Message}");
+    if (diagnostics.Any(diagnostic => diagnostic.Severity == "error"))
+        return 1;
+
     var sourceDirectory = Path.GetDirectoryName(file) ?? Directory.GetCurrentDirectory();
     var outputDirectory = Path.Combine(sourceDirectory, "bin");
     Directory.CreateDirectory(outputDirectory);
