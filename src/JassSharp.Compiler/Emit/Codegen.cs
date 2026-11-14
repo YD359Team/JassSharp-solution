@@ -396,7 +396,7 @@ end
             string value;
             if (m.Value is NumExpr n && TryParseInt32Literal(n.Text, out var v))
             {
-                value = EmitNumber(n.Text);
+                value = _lua ? EmitNumber(n.Text) : n.Text;
                 next = unchecked(v + 1);
             }
             else if (m.Value is not null)
@@ -1051,6 +1051,9 @@ end
         UnaryExpr u when FindOperator(InferType(u.Inner), null, u.Op, [u.Inner]) is { } overload =>
             $"{overload.Owner}.{OperatorFunctionName(overload.Method)}({EmitExpr(u.Inner)})",
 
+        UnaryExpr u when u.Op == "-" && u.Inner is NumExpr { Text: "2147483648" } && _lua =>
+            "(-2147483647 - 1)",
+
         UnaryExpr u when u.Op == "!" && !_lua =>
             $"not ({EmitExpr(u.Inner)})",
 
@@ -1424,7 +1427,7 @@ end
     {
         "&&" => "and",
         "||" => "or",
-        "^" => "~",
+        "^" => _lua ? "~" : "^",
         _ => op,
     };
 
