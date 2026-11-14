@@ -39,7 +39,7 @@ Color.ApplyPlayerColorToDestructable(myDestructable, GetPlayerColor(owner));
 Color.ApplyPlayerColorToEffect(myEffect, owner);
 ```
 
-The effect helper takes a `player` because `BlzSetSpecialEffectColorByPlayer` expects a player handle. The unit and item helpers take `playercolor`.
+The effect helper takes a `player` because `BlzSetSpecialEffectColorByPlayer` expects a player handle. The unit, item, and destructable helpers take `playercolor`.
 
 ## Text formatting
 
