@@ -60,6 +60,21 @@ namespace Colors
                 Color.ClampByte(alpha) / 255.0);
         }
 
+        public static Color FromRgb(int red, int green, int blue)
+        {
+            return Color.FromBytes(red, green, blue, 255);
+        }
+
+        // Input is packed 0xAARRGGBB, matching Warcraft frame color APIs.
+        public static Color FromArgb(int argb)
+        {
+            int alpha = (argb >> 24) & 255;
+            int red = (argb >> 16) & 255;
+            int green = (argb >> 8) & 255;
+            int blue = argb & 255;
+            return Color.FromBytes(red, green, blue, alpha);
+        }
+
         // Percent channels are in the inclusive range 0..100.
         public static Color FromPercent(float red, float green, float blue, float alpha)
         {
@@ -94,6 +109,21 @@ namespace Colors
         public static Color Transparent()
         {
             return new Color(0.0, 0.0, 0.0, 0.0);
+        }
+
+        public Color WithAlpha(float alpha)
+        {
+            return new Color(R, G, B, alpha);
+        }
+
+        public Color Lerp(Color other, float amount)
+        {
+            float t = Color.Clamp01(amount);
+            return new Color(
+                R + (other.R - R) * t,
+                G + (other.G - G) * t,
+                B + (other.B - B) * t,
+                A + (other.A - A) * t);
         }
 
         public int RedByte() { return Color.ToByte(R); }
