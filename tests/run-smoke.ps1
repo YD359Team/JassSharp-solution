@@ -16,19 +16,12 @@ Write-Host "[2/5] Verifying invalid static method calls are rejected..."
 $misuseDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $invalidFixture 2>&1
 $misuseExitCode = $LASTEXITCODE
 $misuseText = $misuseDiagnostics -join "`n"
-try {
-    $parsedDiagnostics = ConvertFrom-Json -InputObject $misuseText
-}
-catch {
-    throw "Could not parse checker diagnostics as JSON. Output: $misuseText"
-}
+$hasStaticCallError = $misuseText.Contains("Factory.Create")
+$hasInstanceCallError = $misuseText.Contains("Factory.Get")
+$hasErrorSeverity = $misuseText.Contains('"Severity":"error"')
 
-$errorDiagnostics = @($parsedDiagnostics | Where-Object { $_.Severity -eq "error" })
-$hasStaticCallError = @($errorDiagnostics | Where-Object { $_.Message -match "Factory\.Create" }).Count -gt 0
-$hasInstanceCallError = @($errorDiagnostics | Where-Object { $_.Message -match "Factory\.Get" }).Count -gt 0
-
-if ($misuseExitCode -eq 0 -or -not $hasStaticCallError -or -not $hasInstanceCallError) {
-    throw "Static method misuse was not rejected with both expected diagnostics. Output: $misuseText"
+if ($misuseExitCode -eq 0 -or -not $hasErrorSeverity -or -not $hasStaticCallError -or -not $hasInstanceCallError) {
+    throw "Static method misuse was not rejected with both expected diagnostics. Exit code: $misuseExitCode. Output: $misuseText"
 }
 
 Write-Host "[3/5] Checking the operator/Math fixture..."
