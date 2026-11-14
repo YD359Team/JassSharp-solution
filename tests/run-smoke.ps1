@@ -251,7 +251,6 @@ if ($destructorLua.Contains("TemporaryResource.__gc") -or $destructorLua.Contain
     throw "Destructor must not be wired to automatic Lua garbage collection."
 }
 
-
 Write-Host "[15/15] Verifying invalid destructor declarations are rejected..."
 $invalidDestructorFixtures = @(
     @{ Path = "DestructorWrongNameSmoke.w3js"; Description = "mismatched destructor name" },
@@ -261,12 +260,21 @@ $invalidDestructorFixtures = @(
     @{ Path = "DestructorDuplicateSmoke.w3js"; Description = "duplicate destructor" },
     @{ Path = "DestructorDisposeConflictSmoke.w3js"; Description = "explicit Dispose conflict" }
 )
-foreach ($invalidCase in $invalidDestructorFixtures) {
-    $invalidDestructorPath = Join-Path $PSScriptRoot ("fixtures/" + $invalidCase.Path)
-    $invalidDestructorOutput = dotnet run --configuration Release --no-build --project $project -- check $invalidDestructorPath 2>&1
-    if ($LASTEXITCODE -eq 0) {
-        throw "Compiler accepted invalid destructor declaration ($($invalidCase.Description)): $invalidDestructorPath"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    # Invalid compiler input is expected to produce a non-zero native exit code.
+    $ErrorActionPreference = "Continue"
+    foreach ($invalidCase in $invalidDestructorFixtures) {
+        $invalidDestructorPath = Join-Path $PSScriptRoot ("fixtures/" + $invalidCase.Path)
+        $invalidDestructorOutput = dotnet run --configuration Release --no-build --project $project -- check $invalidDestructorPath 2>&1
+        $invalidDestructorExitCode = $LASTEXITCODE
+        if ($invalidDestructorExitCode -eq 0) {
+            throw "Compiler accepted invalid destructor declaration ($($invalidCase.Description)): $invalidDestructorPath"
+        }
     }
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
 }
 
 Write-Host "All JASS# compiler smoke checks passed."
