@@ -75,7 +75,50 @@ public sealed class Lexer(string source)
             if (char.IsDigit(c) || (c == '.' && char.IsDigit(Peek(1))))
             {
                 var start = _i;
-                while (_i < source.Length && (char.IsDigit(source[_i]) || source[_i] == '.')) Advance();
+                if (c == '0' && (Peek(1) is 'x' or 'X'))
+                {
+                    Advance();
+                    Advance();
+                    int digitsStart = _i;
+                    while (_i < source.Length && Uri.IsHexDigit(source[_i]))
+                        Advance();
+
+                    if (_i == digitsStart)
+                        throw new ParseException("hex-литерал должен содержать хотя бы одну шестнадцатеричную цифру", line, col);
+
+                    if (_i < source.Length && (char.IsLetterOrDigit(source[_i]) || source[_i] == '_'))
+                        throw new ParseException("некорректный hex-литерал", line, col);
+                }
+                else
+                {
+                    if (c == '.')
+                        Advance();
+
+                    while (_i < source.Length && char.IsDigit(source[_i]))
+                        Advance();
+
+                    if (_i < source.Length && source[_i] == '.' && Peek(1) != '.')
+                    {
+                        Advance();
+                        while (_i < source.Length && char.IsDigit(source[_i]))
+                            Advance();
+                    }
+
+                    if (_i < source.Length && source[_i] is 'e' or 'E')
+                    {
+                        Advance();
+                        if (_i < source.Length && source[_i] is '+' or '-')
+                            Advance();
+
+                        int exponentStart = _i;
+                        while (_i < source.Length && char.IsDigit(source[_i]))
+                            Advance();
+
+                        if (_i == exponentStart)
+                            throw new ParseException("экспонента числового литерала должна содержать цифры", line, col);
+                    }
+                }
+
                 list.Add(new Token(TokKind.Num, source[start.._i], line, col));
                 continue;
             }
