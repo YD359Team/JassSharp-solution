@@ -47,6 +47,11 @@ namespace Inventory
             return BlzUnitHasItemEquipped(_owner, value);
         }
 
+        public bool HasAnyEquippedItem()
+        {
+            return BlzUnitHasAnyItemEquipped(_owner);
+        }
+
         public bool HasEquipmentType(equipmentType value)
         {
             return BlzUnitHasItemEquipmentOfType(_owner, value);
