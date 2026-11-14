@@ -21,8 +21,8 @@ namespace StringsSmoke
             Braces: {{literal}}
             """;
         string concatenated = $"Interpolated {x}" + " tail";
-        string escapedSequences = "Line one\\nLine two\\tindented";
-        string rawPath = """C:\\temp\\file""";
+        string escapedSequences = "Line one\nLine two\tindented";
+        string rawPath = """C:\temp\file""";
 
         Print(basic);
         Print(mixed);
