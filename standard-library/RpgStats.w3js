@@ -1,0 +1,202 @@
+namespace RpgStats
+{
+    using Warcraft3;
+
+    // Engine-backed combat statistics. This is deliberately not a synthetic
+    // representation of campaign-only modifiers such as Ability Amp or Resolve.
+    public class UnitCombatStats
+    {
+        private unit _owner;
+
+        public UnitCombatStats(unit owner)
+        {
+            _owner = owner;
+        }
+
+        public unit Owner()
+        {
+            return _owner;
+        }
+
+        // Hero attributes. includeBonuses follows GetHeroStr/Agi/Int semantics.
+        public int Strength(bool includeBonuses)
+        {
+            return GetHeroStr(_owner, includeBonuses);
+        }
+
+        public int Agility(bool includeBonuses)
+        {
+            return GetHeroAgi(_owner, includeBonuses);
+        }
+
+        public int Intelligence(bool includeBonuses)
+        {
+            return GetHeroInt(_owner, includeBonuses);
+        }
+
+        public void SetStrength(int value, bool permanent)
+        {
+            SetHeroStr(_owner, value, permanent);
+        }
+
+        public void SetAgility(int value, bool permanent)
+        {
+            SetHeroAgi(_owner, value, permanent);
+        }
+
+        public void SetIntelligence(int value, bool permanent)
+        {
+            SetHeroInt(_owner, value, permanent);
+        }
+
+        public float Armor()
+        {
+            return BlzGetUnitArmor(_owner);
+        }
+
+        public void SetArmor(float value)
+        {
+            BlzSetUnitArmor(_owner, value);
+        }
+
+        // Warcraft weapon indices are forwarded unchanged to the native API.
+        public int BaseDamage(int weaponIndex)
+        {
+            return BlzGetUnitBaseDamage(_owner, weaponIndex);
+        }
+
+        public void SetBaseDamage(int value, int weaponIndex)
+        {
+            BlzSetUnitBaseDamage(_owner, value, weaponIndex);
+        }
+
+        public int DamageDiceNumber(int weaponIndex)
+        {
+            return BlzGetUnitDiceNumber(_owner, weaponIndex);
+        }
+
+        public void SetDamageDiceNumber(int value, int weaponIndex)
+        {
+            BlzSetUnitDiceNumber(_owner, value, weaponIndex);
+        }
+
+        public int DamageDiceSides(int weaponIndex)
+        {
+            return BlzGetUnitDiceSides(_owner, weaponIndex);
+        }
+
+        public void SetDamageDiceSides(int value, int weaponIndex)
+        {
+            BlzSetUnitDiceSides(_owner, value, weaponIndex);
+        }
+
+        public float AttackCooldown(int weaponIndex)
+        {
+            return BlzGetUnitAttackCooldown(_owner, weaponIndex);
+        }
+
+        public void SetAttackCooldown(float seconds, int weaponIndex)
+        {
+            BlzSetUnitAttackCooldown(_owner, seconds, weaponIndex);
+        }
+
+        public float MoveSpeed()
+        {
+            return GetUnitMoveSpeed(_owner);
+        }
+
+        public void SetMoveSpeed(float value)
+        {
+            SetUnitMoveSpeed(_owner, value);
+        }
+
+        public int MaxLife()
+        {
+            return BlzGetUnitMaxHP(_owner);
+        }
+
+        public void SetMaxLife(int value)
+        {
+            if (value < 1) { value = 1; }
+            BlzSetUnitMaxHP(_owner, value);
+        }
+
+        public int MaxMana()
+        {
+            return BlzGetUnitMaxMana(_owner);
+        }
+
+        public void SetMaxMana(int value)
+        {
+            if (value < 0) { value = 0; }
+            BlzSetUnitMaxMana(_owner, value);
+        }
+
+        public float Life()
+        {
+            return GetUnitState(_owner, UNIT_STATE_LIFE);
+        }
+
+        public void SetLife(float value)
+        {
+            SetUnitState(_owner, UNIT_STATE_LIFE, value);
+        }
+
+        public float Mana()
+        {
+            return GetUnitState(_owner, UNIT_STATE_MANA);
+        }
+
+        public void SetMana(float value)
+        {
+            SetUnitState(_owner, UNIT_STATE_MANA, value);
+        }
+
+        // Ability level indices are zero-based, as in BlzGetUnitAbilityCooldown.
+        public float AbilityCooldown(int abilityRawcode, int level)
+        {
+            return BlzGetUnitAbilityCooldown(_owner, abilityRawcode, level);
+        }
+
+        public float AbilityCooldownRemaining(int abilityRawcode)
+        {
+            return BlzGetUnitAbilityCooldownRemaining(_owner, abilityRawcode);
+        }
+
+        public void SetAbilityCooldownRemaining(int abilityRawcode, float seconds)
+        {
+            BlzSetUnitAbilityCooldownRemaining(_owner, abilityRawcode, seconds);
+        }
+
+        public float AbilityCooldownPercent(int abilityRawcode)
+        {
+            return BlzGetUnitAbilityCooldownPercent(_owner, abilityRawcode);
+        }
+
+        public void SetAbilityCooldownPercent(int abilityRawcode, float percent)
+        {
+            BlzSetUnitAbilityCooldownPercent(_owner, abilityRawcode, percent);
+        }
+
+        public void AdjustAbilityCooldownPercent(int abilityRawcode, float deltaPercent)
+        {
+            BlzAdjustUnitAbilityCooldownPercent(_owner, abilityRawcode, deltaPercent);
+        }
+
+        public void AdjustAbilityCooldownRemaining(int abilityRawcode, float deltaSeconds)
+        {
+            BlzAdjustUnitAbilityCooldownRemaining(_owner, abilityRawcode, deltaSeconds);
+        }
+
+        public void EndAbilityCooldown(int abilityRawcode)
+        {
+            BlzEndUnitAbilityCooldown(_owner, abilityRawcode);
+        }
+
+        public void StartAbilityCooldown(int abilityRawcode, float seconds)
+        {
+            if (seconds < 0.0) { seconds = 0.0; }
+            BlzStartUnitAbilityCooldown(_owner, abilityRawcode, seconds);
+        }
+    }
+}
