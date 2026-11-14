@@ -680,7 +680,8 @@ public static class Checker
                     return _currentClass;
 
                 case NumExpr number:
-                    return number.Text.Contains('.') || number.Text.Contains('e') || number.Text.Contains('E')
+                    return !number.Text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) &&
+                           (number.Text.Contains('.') || number.Text.Contains('e') || number.Text.Contains('E'))
                         ? "float"
                         : "int";
 
