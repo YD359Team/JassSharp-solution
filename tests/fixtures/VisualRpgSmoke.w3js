@@ -71,6 +71,8 @@ namespace VisualRpgSmoke
         bool equipped = inventory.IsEquipped(equipment);
         bool anyEquipped = inventory.HasAnyEquippedItem();
         bool hasCategory = inventory.HasEquipmentType(equipmentCategory);
+        equipmentType itemType = inventory.ItemEquipmentType(equipment);
+        itemTag itemTagValue = inventory.ItemTag(equipment);
         int randomEquipmentRawcode = ItemSelection.ChooseRandomRawcode(
             ITEM_TYPE_PERMANENT, 5, equipmentCategory, itemTagValue, false, false);
         bool canEquip = inventory.CanEquip(equipmentCategory);
@@ -78,8 +80,6 @@ namespace VisualRpgSmoke
         bool equipResult = inventory.Equip(equipment);
         inventory.Unequip(equipment);
         item removed = inventory.UnequipSlot(equipmentSlot);
-        equipmentType itemType = inventory.ItemEquipmentType(equipment);
-        itemTag itemTagValue = inventory.ItemTag(equipment);
 
         Talents.Reset(hero);
         int talentRawcode = AbilityId("A0T1");
