@@ -425,8 +425,15 @@ if ($vjassDirectiveExitCode -eq 0) {
     throw "The removed target-conditional directive was accepted. Output: $vjassDirectiveText"
 }
 
-$vjassTargetOutput = dotnet run --configuration Release --no-build --project $project -- build $doWhileFixture --target vjass 2>&1
-$vjassTargetExitCode = $LASTEXITCODE
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $vjassTargetOutput = dotnet run --configuration Release --no-build --project $project -- build $doWhileFixture --target vjass 2>&1
+    $vjassTargetExitCode = $LASTEXITCODE
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
 if ($vjassTargetExitCode -eq 0) {
     throw "The removed vJASS target was accepted. Output: $($vjassTargetOutput -join [Environment]::NewLine)"
 }
