@@ -425,6 +425,11 @@ namespace Frames
         public void SetSize(float width, float height) { if (_disposed) { return; } BlzFrameSetSize(_handle, width, height); }
         public void SetVisible(bool value) { if (_disposed) { return; } BlzFrameSetVisible(_handle, value); }
         public bool IsVisible() { if (_disposed) { return false; } return BlzFrameIsVisible(_handle); }
+        public FrameEventSubscription Subscribe(frameeventtype eventType, code callback)
+        {
+            if (_disposed) { return null; }
+            return new FrameEventSubscription(_handle, eventType, callback);
+        }
         ~TextFrame()
         {
             if (!_disposed)
@@ -528,6 +533,155 @@ namespace Frames
             return new FrameEventSubscription(_handle, eventType, callback);
         }
         ~EditBoxFrame()
+        {
+            if (!_disposed)
+            {
+                if (_ownsHandle) { BlzDestroyFrame(_handle); }
+                _disposed = true;
+            }
+        }
+    }
+
+    // A native CHECKBOX frame. Its checked state is observed through frame events.
+    // Warcraft III does not expose a checked-state getter/setter in the native API.
+    public class CheckBoxFrame
+    {
+        private framehandle _handle;
+        private bool _ownsHandle;
+        private bool _disposed;
+
+        public CheckBoxFrame(framehandle handle, bool ownsHandle)
+        {
+            _handle = handle;
+            _ownsHandle = ownsHandle;
+            _disposed = false;
+        }
+
+        public static CheckBoxFrame Create(string name, framehandle parent, string inherits, int context)
+        {
+            return new CheckBoxFrame(BlzCreateFrameByType("CHECKBOX", name, parent, inherits, context), true);
+        }
+
+        public framehandle Handle() { if (_disposed) { return null; } return _handle; }
+        public bool IsDisposed() { return _disposed; }
+        public void SetText(string value) { if (_disposed) { return; } BlzFrameSetText(_handle, value); }
+        public string Text() { if (_disposed) { return ""; } return BlzFrameGetText(_handle); }
+        public void SetEnabled(bool value) { if (_disposed) { return; } BlzFrameSetEnable(_handle, value); }
+        public bool IsEnabled() { if (_disposed) { return false; } return BlzFrameGetEnable(_handle); }
+        public void SetVisible(bool value) { if (_disposed) { return; } BlzFrameSetVisible(_handle, value); }
+        public bool IsVisible() { if (_disposed) { return false; } return BlzFrameIsVisible(_handle); }
+        public void Click() { if (_disposed) { return; } BlzFrameClick(_handle); }
+
+        public FrameEventSubscription Subscribe(frameeventtype eventType, code callback)
+        {
+            if (_disposed) { return null; }
+            return new FrameEventSubscription(_handle, eventType, callback);
+        }
+
+        public FrameEventSubscription SubscribeChecked(code callback)
+        {
+            return Subscribe(FRAMEEVENT_CHECKBOX_CHECKED, callback);
+        }
+
+        public FrameEventSubscription SubscribeUnchecked(code callback)
+        {
+            return Subscribe(FRAMEEVENT_CHECKBOX_UNCHECKED, callback);
+        }
+
+        ~CheckBoxFrame()
+        {
+            if (!_disposed)
+            {
+                if (_ownsHandle) { BlzDestroyFrame(_handle); }
+                _disposed = true;
+            }
+        }
+    }
+
+    // A native POPUPMENU frame. The selected item index is available as
+    // FrameEvents.CurrentValue() while handling POPUPMENU_ITEM_CHANGED.
+    public class PopupFrame
+    {
+        private framehandle _handle;
+        private bool _ownsHandle;
+        private bool _disposed;
+
+        public PopupFrame(framehandle handle, bool ownsHandle)
+        {
+            _handle = handle;
+            _ownsHandle = ownsHandle;
+            _disposed = false;
+        }
+
+        public static PopupFrame Create(string name, framehandle parent, string inherits, int context)
+        {
+            return new PopupFrame(BlzCreateFrameByType("POPUPMENU", name, parent, inherits, context), true);
+        }
+
+        public framehandle Handle() { if (_disposed) { return null; } return _handle; }
+        public bool IsDisposed() { return _disposed; }
+        public void SetEnabled(bool value) { if (_disposed) { return; } BlzFrameSetEnable(_handle, value); }
+        public bool IsEnabled() { if (_disposed) { return false; } return BlzFrameGetEnable(_handle); }
+        public void SetVisible(bool value) { if (_disposed) { return; } BlzFrameSetVisible(_handle, value); }
+        public bool IsVisible() { if (_disposed) { return false; } return BlzFrameIsVisible(_handle); }
+        public void Click() { if (_disposed) { return; } BlzFrameClick(_handle); }
+
+        public FrameEventSubscription Subscribe(frameeventtype eventType, code callback)
+        {
+            if (_disposed) { return null; }
+            return new FrameEventSubscription(_handle, eventType, callback);
+        }
+
+        public FrameEventSubscription SubscribeSelectionChanged(code callback)
+        {
+            return Subscribe(FRAMEEVENT_POPUPMENU_ITEM_CHANGED, callback);
+        }
+
+        ~PopupFrame()
+        {
+            if (!_disposed)
+            {
+                if (_ownsHandle) { BlzDestroyFrame(_handle); }
+                _disposed = true;
+            }
+        }
+    }
+
+    // A native MENU frame. It is a container; item construction is defined by
+    // the frame template/FDF rather than by a dedicated Warcraft III native API.
+    public class MenuFrame
+    {
+        private framehandle _handle;
+        private bool _ownsHandle;
+        private bool _disposed;
+
+        public MenuFrame(framehandle handle, bool ownsHandle)
+        {
+            _handle = handle;
+            _ownsHandle = ownsHandle;
+            _disposed = false;
+        }
+
+        public static MenuFrame Create(string name, framehandle parent, string inherits, int context)
+        {
+            return new MenuFrame(BlzCreateFrameByType("MENU", name, parent, inherits, context), true);
+        }
+
+        public framehandle Handle() { if (_disposed) { return null; } return _handle; }
+        public bool IsDisposed() { return _disposed; }
+        public void SetEnabled(bool value) { if (_disposed) { return; } BlzFrameSetEnable(_handle, value); }
+        public bool IsEnabled() { if (_disposed) { return false; } return BlzFrameGetEnable(_handle); }
+        public void SetVisible(bool value) { if (_disposed) { return; } BlzFrameSetVisible(_handle, value); }
+        public bool IsVisible() { if (_disposed) { return false; } return BlzFrameIsVisible(_handle); }
+        public void Click() { if (_disposed) { return; } BlzFrameClick(_handle); }
+
+        public FrameEventSubscription Subscribe(frameeventtype eventType, code callback)
+        {
+            if (_disposed) { return null; }
+            return new FrameEventSubscription(_handle, eventType, callback);
+        }
+
+        ~MenuFrame()
         {
             if (!_disposed)
             {
