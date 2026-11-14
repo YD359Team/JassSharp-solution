@@ -45,7 +45,6 @@ public sealed class Parser(List<Token> tokens)
             }
             else
             {
-                var typeTok = Peek;
                 string typeName = ParseTypeName();
                 var isArray = typeName.EndsWith("[]", StringComparison.Ordinal);
                 var id = Eat(TokKind.Id).Text;
