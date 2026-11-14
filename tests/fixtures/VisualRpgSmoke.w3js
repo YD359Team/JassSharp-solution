@@ -4,6 +4,9 @@ namespace VisualRpgSmoke
     using FloatingText;
     using Lightning;
     using Inventory;
+    using Effects;
+    using CameraControl;
+    using Audio;
     using Math;
     using Warcraft3;
 
@@ -87,5 +90,10 @@ namespace VisualRpgSmoke
         float drained = RpgCombat.Heal(target, hero, -25.0, false, true);
         item eventEquipped = InventoryEvents.EquippedItem();
         item eventUnequipped = InventoryEvents.UnequippedItem();
+
+        SpecialEffects.Remove(specialEffect);
+        CameraSettings.SetHotkeyTargetLockAllowed(false);
+        bool cameraHotkeyLock = CameraSettings.IsHotkeyTargetLockAllowed();
+        AudioSettings.SetThematicMusicVolume(96);
     }
 }
