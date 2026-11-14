@@ -67,12 +67,30 @@ const BITWISE_OPERATORS = [
 const KEYWORDS = new Set([
     "namespace", "using", "class", "enum", "const", "public", "private", "static",
     "void", "int", "integer", "float", "real", "bool", "boolean", "string", "code",
-    "new", "this", "if", "else", "while", "for", "foreach", "return", "break", "continue",
+    "new", "this", "if", "else", "do", "while", "for", "foreach", "return", "break", "continue",
     "true", "false", "null", "var", "in", "is", "as", "get", "set"
 ]);
 
 const PRIMITIVE_TYPES = new Set(["void", "int", "integer", "float", "real", "bool", "boolean", "string", "code"]);
-const DECLARATION_STOPWORDS = new Set(["namespace", "using", "class", "enum", "const", "public", "private", "static", "new", "this", "if", "else", "while", "for", "return", "break", "continue", "true", "false", "null", "var", "in", "is", "as", "get", "set"]);
+const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; type: string; kind: "Method" | "Property"; parameters: string[] }>> = {
+    Strings: [
+        { name: "Length", type: "int", kind: "Method", parameters: ["string value"] },
+        { name: "Substring", type: "string", kind: "Method", parameters: ["string value", "int startIndex", "int length"] },
+        { name: "Replace", type: "string", kind: "Method", parameters: ["string value", "string oldValue", "string newValue"] },
+        { name: "IndexOf", type: "int", kind: "Method", parameters: ["string value", "string searchValue"] },
+        { name: "LastIndexOf", type: "int", kind: "Method", parameters: ["string value", "string searchValue"] },
+        { name: "Contains", type: "bool", kind: "Method", parameters: ["string value", "string searchValue"] },
+        { name: "Trim", type: "string", kind: "Method", parameters: ["string value"] },
+        { name: "TrimStart", type: "string", kind: "Method", parameters: ["string value"] },
+        { name: "TrimEnd", type: "string", kind: "Method", parameters: ["string value"] },
+        { name: "ToLower", type: "string", kind: "Method", parameters: ["string value"] },
+        { name: "ToUpper", type: "string", kind: "Method", parameters: ["string value"] },
+        { name: "Split", type: "string[]", kind: "Method", parameters: ["string value", "string separator"] },
+        { name: "Join", type: "string", kind: "Method", parameters: ["string separator", "string[] values"] }
+    ]
+};
+
+const DECLARATION_STOPWORDS = new Set(["namespace", "using", "class", "enum", "const", "public", "private", "static", "new", "this", "if", "else", "do", "while", "for", "return", "break", "continue", "true", "false", "null", "var", "in", "is", "as", "get", "set"]);
 
 const BUILTIN_TYPES = new Set((`
 ability abilitybooleanfield abilitybooleanlevelarrayfield abilitybooleanlevelfield abilityintegerfield
@@ -622,7 +640,7 @@ function inferExpressionType(expression: string, documentText: string, offset: n
     const segments = expr.split(".");
     let type = latestVariableType(segments[0], documentText, offset);
     if (!type && ((hasWarcraft3Using(documentText) && BUILTIN_TYPES.has(segments[0].toLowerCase())) ||
-        readClasses(documentText).some(c => c.name === segments[0])))
+        readClasses(documentText).some(c => c.name === segments[0]) || segments[0] in STANDARD_LIBRARY_MEMBERS))
         type = segments[0];
     if (!type && segments[0] === "this") type = getCurrentClass(documentText, offset)?.name;
     if (!type) {
@@ -852,7 +870,8 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
 
                 const classInfo = readClasses(fullText).find(c => c.name === receiverType);
                 const custom = classInfo ? readClassMembers(fullText, classInfo) : [];
-                for (const member of (hasWarcraft3Using(fullText) ? MEMBERS : []).filter(m => m.type === receiverType)) {
+                const standard = STANDARD_LIBRARY_MEMBERS[receiverType] ?? [];
+                for (const member of [...(hasWarcraft3Using(fullText) ? MEMBERS : []).filter(m => m.type === receiverType), ...standard]) {
                     const isMethod = member.kind === "Method";
                     addCompletion(items, seen, member.name,
                         isMethod ? vscode.CompletionItemKind.Method : vscode.CompletionItemKind.Property,
