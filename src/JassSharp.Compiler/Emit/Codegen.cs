@@ -814,7 +814,7 @@ end
     private string ToStringExpr(Expr e)
     {
         if (e is NullExpr)
-            return "\\"\\"";
+            return "\"\"";
 
         var t = InferType(e);
         var emitted = EmitExpr(e);
@@ -823,7 +823,7 @@ end
             "int" => _lua ? $"tostring({emitted})" : $"I2S({emitted})",
             "float" => _lua ? $"tostring({emitted})" : $"R2S({emitted})",
             "bool" => _lua ? $"tostring({emitted})" : $"B2S({emitted})",
-            "string" => _lua ? $"({emitted} or \\"\\")" : emitted,
+            "string" => _lua ? $"({emitted} or \"\")" : emitted,
             "unit" => $"GetUnitName({emitted})",
             "player" => $"GetPlayerName({emitted})",
             "item" => $"GetItemName({emitted})",
