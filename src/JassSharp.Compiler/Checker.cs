@@ -405,6 +405,22 @@ public static class Checker
                     }
                     break;
 
+                case NumExpr number:
+                    if (number.Text.StartsWith("0x", StringComparison.OrdinalIgnoreCase))
+                    {
+                        if (!uint.TryParse(number.Text.AsSpan(2), System.Globalization.NumberStyles.AllowHexSpecifier,
+                                System.Globalization.CultureInfo.InvariantCulture, out _))
+                            Add(number.Line, number.Col, "error", "hex-литерал выходит за пределы 32-битного значения");
+                    }
+                    else if (!number.Text.Contains('.') && !number.Text.Contains('e') && !number.Text.Contains('E') &&
+                             long.TryParse(number.Text, System.Globalization.NumberStyles.None,
+                                 System.Globalization.CultureInfo.InvariantCulture, out long integerValue) &&
+                             integerValue > int.MaxValue)
+                    {
+                        Add(number.Line, number.Col, "error", "целочисленный литерал выходит за пределы int32");
+                    }
+                    break;
+
                 case InterpolatedExpr interpolated:
                     foreach (var part in interpolated.Parts)
                         if (part.Expression is not null)
@@ -506,6 +522,13 @@ public static class Checker
                         if (!stringConcatenation && !numericOperands && leftType is not null && rightType is not null)
                             Add(binary.Line, binary.Col, "error",
                                 $"оператор {binary.Op} требует числовые операнды, получены {leftType} и {rightType}");
+                    }
+                    else if (binary.Op is "<<" or ">>" or "|" or "&" or "^")
+                    {
+                        if (leftType is not null && rightType is not null &&
+                            (leftType != "int" || rightType != "int"))
+                            Add(binary.Line, binary.Col, "error",
+                                $"оператор {binary.Op} требует два операнда типа int, получены {leftType} и {rightType}");
                     }
                     break;
 
@@ -768,6 +791,8 @@ public static class Checker
                     var right = InferType(binary.Right);
                     if (binary.Op is "==" or "!=" or "<" or ">" or "<=" or ">=" or "and" or "or" or "&&" or "||")
                         return "bool";
+                    if (binary.Op is "<<" or ">>" or "|" or "&" or "^")
+                        return "int";
                     if (binary.Op == "+" && (left == "string" || right == "string"))
                         return "string";
                     if (left == "float" || right == "float")
