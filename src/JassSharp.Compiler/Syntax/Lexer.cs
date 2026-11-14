@@ -56,7 +56,7 @@ public sealed class Lexer(string source)
             if (c == '"' && Peek(1) == '"' && Peek(2) == '"')
             {
                 Advance(); Advance(); Advance();
-                list.Add(new Token(TokKind.Str, ReadRawString(), line, col));
+                list.Add(new Token(TokKind.Str, ReadRawString(line, col), line, col));
                 continue;
             }
 
@@ -175,7 +175,7 @@ public sealed class Lexer(string source)
         return builder.ToString();
     }
 
-    private string ReadRawString()
+    private string ReadRawString(int startLine, int startCol)
     {
         var start = _i;
         while (_i < source.Length && !(source[_i] == '"' && Peek(1) == '"' && Peek(2) == '"'))
@@ -184,10 +184,10 @@ public sealed class Lexer(string source)
             throw new ParseException("незакрытая raw-строка", _line, _col);
         var value = source[start.._i];
         Advance(); Advance(); Advance();
-        return TrimRawIndentation(value);
+        return TrimRawIndentation(value, startLine, startCol);
     }
 
-    private string ReadInterpolatedString(string terminator, bool raw)
+    private string ReadInterpolatedString(string terminator, bool raw, int startLine, int startCol)
     {
         var builder = new StringBuilder();
         int braceDepth = 0;
@@ -199,7 +199,7 @@ public sealed class Lexer(string source)
             if (braceDepth == 0 && source.AsSpan(_i).StartsWith(terminator, StringComparison.Ordinal))
             {
                 for (int i = 0; i < terminator.Length; i++) Advance();
-                return raw ? TrimRawIndentation(builder.ToString()) : builder.ToString();
+                return raw ? TrimRawIndentation(builder.ToString(), startLine, startCol) : builder.ToString();
             }
 
             char c = source[_i];
@@ -281,7 +281,7 @@ public sealed class Lexer(string source)
         throw new ParseException("незакрытая строка или интерполяция", _line, _col);
     }
 
-    private static string TrimRawIndentation(string value)
+    private static string TrimRawIndentation(string value, int startLine, int startCol)
     {
         if (value.Length == 0 || (value[0] != '\n' && value[0] != '\r'))
             return value;
@@ -306,7 +306,7 @@ public sealed class Lexer(string source)
             }
 
             if (!lines[i].StartsWith(closingIndent, StringComparison.Ordinal))
-                throw new ParseException("отступ строки raw-литерала меньше отступа закрывающего разделителя", 1, 1);
+                throw new ParseException("отступ строки raw-литерала меньше отступа закрывающего разделителя", startLine, startCol);
 
             lines[i] = lines[i][closingIndent.Length..];
         }
