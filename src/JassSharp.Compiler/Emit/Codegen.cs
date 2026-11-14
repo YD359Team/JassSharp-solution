@@ -1076,7 +1076,7 @@ end
         if (m.Name == "Length")
         {
             if (receiverType == "string")
-                return $"string.len({receiver})";
+                return $"utf8.len({receiver})";
             return $"#{receiver}";
         }
 
