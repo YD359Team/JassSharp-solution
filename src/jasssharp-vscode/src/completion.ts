@@ -48,10 +48,11 @@ async function fetchSymbols(projectDir: string, currentFile: string): Promise<Sy
 
 const KEYWORDS = [
     "namespace", "using", "class", "void", "int", "float", "bool", "string", "const",
-    "new", "this", "if", "else", "while", "return", "true", "false", "null",
+    "new", "this", "if", "else", "while", "return", "true", "false", "null", "foreach", "var",
 ];
 
 const TYPES = [
+    "List", "Queue", "Stack", "Dictionary", "KeyValuePair",
     "ability", "abilitybooleanfield", "abilitybooleanlevelarrayfield", "abilitybooleanlevelfield", "abilityintegerfield",
     "abilityintegerlevelarrayfield", "abilityintegerlevelfield", "abilityrealfield", "abilityreallevelarrayfield",
     "abilityreallevelfield", "abilitystringfield", "abilitystringlevelarrayfield", "abilitystringlevelfield", "agent",
@@ -1850,6 +1851,61 @@ export function registerCompletions(context: vscode.ExtensionContext) {
             const afterDot = /(\w+)\.\w*$/.exec(line);
             if (afterDot) {
                 const recv = afterDot[1];
+                const declarationPattern = new RegExp(
+                    `\\b(List|Queue|Stack|Dictionary)\\s*<([^>]+)>\\s+${recv}\\b`,
+                    "g"
+                );
+                const declarations = [...doc.getText().matchAll(declarationPattern)];
+                const collectionDeclaration = declarations.length > 0 ? declarations[declarations.length - 1] : null;
+                if (collectionDeclaration) {
+                    const collectionType = collectionDeclaration[1];
+                    const typeArguments = collectionDeclaration[2].split(",").map(value => value.trim());
+                    const collectionMembers: Record<string, { name: string; kind: "Method" | "Property"; ret: string; args?: string[] }[]> = {
+                        List: [
+                            { name: "Add", kind: "Method", ret: "void", args: [typeArguments[0]] },
+                            { name: "Remove", kind: "Method", ret: "bool", args: [typeArguments[0]] },
+                            { name: "IndexOf", kind: "Method", ret: "int", args: [typeArguments[0]] },
+                            { name: "Clear", kind: "Method", ret: "void", args: [] },
+                            { name: "Count", kind: "Property", ret: "int" },
+                        ],
+                        Queue: [
+                            { name: "Enqueue", kind: "Method", ret: "void", args: [typeArguments[0]] },
+                            { name: "Dequeue", kind: "Method", ret: typeArguments[0], args: [] },
+                            { name: "Peek", kind: "Method", ret: typeArguments[0], args: [] },
+                            { name: "Count", kind: "Property", ret: "int" },
+                        ],
+                        Stack: [
+                            { name: "Push", kind: "Method", ret: "void", args: [typeArguments[0]] },
+                            { name: "Pop", kind: "Method", ret: typeArguments[0], args: [] },
+                            { name: "Peek", kind: "Method", ret: typeArguments[0], args: [] },
+                            { name: "Count", kind: "Property", ret: "int" },
+                        ],
+                        Dictionary: [
+                            { name: "Add", kind: "Method", ret: "void", args: typeArguments },
+                            { name: "Remove", kind: "Method", ret: "bool", args: [typeArguments[0]] },
+                            { name: "TryAdd", kind: "Method", ret: "bool", args: typeArguments },
+                            { name: "TryRemove", kind: "Method", ret: "bool", args: [typeArguments[0]] },
+                            { name: "ContainsKey", kind: "Method", ret: "bool", args: [typeArguments[0]] },
+                            { name: "Count", kind: "Property", ret: "int" },
+                        ],
+                    };
+                    for (const member of collectionMembers[collectionType] ?? []) {
+                        const item = new vscode.CompletionItem(
+                            member.name,
+                            member.kind === "Method" ? vscode.CompletionItemKind.Method : vscode.CompletionItemKind.Property
+                        );
+                        item.range = range;
+                        item.detail = `${collectionType}.${member.name} (${member.kind}) → ${member.ret}`;
+                        if (member.kind === "Method") {
+                            const args = member.args ?? [];
+                            item.insertText = new vscode.SnippetString(
+                                `${member.name}(${args.map((type, index) => `${type} ${String.fromCharCode(97 + index)}`).join(", ")}$0)`
+                            );
+                        }
+                        items.push(item);
+                    }
+                    return items;
+                }
                 for (const m of MEMBERS.filter(x => x.type === recv || recv === "self" || recv === "this")) {
                     const i = new vscode.CompletionItem(m.name, m.kind === "Method" ? vscode.CompletionItemKind.Method : vscode.CompletionItemKind.Property);
                     i.range = range;
