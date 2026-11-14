@@ -101,6 +101,41 @@ namespace Inventory
             if (target == null) { return; }
             BlzResetUnitTalents(target);
         }
+
+        // In Warcraft III, authored talent choices are commonly represented by abilities.
+        public static bool GrantAbility(unit target, int abilityRawcode)
+        {
+            if (target == null) { return false; }
+            return UnitAddAbility(target, abilityRawcode);
+        }
+
+        public static bool RemoveAbility(unit target, int abilityRawcode)
+        {
+            if (target == null) { return false; }
+            return UnitRemoveAbility(target, abilityRawcode);
+        }
+
+        public static int AbilityRank(unit target, int abilityRawcode)
+        {
+            if (target == null) { return 0; }
+            return GetUnitAbilityLevel(target, abilityRawcode);
+        }
+
+        public static bool SetAbilityRank(unit target, int abilityRawcode, int rank)
+        {
+            if (target == null || rank < 1) { return false; }
+            if (GetUnitAbilityLevel(target, abilityRawcode) == 0)
+            {
+                if (!UnitAddAbility(target, abilityRawcode)) { return false; }
+            }
+            return SetUnitAbilityLevel(target, abilityRawcode, rank) == rank;
+        }
+
+        public static bool SetAbilityPermanent(unit target, int abilityRawcode, bool permanent)
+        {
+            if (target == null) { return false; }
+            return UnitMakeAbilityPermanent(target, permanent, abilityRawcode);
+        }
     }
 
     public class RpgCombat
