@@ -38,7 +38,10 @@ The constructor accepts the owning `unit` and an integer ability rawcode. Use Wa
 | `RemainingCooldown()` | Reads the current remaining cooldown |
 | `StartCooldown(seconds)` / `EndCooldown()` | Starts or ends this ability's cooldown |
 | `ManaCost(level)` | Reads mana cost for a 1-based ability level |
-| `Handle()` | Returns the borrowed native `ability` handle for advanced field access |
+| `IntegerField(field)` / `SetIntegerField(field, value)` | Reads or writes an integer ability field using `abilityintegerfield` |
+| `RealField(field)` / `SetRealField(field, value)` | Reads or writes a real ability field using `abilityrealfield` |
+| `StringField(field)` / `SetStringField(field, value)` | Reads or writes a string ability field using `abilitystringfield` |
+| `Handle()` | Returns the borrowed native `ability` handle for advanced native API calls |
 
 Cooldown duration is expressed in game seconds. Negative cooldown durations are clamped to zero. Level arguments to `Cooldown` and `ManaCost` are clamped to at least one.
 
@@ -46,6 +49,6 @@ Cooldown duration is expressed in game seconds. Negative cooldown durations are 
 
 `UnitAbility` is a lightweight, non-owning view. It does not create or destroy the unit or ability, and it does not own the handle returned by `Handle()`. No destructor or `Dispose()` is needed. The view remains associated with its original unit and rawcode; if the ability is removed and later re-added, the same wrapper addresses that ability again.
 
-The wrapper does not validate that the unit is non-null, alive, or currently owns the ability before forwarding calls to Warcraft III. Check `IsPresent()` when that distinction matters. Gameplay-specific preconditions remain the caller's responsibility.
+The wrapper does not validate that the unit is non-null, alive, or currently owns the ability before forwarding calls to Warcraft III. Check `IsPresent()` when that distinction matters. Field access also assumes that the ability handle exists and that the supplied field belongs to the corresponding field type. The native setters return Warcraft III's success result; the wrapper does not impose additional validation. Gameplay-specific preconditions remain the caller's responsibility.
 
 This module uses Warcraft III natives at runtime. In headless mode it can be checked and translated with `using Warcraft3;`, but the generated Lua still requires the Warcraft III runtime for these calls.

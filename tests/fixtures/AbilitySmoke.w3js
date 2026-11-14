@@ -25,6 +25,13 @@ namespace AbilitySmoke
         float remaining = firebolt.RemainingCooldown();
         firebolt.EndCooldown();
 
+        int abilityLevels = firebolt.IntegerField(ABILITY_IF_LEVELS);
+        bool integerFieldSet = firebolt.SetIntegerField(ABILITY_IF_LEVELS, abilityLevels);
+        float missileArc = firebolt.RealField(ABILITY_RF_ARF_MISSILE_ARC);
+        bool realFieldSet = firebolt.SetRealField(ABILITY_RF_ARF_MISSILE_ARC, missileArc);
+        string abilityName = firebolt.StringField(ABILITY_SF_NAME);
+        bool stringFieldSet = firebolt.SetStringField(ABILITY_SF_NAME, abilityName);
+
         ability handle = firebolt.Handle();
         bool removed = firebolt.Remove();
         bool presentAfter = firebolt.IsPresent();

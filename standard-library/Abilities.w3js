@@ -89,7 +89,39 @@ namespace Abilities
             return BlzGetUnitAbilityManaCost(_owner, _rawcode, level);
         }
 
-        // Returns the borrowed native handle for advanced BlzGetAbility*Field calls.
+        // Ability field access is typed by Warcraft III's field handle enums.
+        // These methods forward to the native API; field validity is the caller's responsibility.
+        public int IntegerField(abilityintegerfield field)
+        {
+            return BlzGetAbilityIntegerField(Handle(), field);
+        }
+
+        public bool SetIntegerField(abilityintegerfield field, int value)
+        {
+            return BlzSetAbilityIntegerField(Handle(), field, value);
+        }
+
+        public float RealField(abilityrealfield field)
+        {
+            return BlzGetAbilityRealField(Handle(), field);
+        }
+
+        public bool SetRealField(abilityrealfield field, float value)
+        {
+            return BlzSetAbilityRealField(Handle(), field, value);
+        }
+
+        public string StringField(abilitystringfield field)
+        {
+            return BlzGetAbilityStringField(Handle(), field);
+        }
+
+        public bool SetStringField(abilitystringfield field, string value)
+        {
+            return BlzSetAbilityStringField(Handle(), field, value);
+        }
+
+        // Returns the borrowed native ability handle for advanced native API calls.
         public ability Handle()
         {
             return BlzGetUnitAbility(_owner, _rawcode);

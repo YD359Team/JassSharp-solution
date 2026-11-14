@@ -406,7 +406,7 @@ if ($groupLua.Contains("function UnitGroup.__gc") -or $groupLua.Contains("newpro
 }
 
 
-Write-Host "[19/19] Verifying unit ability wrapper and native cooldown integration..."
+Write-Host "[19/19] Verifying unit ability wrapper, cooldowns, and typed ability fields..."
 $abilityLibrary = Join-Path $repoRoot "standard-library/Abilities.w3js"
 $abilityFixture = Join-Path $PSScriptRoot "fixtures/AbilitySmoke.w3js"
 
@@ -439,7 +439,13 @@ $abilityFragments = @(
     "BlzStartUnitAbilityCooldown(self._owner, self._rawcode",
     "BlzEndUnitAbilityCooldown(self._owner, self._rawcode)",
     "BlzGetUnitAbilityManaCost(self._owner, self._rawcode, level)",
-    "BlzGetUnitAbility(self._owner, self._rawcode)"
+    "BlzGetUnitAbility(self._owner, self._rawcode)",
+    "BlzGetAbilityIntegerField(self:Handle(), field)",
+    "BlzSetAbilityIntegerField(self:Handle(), field, value)",
+    "BlzGetAbilityRealField(self:Handle(), field)",
+    "BlzSetAbilityRealField(self:Handle(), field, value)",
+    "BlzGetAbilityStringField(self:Handle(), field)",
+    "BlzSetAbilityStringField(self:Handle(), field, value)"
 )
 foreach ($fragment in $abilityFragments) {
     if (-not $abilityLua.Contains($fragment)) {
