@@ -25,6 +25,17 @@ internal static class StandardLibrary
     public static IEnumerable<NsUnit> LoadUnits()
     {
         foreach (var source in LoadSources())
-            yield return new Parser(new Lexer(source.Source).Lex()).ParseNamespace();
+        {
+            try
+            {
+                yield return new Parser(new Lexer(source.Source).Lex()).ParseNamespace();
+            }
+            catch (ParseException ex)
+            {
+                throw new InvalidDataException(
+                    $"standard-library source '{source.FileName}':{ex.Line}:{ex.Col}: {ex.Message}",
+                    ex);
+            }
+        }
     }
 }
