@@ -5,7 +5,7 @@ namespace JassSharp.Emit;
 
 public sealed class Codegen
 {
-    private readonly bool _lua;
+    private const bool _lua = true;
     private readonly bool _headless;
     private readonly HashSet<string> _classes;
     private List<string> _lines = [];
@@ -20,9 +20,8 @@ public sealed class Codegen
     private readonly Dictionary<string, EnumDecl> _enums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
 
-    public Codegen(bool lua, IEnumerable<string> classes, bool headless = false)
+    public Codegen(IEnumerable<string> classes, bool headless = false)
     {
-        _lua = lua;
         _headless = headless;
         _classes = new HashSet<string>(classes, StringComparer.Ordinal);
     }
