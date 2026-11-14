@@ -165,6 +165,7 @@ function __dictionary_add(d, key, value)
     if value == nil then error("Dictionary value cannot be nil") end
     if rawget(d._items, key) ~= nil then error("An item with the same key already exists") end
     d._items[key] = value
+    d._count = d._count + 1
 end
 function __dictionary_remove(d, key)
     if rawget(d._items, key) == nil then return false end
