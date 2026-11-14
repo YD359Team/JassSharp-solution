@@ -20,6 +20,63 @@ if ($LASTEXITCODE -ne 0) {
     throw "Compiler build failed with exit code $LASTEXITCODE"
 }
 
+Write-Host "[1a] Verifying hexadecimal literals and bitwise operators..."
+$bitwiseFixture = Join-Path $PSScriptRoot "fixtures/BitwiseSmoke.w3js"
+$bitwiseBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $bitwiseFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Bitwise fixture failed to compile: $($bitwiseBuildOutput -join [Environment]::NewLine)"
+}
+$bitwiseLuaPath = Join-Path $PSScriptRoot "fixtures/bin/BitwiseSmoke.lua"
+if (-not (Test-Path $bitwiseLuaPath)) {
+    throw "Expected generated bitwise Lua file was not created: $bitwiseLuaPath"
+}
+$bitwiseLua = Get-Content -LiteralPath $bitwiseLuaPath -Raw
+foreach ($fragment in @(
+    "local combined = (flags | mask)",
+    "local intersection = (flags & mask)",
+    "local toggled = (flags ~ mask)",
+    "local shiftedLeft = (1 << 5)",
+    "local shiftedRight = (32 >> 2)",
+    "local allBits = (-1)",
+    "local signBit = (-2147483648)",
+    "flags = (flags | (16))",
+    "flags = (flags & (255))",
+    "flags = (flags ~ (1))",
+    "flags = (flags << 1)",
+    "flags = (flags >> 1)"
+)) {
+    if (-not $bitwiseLua.Contains($fragment)) {
+        throw "Generated bitwise Lua is missing expected fragment: $fragment"
+    }
+}
+if ($bitwiseLua.Contains("bit32.") -or $bitwiseLua.Contains("bit.")) {
+    throw "Bitwise code generation must use native Lua 5.3 operators, not external bit libraries."
+}
+
+Write-Host "[1b] Verifying bitwise operand types and 32-bit literal overflow..."
+$bitwiseInvalidFixture = Join-Path $PSScriptRoot "fixtures/BitwiseTypeMismatchSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $bitwiseDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $bitwiseInvalidFixture 2>&1
+    $bitwiseExitCode = $LASTEXITCODE
+    $bitwiseText = $bitwiseDiagnostics -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $parsedBitwiseDiagnostics = ConvertFrom-Json -InputObject $bitwiseText
+}
+catch {
+    throw "Could not parse bitwise diagnostics as JSON. Exit code: $bitwiseExitCode. Output: $bitwiseText"
+}
+$bitwiseErrors = @($parsedBitwiseDiagnostics | Where-Object { $_.Severity -eq "error" })
+$bitwiseErrorLines = @($bitwiseErrors | ForEach-Object { [int]$_.Line } | Sort-Object) -join ","
+if ($bitwiseExitCode -eq 0 -or $bitwiseErrors.Count -ne 2 -or $bitwiseErrorLines -ne "6,7") {
+    throw "Bitwise type checking or 32-bit literal overflow validation failed. Exit code: $bitwiseExitCode. Error lines: $bitwiseErrorLines. Output: $bitwiseText"
+}
+
 Write-Host "[2/20] Verifying invalid static method calls are rejected..."
 $misuseDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $invalidFixture 2>&1
 $misuseExitCode = $LASTEXITCODE
