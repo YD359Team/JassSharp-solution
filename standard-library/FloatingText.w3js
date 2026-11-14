@@ -70,7 +70,7 @@ namespace FloatingText
 
         public void SetColor(Color value)
         {
-            if (_disposed || value == null) { return; }
+            if (_disposed) { return; }
             value.ApplyToTextTag(_handle);
         }
 
