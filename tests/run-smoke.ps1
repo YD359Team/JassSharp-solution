@@ -444,7 +444,10 @@ $visualLibraries = @(
     "Colors.w3js",
     "FloatingText.w3js",
     "Lightning.w3js",
-    "Inventory.w3js"
+    "Inventory.w3js",
+    "Effects.w3js",
+    "Camera.w3js",
+    "Audio.w3js"
 )
 foreach ($libraryName in $visualLibraries) {
     $libraryPath = Join-Path $repoRoot ("standard-library/" + $libraryName)
@@ -485,7 +488,11 @@ foreach ($fragment in @(
     "UnitAddAbility(target, abilityRawcode)",
     "SetUnitAbilityLevel(target, abilityRawcode, rank)",
     "UnitMakeAbilityPermanent(target, permanent, abilityRawcode)",
-    "BlzUnitHeal(target, source, amount, isItem, applyStatBonuses)"
+    "BlzUnitHeal(target, source, amount, isItem, applyStatBonuses)",
+    "BlzRemoveEffect(value)",
+    "BlzSetCameraAllowsHotkeyTargetLock(allowed)",
+    "BlzGetCameraAllowsHotkeyTargetLock()",
+    "BlzSetThematicMusicAbsoluteVolume(volume)"
 )) {
     if (-not $visualLua.Contains($fragment)) {
         throw "Generated visual/RPG Lua is missing expected fragment: $fragment"
