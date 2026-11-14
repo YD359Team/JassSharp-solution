@@ -38,7 +38,9 @@ foreach ($fragment in @(
     "local shiftedLeft = (1 << 5)",
     "local shiftedRight = (32 >> 2)",
     "local allBits = (-1)",
-    "local signBit = (-2147483648)",
+    "local signBit = (-2147483647 - 1)",
+    "local minValue = (-2147483647 - 1)",
+    "local precedence = (1 | (2 ~ (3 & (4 << 1))))",
     "flags = (flags | (16))",
     "flags = (flags & (255))",
     "flags = (flags ~ (1))",
@@ -73,7 +75,7 @@ catch {
 }
 $bitwiseErrors = @($parsedBitwiseDiagnostics | Where-Object { $_.Severity -eq "error" })
 $bitwiseErrorLines = @($bitwiseErrors | ForEach-Object { [int]$_.Line } | Sort-Object) -join ","
-if ($bitwiseExitCode -eq 0 -or $bitwiseErrors.Count -ne 2 -or $bitwiseErrorLines -ne "6,7") {
+if ($bitwiseExitCode -eq 0 -or $bitwiseErrors.Count -ne 2 -or $bitwiseErrorLines -ne "6,7,8") {
     throw "Bitwise type checking or 32-bit literal overflow validation failed. Exit code: $bitwiseExitCode. Error lines: $bitwiseErrorLines. Output: $bitwiseText"
 }
 
