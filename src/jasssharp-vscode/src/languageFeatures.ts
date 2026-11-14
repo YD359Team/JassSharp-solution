@@ -444,7 +444,7 @@ function readVariables(text: string, classes = readClasses(text), functions = re
 
         const initializer = declaration.initializer;
         let inferred: string | undefined;
-        const creation = /^new\s+([A-Za-z_]\w*)/.exec(initializer);
+        const creation = /^new\s+([A-Za-z_]\w*(?:\[\])*)/.exec(initializer);
         if (creation) inferred = creation[1];
         else if (/^(?:true|false)$/.test(initializer)) inferred = "bool";
         else if (/^null$/.test(initializer)) inferred = undefined;
@@ -452,6 +452,17 @@ function readVariables(text: string, classes = readClasses(text), functions = re
         else if (/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(initializer))
             inferred = /[.eE]/.test(initializer) ? "float" : "int";
         else {
+            const indexed = /^([A-Za-z_]\w*)((?:\s*\[[^\]]+\])+)$/.exec(initializer);
+            if (indexed) {
+                inferred = knownTypes.get(indexed[1]);
+                const indexCount = (indexed[2].match(/\[/g) ?? []).length;
+                for (let i = 0; i < indexCount && inferred; i++) {
+                    if (inferred === "string") continue;
+                    if (inferred.endsWith("[]")) inferred = inferred.slice(0, -2);
+                    else inferred = undefined;
+                }
+            }
+
             const identifier = /^([A-Za-z_]\w*)$/.exec(initializer);
             if (identifier) inferred = knownTypes.get(identifier[1]);
 
