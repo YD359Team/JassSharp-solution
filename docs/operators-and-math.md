@@ -32,7 +32,7 @@ Static methods on Math:
 - Pow(float, float), Sqrt(float)
 - Abs(float), Sin(float), Cos(float), Tan(float)
 
-The initial API uses float arguments and returns float, including the rounding functions.
+The initial API uses float arguments and returns float, including the rounding functions. Static class methods are called through the type name (for example, `Math.Clamp(...)`); calling a static method through an instance or an instance method through a type name is a semantic error.
 
 ## Vector2 and Vector3
 
@@ -83,4 +83,7 @@ tests/fixtures/MathOperatorsSmoke.w3js exercises import resolution, static calls
 ~~~powershell
 dotnet run --project src/JassSharp.Compiler -- check tests/fixtures/MathOperatorsSmoke.w3js
 dotnet run --project src/JassSharp.Compiler -- build tests/fixtures/MathOperatorsSmoke.w3js
+
+# Run the repeatable build/check/Lua-output smoke suite on Windows PowerShell:
+./tests/run-smoke.ps1
 ~~~
