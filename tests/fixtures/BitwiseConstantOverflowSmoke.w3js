@@ -1,0 +1,9 @@
+namespace BitwiseConstantOverflowSmoke
+{
+    const int TooLargeConstant = 2147483648;
+
+    enum InvalidFlags
+    {
+        TooLargeFlag = 0x100000000
+    }
+}
