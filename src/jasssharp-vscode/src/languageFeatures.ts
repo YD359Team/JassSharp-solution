@@ -420,6 +420,19 @@ function getCurrentClass(text: string, offset: number): ClassInfo | undefined {
     return readClasses(text).filter(c => c.start < offset && offset <= c.bodyEnd).sort((a, b) => b.start - a.start)[0];
 }
 
+function isVariableVisibleAt(
+    variable: VariableInfo,
+    offset: number,
+    currentFunction: FunctionInfo | undefined,
+    currentClass: ClassInfo | undefined
+): boolean {
+    if (variable.offset >= offset) return false;
+    if (variable.scopeStart === undefined) return true;
+    if (currentFunction && variable.scopeStart === currentFunction.bodyStart) return true;
+    return !!currentClass && variable.scopeStart === currentClass.bodyStart &&
+        variable.scopeEnd === currentClass.bodyEnd;
+}
+
 function visibleVariables(text: string, offset: number): VariableInfo[] {
     const classes = readClasses(text);
     const functions = readFunctions(text, classes);
@@ -431,13 +444,8 @@ function visibleVariables(text: string, offset: number): VariableInfo[] {
         .filter(cls => cls.bodyStart <= offset && offset <= cls.bodyEnd)
         .sort((a, b) => b.start - a.start)[0];
 
-    return readVariables(text, classes, functions).filter(variable => {
-        if (variable.offset >= offset) return false;
-        if (variable.scopeStart === undefined) return true;
-        if (currentFunction && variable.scopeStart === currentFunction.bodyStart) return true;
-        return !!currentClass && variable.scopeStart === currentClass.bodyStart &&
-            variable.scopeEnd === currentClass.bodyEnd;
-    });
+    return readVariables(text, classes, functions).filter(variable =>
+        isVariableVisibleAt(variable, offset, currentFunction, currentClass));
 }
 
 function latestVariableType(name: string, text: string, offset: number): string | undefined {
@@ -748,8 +756,6 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             const variables = readVariables(text, classes, functions);
             const classNames = new Set(classes.map(c => c.name));
             const functionNames = new Set(functions.map(f => f.name));
-            const parameterNamesSet = new Set(variables.filter(v => v.isParameter).map(v => v.name));
-            const variableNames = new Set(variables.map(v => v.name));
             const customMembers = classes.flatMap(cls => readClassMembers(text, cls));
             const memberMethods = new Set([...MEMBERS.filter(m => m.kind === "Method").map(m => m.name), ...customMembers.filter(m => m.kind === "Method").map(m => m.name)]);
             const memberProperties = new Set([...MEMBERS.filter(m => m.kind !== "Method").map(m => m.name), ...customMembers.filter(m => m.kind === "Property").map(m => m.name)]);
@@ -789,15 +795,27 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
                     modifiers = ["readonly", "defaultLibrary"];
                 } else if (functionNames.has(token.text)) {
                     type = functions.find(f => f.name === token.text)?.isMethod ? "method" : "function";
-                } else if (parameterNamesSet.has(token.text)) {
-                    type = "parameter";
-                } else if (variableNames.has(token.text)) {
-                    type = "variable";
                 } else {
-                    const previous = text.slice(0, token.start).trimEnd();
+                    const currentFunction = functions
+                        .filter(fn => fn.bodyStart !== undefined && fn.bodyEnd !== undefined &&
+                            fn.bodyStart <= token.start && token.start <= fn.bodyEnd)
+                        .sort((a, b) => b.offset - a.offset)[0];
+                    const currentClass = classes
+                        .filter(cls => cls.bodyStart <= token.start && token.start <= cls.bodyEnd)
+                        .sort((a, b) => b.start - a.start)[0];
+                    const visibleVariable = variables
+                        .filter(variable => variable.name === token.text &&
+                            isVariableVisibleAt(variable, token.start, currentFunction, currentClass))
+                        .sort((a, b) => b.offset - a.offset)[0];
+
+                    if (visibleVariable) {
+                        type = visibleVariable.isParameter ? "parameter" : "variable";
+                    } else {
+                        const previous = text.slice(0, token.start).trimEnd();
                     if (previous.endsWith(".")) {
-                        if (memberMethods.has(token.text)) type = "method";
-                        else if (memberProperties.has(token.text)) type = "property";
+                            if (memberMethods.has(token.text)) type = "method";
+                            else if (memberProperties.has(token.text)) type = "property";
+                        }
                     }
                 }
 
