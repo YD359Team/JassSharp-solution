@@ -643,7 +643,7 @@ function inferExpressionType(expression: string, documentText: string, offset: n
     const segments = expr.split(".");
     let type = latestVariableType(segments[0], documentText, offset);
     if (!type && ((hasWarcraft3Using(documentText) && BUILTIN_TYPES.has(segments[0].toLowerCase())) ||
-        readClasses(documentText).some(c => c.name === segments[0]) || segments[0] in STANDARD_LIBRARY_MEMBERS))
+        readClasses(documentText).some(c => c.name === segments[0]) || Object.prototype.hasOwnProperty.call(STANDARD_LIBRARY_MEMBERS, segments[0])))
         type = segments[0];
     if (!type && segments[0] === "this") type = getCurrentClass(documentText, offset)?.name;
     if (!type) {
