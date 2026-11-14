@@ -1245,7 +1245,7 @@ public static class NativeSigs
         ["SetMusicVolume"] = new("SetMusicVolume", "void", ["int"], ""),
         ["SetMusicPlayPosition"] = new("SetMusicPlayPosition", "void", ["int"], ""),
         ["SetThematicMusicVolume"] = new("SetThematicMusicVolume", "void", ["int"], ""),
-        ["SetThematicMusicAbsoluteVolume"] = new("SetThematicMusicAbsoluteVolume", "void", ["int"], ""),
+        ["BlzSetThematicMusicAbsoluteVolume"] = new("BlzSetThematicMusicAbsoluteVolume", "void", ["int"], ""),
         ["SetThematicMusicPlayPosition"] = new("SetThematicMusicPlayPosition", "void", ["int"], ""),
         ["SetSoundDuration"] = new("SetSoundDuration", "void", ["sound", "int"], ""),
         ["GetSoundDuration"] = new("GetSoundDuration", "int", ["sound"], ""),
