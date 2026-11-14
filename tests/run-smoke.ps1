@@ -8,13 +8,13 @@ $typeFixture = Join-Path $PSScriptRoot "fixtures/TypeSafetySmoke.w3js"
 $mathLibrary = Join-Path $repoRoot "standard-library/Math.w3js"
 $output = Join-Path $PSScriptRoot "fixtures/bin/MathOperatorsSmoke.lua"
 
-Write-Host "[1/6] Building compiler..."
+Write-Host "[1/7] Building compiler..."
 dotnet build $project -c Release
 if ($LASTEXITCODE -ne 0) {
     throw "Compiler build failed with exit code $LASTEXITCODE"
 }
 
-Write-Host "[2/6] Verifying invalid static method calls are rejected..."
+Write-Host "[2/7] Verifying invalid static method calls are rejected..."
 $misuseDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $invalidFixture 2>&1
 $misuseExitCode = $LASTEXITCODE
 $misuseText = $misuseDiagnostics -join "`n"
@@ -27,7 +27,7 @@ if ($misuseExitCode -eq 0 -or -not $hasErrorSeverity -or -not $hasStaticCallErro
     throw "Static/instance misuse was not rejected with all expected diagnostics. Exit code: $misuseExitCode. Output: $misuseText"
 }
 
-Write-Host "[3/6] Verifying build rejects semantic errors..."
+Write-Host "[3/7] Verifying build rejects semantic errors..."
 $previousErrorActionPreference = $ErrorActionPreference
 try {
     # PowerShell can promote native stderr output to a terminating error when
