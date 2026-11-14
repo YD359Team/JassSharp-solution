@@ -16,13 +16,13 @@ JASS# — язык с C#-подобным синтаксисом для разр
 - Пространства имён, `using` и разрешение зависимостей между исходными файлами.
 - Встроенная библиотека Warcraft III и стандартная библиотека.
 
-Текущая цель генерации — Lua. Генерация vJASS/JASS через CLI больше не поддерживается.
+Lua — единственный backend JASS#. Условная компиляция под vJASS/JASS и генерация этих форматов не входят в язык.
 
 ## Структура репозитория
 
 - `src/JassSharp.Compiler` — компилятор, проверка семантики и CLI.
 - `src/jasssharp-vscode` — расширение VS Code.
-- `standard-library` — исходники стандартной библиотеки, включая обёртки над Warcraft III Frame API. Документация по математике и векторам: `docs/operators-and-math.md`; по 2D-геометрии: `docs/geometry.md`; по таймерам Warcraft III: `docs/timers.md`; по группам юнитов: `docs/groups.md`; по способностям: `docs/abilities.md`; по Frame API: `docs/frames.md`.
+- `standard-library` — исходники стандартной библиотеки, включая `Math`, `Strings` и обёртки над Warcraft III Frame API. Документация по строкам: `docs/strings.md`; по математике и векторам: `docs/operators-and-math.md`; по 2D-геометрии: `docs/geometry.md`; по таймерам Warcraft III: `docs/timers.md`; по группам юнитов: `docs/groups.md`; по способностям: `docs/abilities.md`; по Frame API: `docs/frames.md`.
 - `samples` — демонстрационные проекты.
 - `tests` — smoke fixtures и сценарии проверки компилятора.
 - `docs` — дополнительные заметки по языку.
