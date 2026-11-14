@@ -193,8 +193,8 @@ catch {
     throw "Could not parse generic collection diagnostics as JSON. Exit code: $collectionsExitCode. Output: $collectionsText"
 }
 $collectionErrors = @($parsedCollectionsDiagnostics | Where-Object { $_.Severity -eq "error" })
-if ($collectionsExitCode -eq 0 -or $collectionErrors.Count -ne 3) {
-    throw "Generic collection type safety did not reject all three invalid operations. Exit code: $collectionsExitCode. Errors: $($collectionErrors.Count). Output: $collectionsText"
+if ($collectionsExitCode -eq 0 -or $collectionErrors.Count -ne 4) {
+    throw "Generic collection type safety did not reject all four invalid type mismatches. Exit code: $collectionsExitCode. Errors: $($collectionErrors.Count). Output: $collectionsText"
 }
 
 Write-Host "[6/20] Generating Lua and validating 2D geometry..."
