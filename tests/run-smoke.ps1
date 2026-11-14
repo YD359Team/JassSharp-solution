@@ -75,7 +75,7 @@ catch {
 }
 $bitwiseErrors = @($parsedBitwiseDiagnostics | Where-Object { $_.Severity -eq "error" })
 $bitwiseErrorLines = @($bitwiseErrors | ForEach-Object { [int]$_.Line } | Sort-Object) -join ","
-if ($bitwiseExitCode -eq 0 -or $bitwiseErrors.Count -ne 2 -or $bitwiseErrorLines -ne "6,7,8") {
+if ($bitwiseExitCode -eq 0 -or $bitwiseErrors.Count -ne 2 -or $bitwiseErrorLines -ne "6,7,8,9,10") {
     throw "Bitwise type checking or 32-bit literal overflow validation failed. Exit code: $bitwiseExitCode. Error lines: $bitwiseErrorLines. Output: $bitwiseText"
 }
 
