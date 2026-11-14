@@ -132,7 +132,7 @@ foreach ($fragment in $geometryFragments) {
     }
 }
 
-Write-Host "[7/16] Generating Math/vector Lua..."
+Write-Host "[8/16] Generating Math/vector Lua..."
 dotnet run --configuration Release --no-build --project $project -- build $fixture
 if ($LASTEXITCODE -ne 0) {
     throw "Fixture build failed with exit code $LASTEXITCODE"
@@ -142,7 +142,7 @@ if (-not (Test-Path $output)) {
     throw "Expected generated Lua file was not created: $output"
 }
 
-Write-Host "[7/16] Verifying generated static calls, Math helpers, and operator adapters..."
+Write-Host "[8/16] Verifying generated static calls, Math helpers, and operator adapters..."
 $lua = Get-Content -LiteralPath $output -Raw
 $requiredFragments = @(
     "function Score.FromValue(value)",
@@ -178,7 +178,7 @@ foreach ($fragment in $requiredFragments) {
     }
 }
 
-Write-Host "[8/16] Verifying headless mode emits standalone Lua without Warcraft entry points..."
+Write-Host "[9/16] Verifying headless mode emits standalone Lua without Warcraft entry points..."
 $headlessBuildOutput = dotnet run --configuration Release --no-build --project $project -- map --project $headlessProject
 if ($LASTEXITCODE -ne 0) {
     throw "Headless build failed: $($headlessBuildOutput -join [Environment]::NewLine)"
@@ -204,7 +204,7 @@ if ($missingUsingExitCode -eq 0) {
     throw "Headless mode accepted Warcraft III symbols without using Warcraft3."
 }
 
-Write-Host "[9/16] Verifying explicit using Warcraft3 enables the built-in module..."
+Write-Host "[10/16] Verifying explicit using Warcraft3 enables the built-in module..."
 $warcraftProject = Join-Path $PSScriptRoot "headless-warcraft-smoke"
 $warcraftBuildOutput = dotnet run --configuration Release --no-build --project $project -- map --project $warcraftProject
 if ($LASTEXITCODE -ne 0) {
@@ -215,7 +215,7 @@ if (-not $warcraftLua.Contains("CreateGroup()") -or $warcraftLua.Contains("funct
     throw "Explicit Warcraft3 module did not compile to standalone Lua as expected."
 }
 
-Write-Host "[10/16] Verifying jagged array parsing, typing, and Lua indexing..."
+Write-Host "[11/16] Verifying jagged array parsing, typing, and Lua indexing..."
 $arrayFixture = Join-Path $PSScriptRoot "fixtures/ArrayTypesSmoke.w3js"
 $arrayBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $arrayFixture --target lua
 if ($LASTEXITCODE -ne 0) {
@@ -244,14 +244,14 @@ foreach ($fragment in $arrayFragments) {
     }
 }
 
-Write-Host "[11/16] Verifying incompatible array element types are rejected..."
+Write-Host "[12/16] Verifying incompatible array element types are rejected..."
 $arrayMismatchFixture = Join-Path $PSScriptRoot "fixtures/ArrayTypeMismatchSmoke.w3js"
 $arrayMismatchOutput = dotnet run --configuration Release --no-build --project $project -- check $arrayMismatchFixture 2>&1
 if ($LASTEXITCODE -eq 0) {
     throw "Compiler accepted assignment from float[] to int[]."
 }
 
-Write-Host "[12/16] Verifying foreach array loops and Warcraft group iteration..."
+Write-Host "[13/16] Verifying foreach array loops and Warcraft group iteration..."
 $foreachFixture = Join-Path $PSScriptRoot "fixtures/ForeachSmoke.w3js"
 $foreachBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $foreachFixture --target lua
 if ($LASTEXITCODE -ne 0) {
@@ -275,14 +275,14 @@ foreach ($fragment in $foreachFragments) {
     }
 }
 
-Write-Host "[13/16] Verifying unsupported foreach collection types are rejected..."
+Write-Host "[14/16] Verifying unsupported foreach collection types are rejected..."
 $unsupportedForeachFixture = Join-Path $PSScriptRoot "fixtures/ForeachUnsupportedSmoke.w3js"
 $unsupportedForeachOutput = dotnet run --configuration Release --no-build --project $project -- check $unsupportedForeachFixture 2>&1
 if ($LASTEXITCODE -eq 0) {
     throw "Compiler accepted foreach over a scalar value."
 }
 
-Write-Host "[14/16] Verifying manually invoked class destructors..."
+Write-Host "[15/16] Verifying manually invoked class destructors..."
 $destructorFixture = Join-Path $PSScriptRoot "fixtures/DestructorSmoke.w3js"
 $destructorBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $destructorFixture --target lua
 if ($LASTEXITCODE -ne 0) {
@@ -299,7 +299,7 @@ if ($destructorLua.Contains("TemporaryResource.__gc") -or $destructorLua.Contain
     throw "Destructor must not be wired to automatic Lua garbage collection."
 }
 
-Write-Host "[15/16] Verifying invalid destructor declarations are rejected..."
+Write-Host "[16/16] Verifying invalid destructor declarations are rejected..."
 $invalidDestructorFixtures = @(
     @{ Path = "DestructorWrongNameSmoke.w3js"; Description = "mismatched destructor name" },
     @{ Path = "DestructorParametersSmoke.w3js"; Description = "destructor parameters" },
