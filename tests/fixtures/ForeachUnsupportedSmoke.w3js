@@ -1,0 +1,10 @@
+namespace ForeachUnsupportedSmoke
+{
+    public void Verify(int count)
+    {
+        foreach (var item in count)
+        {
+            Print(item);
+        }
+    }
+}

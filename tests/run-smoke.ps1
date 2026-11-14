@@ -227,10 +227,11 @@ foreach ($fragment in $foreachFragments) {
     }
 }
 
-Write-Host "[13/13] Verifying foreach does not silently emit invalid JASS..."
-$foreachJassOutput = dotnet run --configuration Release --no-build --project $project -- build $foreachFixture --target jass 2>&1
+Write-Host "[13/13] Verifying unsupported foreach collection types are rejected..."
+$unsupportedForeachFixture = Join-Path $PSScriptRoot "fixtures/ForeachUnsupportedSmoke.w3js"
+$unsupportedForeachOutput = dotnet run --configuration Release --no-build --project $project -- check $unsupportedForeachFixture 2>&1
 if ($LASTEXITCODE -eq 0) {
-    throw "Compiler accepted foreach for the JASS backend, which has no array length semantics."
+    throw "Compiler accepted foreach over a scalar value."
 }
 
 Write-Host "All JASS# compiler smoke checks passed."
