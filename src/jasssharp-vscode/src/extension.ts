@@ -104,6 +104,12 @@ function runCompiler(args: string[], cwd: string): Promise<{ code: number; out: 
     });
 }
 
+function projectConfigPath(document: vscode.TextDocument): string {
+    const root = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath ?? path.dirname(document.uri.fsPath);
+    const configured = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile")?.trim() || "jasssharp.json";
+    return path.isAbsolute(configured) ? configured : path.join(root, configured);
+}
+
 function scheduleCheck(document: vscode.TextDocument, diagnostics: vscode.DiagnosticCollection): void {
     if (document.languageId !== "jasssharp" || document.uri.scheme !== "file") return;
     const key = document.uri.toString();
@@ -119,7 +125,9 @@ function scheduleCheck(document: vscode.TextDocument, diagnostics: vscode.Diagno
 async function check(document: vscode.TextDocument, diagnostics: vscode.DiagnosticCollection): Promise<void> {
     if (document.languageId !== "jasssharp" || document.uri.scheme !== "file" || document.isDirty) return;
     const version = document.version;
-    const result = await runCompiler(["check", document.fileName], path.dirname(document.fileName));
+    const result = await runCompiler(
+        ["check", document.fileName, "--config", projectConfigPath(document)],
+        path.dirname(document.fileName));
     if (document.isClosed || document.version !== version || document.isDirty) return;
 
     if (result.code === -1) {
@@ -162,7 +170,9 @@ async function build(forcedTarget: string): Promise<void> {
     await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: `JASS# → ${target}` },
         async () => {
-            const result = await runCompiler(["build", document.fileName, "--target", target], path.dirname(document.fileName));
+            const result = await runCompiler(
+                ["build", document.fileName, "--target", target, "--config", projectConfigPath(document)],
+                path.dirname(document.fileName));
             if (result.code === -1) {
                 vscode.window.showErrorMessage(`Не удалось запустить компилятор (${compilerPath()}). Укажите jasssharp.compilerPath. ${result.err}`);
             } else if (result.code === 0) {

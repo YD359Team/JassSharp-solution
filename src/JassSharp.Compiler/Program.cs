@@ -12,8 +12,8 @@ if (args.Length == 0 ||
     (args[0] != "map" && args.Length < 2))
 {
     Console.Error.WriteLine("usage:");
-    Console.Error.WriteLine("  jasssharp build <file.w3js> [--target lua]");
-    Console.Error.WriteLine("  jasssharp check <file.w3js>");
+    Console.Error.WriteLine("  jasssharp build <file.w3js> [--target lua] [--config file.json]");
+    Console.Error.WriteLine("  jasssharp check <file.w3js> [--config file.json]");
     Console.Error.WriteLine("  jasssharp map [--project dir] [--config file.json] [--run]");
     Console.Error.WriteLine("  jasssharp symbols <file.w3js> [--project dir]");
     return 1;
@@ -30,13 +30,25 @@ if (cmd == "check")
         return 1;
     }
 
+    string? checkConfig = null;
+    for (var i = 2; i < args.Length; i++)
+    {
+        if (args[i] == "--config" && i + 1 < args.Length)
+            checkConfig = args[++i];
+        else
+        {
+            Console.Error.WriteLine($"unknown or incomplete check option: {args[i]}");
+            return 1;
+        }
+    }
+
     var diagnostics = new List<JassSharp.Diagnostic>();
 
     try
     {
         var unit = new Parser(new Lexer(File.ReadAllText(path)).Lex()).ParseNamespace();
         var projectDirectory = FindProjectDirectory(path);
-        var mode = ReadProjectMode(projectDirectory);
+        var mode = ReadProjectMode(projectDirectory, checkConfig);
         if (mode is not ("wc3" or "headless"))
             throw new InvalidDataException($"unsupported project mode '{mode}'.");
         var allUnits = MapBuild.LoadProject(projectDirectory);
@@ -144,10 +156,13 @@ if (!File.Exists(file))
 }
 
 var target = "lua";
+string? buildConfig = null;
 for (var i = 2; i < args.Length; i++)
 {
     if (args[i] == "--target" && i + 1 < args.Length)
         target = args[++i].Trim().ToLowerInvariant();
+    else if (args[i] == "--config" && i + 1 < args.Length)
+        buildConfig = args[++i];
     else
     {
         Console.Error.WriteLine($"unknown or incomplete build option: {args[i]}");
@@ -165,7 +180,7 @@ try
 {
     var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
     var projectDirectory = FindProjectDirectory(file);
-    var mode = ReadProjectMode(projectDirectory);
+    var mode = ReadProjectMode(projectDirectory, buildConfig);
     if (mode is not ("wc3" or "headless"))
         throw new InvalidDataException($"unsupported project mode '{mode}'. Supported modes are 'wc3' and 'headless'.");
     var allUnits = MapBuild.LoadProject(projectDirectory);
@@ -216,9 +231,11 @@ catch (Exception ex)
 return 0;
 
 
-static string ReadProjectMode(string projectDirectory)
+static string ReadProjectMode(string projectDirectory, string? configName = null)
 {
-    string configPath = Path.Combine(projectDirectory, "jasssharp.json");
+    string configPath = string.IsNullOrWhiteSpace(configName)
+        ? Path.Combine(projectDirectory, "jasssharp.json")
+        : Path.GetFullPath(Path.IsPathRooted(configName) ? configName : Path.Combine(projectDirectory, configName));
     if (!File.Exists(configPath))
         return "wc3";
 
