@@ -81,6 +81,30 @@ if ($bitwiseExitCode -eq 0 -or $bitwiseErrors.Count -ne 5 -or $bitwiseErrorLines
     throw "Bitwise type checking or 32-bit literal overflow validation failed. Exit code: $bitwiseExitCode. Error lines: $bitwiseErrorLines. Output: $bitwiseText"
 }
 
+Write-Host "[1c] Verifying overflow validation in constants and enum members..."
+$bitwiseConstantsFixture = Join-Path $PSScriptRoot "fixtures/BitwiseConstantOverflowSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $bitwiseConstantsDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $bitwiseConstantsFixture 2>&1
+    $bitwiseConstantsExitCode = $LASTEXITCODE
+    $bitwiseConstantsText = $bitwiseConstantsDiagnostics -join [Environment]::NewLine
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $parsedBitwiseConstantsDiagnostics = ConvertFrom-Json -InputObject $bitwiseConstantsText
+}
+catch {
+    throw "Could not parse constant/enum overflow diagnostics as JSON. Exit code: $bitwiseConstantsExitCode. Output: $bitwiseConstantsText"
+}
+$bitwiseConstantsErrors = @($parsedBitwiseConstantsDiagnostics | Where-Object { $_.Severity -eq "error" })
+$bitwiseConstantsErrorLines = @($bitwiseConstantsErrors | ForEach-Object { [int]$_.Line } | Sort-Object) -join ","
+if ($bitwiseConstantsExitCode -eq 0 -or $bitwiseConstantsErrors.Count -ne 2 -or $bitwiseConstantsErrorLines -ne "3,6") {
+    throw "Overflow validation did not cover const and enum expressions. Exit code: $bitwiseConstantsExitCode. Error lines: $bitwiseConstantsErrorLines. Output: $bitwiseConstantsText"
+}
+
 Write-Host "[2/20] Verifying invalid static method calls are rejected..."
 $misuseDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $invalidFixture 2>&1
 $misuseExitCode = $LASTEXITCODE
