@@ -352,6 +352,13 @@ public static class Checker
                 return collectionType[..^2];
             if (collectionType == "group")
                 return _hasWarcraft3 ? "unit" : null;
+            if (TryGetGenericArguments(collectionType, out var collectionName, out var arguments))
+            {
+                if (collectionName is "List" or "Queue" or "Stack")
+                    return arguments[0];
+                if (collectionName == "Dictionary")
+                    return $"KeyValuePair<{arguments[0]},{arguments[1]}>";
+            }
             return null;
         }
 
@@ -438,10 +445,20 @@ public static class Checker
                         Add(index.Index.Line, index.Index.Col, "error",
                             $"индекс должен иметь тип int, получен {indexType}");
                     var indexedType = InferType(index.Object);
-                    if (indexedType is not null && indexedType != "string" &&
-                        indexedType != "List" && !indexedType.EndsWith("[]", StringComparison.Ordinal))
-                        Add(index.Line, index.Col, "error",
-                            $"тип {indexedType} не поддерживает индексатор");
+                    bool supportsIndex = indexedType == "string" ||
+                        indexedType is not null && indexedType.EndsWith("[]", StringComparison.Ordinal);
+                    if (indexedType is not null && TryGetGenericArguments(indexedType, out var indexedName, out _))
+                        supportsIndex = indexedName is "List" or "Dictionary";
+                    if (indexedType is not null && !supportsIndex)
+                        Add(index.Line, index.Col, "error", $"тип {indexedType} не поддерживает индексатор");
+                    if (indexedType is not null && TryGetGenericArguments(indexedType, out var dictionaryName, out var dictionaryArgs) &&
+                        dictionaryName == "Dictionary")
+                    {
+                        var keyType = InferType(index.Index);
+                        if (keyType is not null && !IsCompatible(keyType, dictionaryArgs[0]))
+                            Add(index.Index.Line, index.Index.Col, "error",
+                                $"ключ Dictionary: ожидался тип {dictionaryArgs[0]}, получен {keyType}");
+                    }
                     break;
 
                 case FromEndExpr fromEnd:
@@ -543,6 +560,10 @@ public static class Checker
                 return;
             }
 
+            if (receiverType is not null && TryGetGenericArguments(receiverType, out var collectionName, out var collectionArgs) &&
+                CheckCollectionCall(member, call.Args, collectionName, collectionArgs))
+                return;
+
             if (receiverType is not null)
             {
                 var nativeMember = _hasWarcraft3 ? NativeTable.Find(receiverType, member.Name) : null;
@@ -636,6 +657,15 @@ public static class Checker
                     if (receiverType is null)
                         return null;
 
+                    if (TryGetGenericArguments(receiverType, out var collectionName, out var collectionArgs))
+                    {
+                        if (collectionName == "Queue" && (member.Name is "Dequeue" or "Peek")) return collectionArgs[0];
+                        if (collectionName == "Stack" && (member.Name is "Pop" or "Peek")) return collectionArgs[0];
+                        if (collectionName == "List" && member.Name == "IndexOf") return "int";
+                        if (collectionName == "List" && member.Name == "Remove") return "bool";
+                        if (collectionName == "Dictionary" && (member.Name is "Remove" or "TryAdd" or "TryRemove" or "ContainsKey")) return "bool";
+                    }
+
                     if (_classMethods.TryGetValue(receiverType, out var methods) &&
                         methods.TryGetValue(member.Name, out var method))
                         return method.ReturnType;
@@ -656,6 +686,13 @@ public static class Checker
                     if (receiverType is null)
                         return null;
 
+                    if (member.Name == "Count" && IsCollectionType(receiverType))
+                        return "int";
+
+                    if (TryGetGenericArguments(receiverType, out var pairCollection, out var pairArgs) &&
+                        pairCollection == "KeyValuePair" && pairArgs.Count == 2)
+                        return member.Name switch { "Key" => pairArgs[0], "Value" => pairArgs[1], _ => null };
+
                     if (_classFields.TryGetValue(receiverType, out var fields) &&
                         fields.TryGetValue(member.Name, out var fieldType2))
                         return fieldType2;
@@ -674,9 +711,14 @@ public static class Checker
                 {
                     var indexedType = InferType(index.Object);
                     if (indexedType == "string") return "string";
-                    return indexedType is not null && indexedType.EndsWith("[]", StringComparison.Ordinal)
-                        ? indexedType[..^2]
-                        : null;
+                    if (indexedType is not null && indexedType.EndsWith("[]", StringComparison.Ordinal))
+                        return indexedType[..^2];
+                    if (indexedType is not null && TryGetGenericArguments(indexedType, out var collectionName, out var collectionArgs))
+                    {
+                        if (collectionName == "List") return collectionArgs[0];
+                        if (collectionName == "Dictionary") return collectionArgs[1];
+                    }
+                    return null;
                 }
 
                 case UnaryExpr unary:
@@ -769,6 +811,10 @@ public static class Checker
 
         private bool HasMember(string type, string memberName)
         {
+            if (IsCollectionType(type))
+                return memberName == "Count";
+            if (TryGetGenericArguments(type, out var pairName, out _) && pairName == "KeyValuePair")
+                return memberName is "Key" or "Value";
             return (_classFields.TryGetValue(type, out var fields) && fields.ContainsKey(memberName)) ||
                    (_classMethods.TryGetValue(type, out var methods) && methods.ContainsKey(memberName)) ||
                    (_hasWarcraft3 && NativeTable.Find(type, memberName) is not null);
@@ -799,7 +845,18 @@ public static class Checker
             string baseType = StripArrayRanks(type);
             if (type != baseType && baseType.Length == 0)
                 return false;
-            if (baseType is "int" or "float" or "bool" or "string" or "List")
+            if (TryGetGenericArguments(baseType, out var genericName, out var genericArguments))
+            {
+                int expectedArity = genericName switch
+                {
+                    "List" or "Queue" or "Stack" => 1,
+                    "Dictionary" or "KeyValuePair" => 2,
+                    _ => -1
+                };
+                return expectedArity == genericArguments.Count &&
+                       genericArguments.All(argument => IsKnownType(argument, allowVoid: false));
+            }
+            if (baseType is "int" or "float" or "bool" or "string")
                 return true;
             if (allowVoid && baseType == "void")
                 return true;
@@ -814,6 +871,85 @@ public static class Checker
             while (type.EndsWith("[]", StringComparison.Ordinal))
                 type = type[..^2];
             return type;
+        }
+
+        private static bool TryGetGenericArguments(string type, out string genericName, out List<string> arguments)
+        {
+            genericName = string.Empty;
+            arguments = [];
+            int open = type.IndexOf('<');
+            if (open <= 0 || !type.EndsWith(">", StringComparison.Ordinal))
+                return false;
+
+            genericName = type[..open];
+            string content = type[(open + 1)..^1];
+            int depth = 0;
+            int start = 0;
+            for (int i = 0; i < content.Length; i++)
+            {
+                if (content[i] == '<') depth++;
+                else if (content[i] == '>') depth--;
+                else if (content[i] == ',' && depth == 0)
+                {
+                    arguments.Add(content[start..i]);
+                    start = i + 1;
+                }
+            }
+            arguments.Add(content[start..]);
+            return arguments.All(argument => argument.Length > 0);
+        }
+
+        private static bool IsCollectionType(string type) =>
+            TryGetGenericArguments(type, out var name, out _) &&
+            name is "List" or "Queue" or "Stack" or "Dictionary";
+
+        private bool CheckCollectionCall(MemberExpr member, IReadOnlyList<Expr> args, string collectionName, IReadOnlyList<string> typeArgs)
+        {
+            string[] expected = collectionName switch
+            {
+                "List" => member.Name switch
+                {
+                    "Add" or "Remove" or "IndexOf" => [typeArgs[0]],
+                    "Clear" => [],
+                    _ => []
+                },
+                "Queue" => member.Name == "Enqueue" ? [typeArgs[0]] : [],
+                "Stack" => member.Name == "Push" ? [typeArgs[0]] : [],
+                "Dictionary" => member.Name switch
+                {
+                    "Add" or "TryAdd" => [typeArgs[0], typeArgs[1]],
+                    "Remove" or "TryRemove" or "ContainsKey" => [typeArgs[0]],
+                    _ => []
+                },
+                _ => []
+            };
+
+            bool known = collectionName switch
+            {
+                "List" => member.Name is "Add" or "Remove" or "IndexOf" or "Clear",
+                "Queue" => member.Name is "Enqueue" or "Dequeue" or "Peek",
+                "Stack" => member.Name is "Push" or "Pop" or "Peek",
+                "Dictionary" => member.Name is "Add" or "Remove" or "TryAdd" or "TryRemove" or "ContainsKey",
+                _ => false
+            };
+            if (!known)
+                return false;
+
+            if (args.Count != expected.Length)
+                Add(member.Line, member.Col, "error",
+                    $"{collectionName}.{member.Name}: ожидалось {expected.Length} аргументов, получено {args.Count}");
+
+            for (int i = 0; i < Math.Min(args.Count, expected.Length); i++)
+            {
+                CheckExpression(args[i]);
+                string? actual = InferType(args[i]);
+                if (actual is not null && !IsCompatible(actual, expected[i]))
+                    Add(args[i].Line, args[i].Col, "error",
+                        $"{collectionName}.{member.Name}: аргумент {i + 1}: ожидался тип {expected[i]}, получен {actual}");
+            }
+            for (int i = expected.Length; i < args.Count; i++)
+                CheckExpression(args[i]);
+            return true;
         }
 
         private static bool IsWarcraftSymbol(string name) =>
