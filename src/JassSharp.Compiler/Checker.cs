@@ -919,7 +919,7 @@ public static class Checker
 
         private static bool IsCollectionType(string type) =>
             TryGetGenericArguments(type, out var name, out _) &&
-            name is "List" or "Queue" or "Stack" or "Dictionary";
+            (name is "List" or "Queue" or "Stack" or "Dictionary");
 
         private bool CheckCollectionCall(MemberExpr member, IReadOnlyList<Expr> args, string collectionName, IReadOnlyList<string> typeArgs)
         {
