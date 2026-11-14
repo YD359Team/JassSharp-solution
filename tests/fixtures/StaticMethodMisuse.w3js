@@ -1,0 +1,22 @@
+namespace StaticMethodMisuse
+{
+    public class Factory
+    {
+        public static int Create()
+        {
+            return 1;
+        }
+
+        public int Get()
+        {
+            return 2;
+        }
+    }
+
+    public void OnInit()
+    {
+        Factory factory;
+        int invalidStaticCall = factory.Create();
+        int invalidInstanceCall = Factory.Get();
+    }
+}
