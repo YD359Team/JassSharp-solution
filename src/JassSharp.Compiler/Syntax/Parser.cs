@@ -207,7 +207,7 @@ public sealed class Parser(List<Token> tokens)
             int expectedArity = typeName switch
             {
                 "List" or "Queue" or "Stack" => 1,
-                "Dictionary" => 2,
+                "Dictionary" or "KeyValuePair" => 2,
                 _ => -1
             };
             if (expectedArity < 0)
@@ -258,7 +258,7 @@ public sealed class Parser(List<Token> tokens)
         // common types
         "int", "float", "bool", "void", "string", "var",
         // extended types
-        "List", "Queue", "Stack", "Dictionary",
+        "List", "Queue", "Stack", "Dictionary", "KeyValuePair",
         // warctaft 3 types
         "ability", "abilitybooleanfield", "abilitybooleanlevelarrayfield", "abilitybooleanlevelfield", "abilityintegerfield",
         "abilityintegerlevelarrayfield", "abilityintegerlevelfield", "abilityrealfield", "abilityreallevelarrayfield",
