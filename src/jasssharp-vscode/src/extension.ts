@@ -198,7 +198,7 @@ function projectRoot(document?: vscode.TextDocument): string | undefined {
     const documentFolder = document
         ? vscode.workspace.getWorkspaceFolder(document.uri)
         : undefined;
-    return documentFolder?.uri.fsPath ?? vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    return document ? documentFolder?.uri.fsPath : vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 
 function readProject(document?: vscode.TextDocument): { map?: string; game?: string; mode?: "wc3" | "headless" } | undefined {
@@ -257,7 +257,7 @@ async function openEditor(): Promise<void> {
 async function packMap(): Promise<void> {
     log.show(true);
     info("=== Pack Map ===");
-    const map = mapPath();
+    const map = mapPath(vscode.window.activeTextEditor?.document);
     info(`map: ${map ?? "(none)"}`);
     if (!map || !fs.existsSync(map) || !fs.statSync(map).isDirectory()) {
         vscode.window.showErrorMessage("Карта должна быть папкой");
@@ -305,7 +305,7 @@ async function mapBuild(run: boolean): Promise<void> {
     const configName = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile") || "jasssharp.json";
     const configPath = path.isAbsolute(configName) ? configName : path.join(root, configName);
     info(`config: ${configPath} exists=${fs.existsSync(configPath)}`);
-    const projectConfig = readProject();
+    const projectConfig = readProject(activeDocument);
     if (run && projectConfig?.mode === "headless") {
         vscode.window.showWarningMessage("Run Map недоступен в режиме headless. Используйте Build Lua.");
         return;
