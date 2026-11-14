@@ -1,6 +1,6 @@
 # Operator overloading and standard Math library
 
-The compiler includes a built-in Math namespace. Import it explicitly:
+The compiler embeds the JASS# standard library automatically. Import its namespace explicitly:
 
 ~~~csharp
 namespace Gameplay
@@ -18,36 +18,46 @@ namespace Gameplay
 }
 ~~~
 
-The compiler resolves the import automatically. You do not need to copy standard-library files into the map project.
+You do not need to copy standard-library files into the map project. Files in `standard-library` are embedded into the compiler and loaded as regular JASS# source units.
 
 ## Math
 
-Static methods on Math:
+Static methods on `Math.Math` (imported with `using Math;`):
 
-- Min(float, float), Max(float, float)
-- Clamp(float value, float min, float max)
-- Lerp(float a, float b, float t)
-- Round(float) — midpoint-to-even rounding
-- Floor(float), Ceil(float)
-- Pow(float, float), Sqrt(float)
-- Abs(float), Sin(float), Cos(float), Tan(float)
+| Method | Description |
+|---|---|
+| `Pi()` | Returns π |
+| `DegToRad(degrees)` / `RadToDeg(radians)` | Converts angular units |
+| `Min(a, b)` / `Max(a, b)` | Returns the smaller/larger value |
+| `Clamp(value, min, max)` | Clamps a value to the inclusive range; requires min ≤ max |
+| `Lerp(a, b, t)` | Linear interpolation; t is not clamped |
+| `InverseLerp(a, b, value)` | Returns a clamped interpolation factor; returns 0 when a == b |
+| `SmoothStep(a, b, t)` | Smooth Hermite interpolation with t clamped to [0, 1] |
+| `MoveTowards(current, target, maxDelta)` | Moves toward target by at most maxDelta; non-positive maxDelta leaves current unchanged |
+| `Repeat(value, length)` | Repeats value in [0, length); non-positive length returns 0 |
+| `LerpAngle(a, b, t)` | Interpolates degrees using the shortest angular path; t is not clamped |
+| `Round(value)` | Midpoint-to-even rounding |
+| `Floor(value)` / `Ceil(value)` | Rounds down/up |
+| `Pow(value, power)` / `Sqrt(value)` | Power and square root |
+| `Abs(value)` | Absolute value |
+| `Sin(value)` / `Cos(value)` / `Tan(value)` | Trigonometric functions; arguments are radians |
 
-The initial API uses float arguments and returns float, including the rounding functions. Static class methods are called through the type name (for example, `Math.Clamp(...)`); calling a static method through an instance or an instance method through a type name is a semantic error.
+The initial API uses float arguments and returns float, including the rounding functions. Static methods are called through the type name (for example, `Math.Clamp(...)`); calling a static method through an instance or an instance method through a type name is a semantic error.
 
-## Vector2 and Vector3
+## Vectors
 
-Both types are mutable reference types with public X, Y and (for Vector3) Z fields.
+`Vector2` and `Vector3` are declared in the same `Math` namespace, in the separate `standard-library/Vectors.w3js` module. Both are mutable reference types with public coordinate fields.
 
 Methods:
 
-- Length()
-- Normalized() — returns the zero vector when the input length is zero
-- Dot(other)
-- Distance(other)
-- Lerp(other, t)
-- Vector3.Cross(other)
+- `Length()`
+- `Normalized()` — returns the zero vector when the input length is zero
+- `Dot(other)`
+- `Distance(other)`
+- `Lerp(other, t)`
+- `Vector3.Cross(other))
 
-Supported operators include addition, subtraction, unary negation, scalar multiplication, division by a scalar, and value equality/inequality. Scalar multiplication is supported in both operand orders.
+Supported operators include addition, subtraction, unary negation, scalar multiplication, division by a scalar, and value equality/inequality. Scalar multiplication is supported in both operand orders. Division by zero follows the generated Lua numeric semantics; callers should guard a zero divisor.
 
 ## User-defined operators
 
@@ -78,12 +88,11 @@ Logical && and || are intentionally not overloadable because their short-circuit
 
 ## Smoke fixture
 
-tests/fixtures/MathOperatorsSmoke.w3js exercises import resolution, static calls, vector operations, and operator overloads. Run:
+`tests/fixtures/MathOperatorsSmoke.w3js` exercises import resolution, static calls, vector operations, and operator overloads. Run:
 
 ~~~powershell
 dotnet run --project src/JassSharp.Compiler -- check tests/fixtures/MathOperatorsSmoke.w3js
 dotnet run --project src/JassSharp.Compiler -- build tests/fixtures/MathOperatorsSmoke.w3js
 
-# Run the repeatable build/check/Lua-output smoke suite on Windows PowerShell:
 ./tests/run-smoke.ps1
 ~~~

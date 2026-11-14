@@ -105,6 +105,15 @@ namespace MathOperatorsSmoke
         float root = Math.Sqrt(16.0);
         float absolute = Math.Abs(-5.0);
 
+        float pi = Math.Pi();
+        float radians = Math.DegToRad(180.0);
+        float degrees = Math.RadToDeg(pi);
+        float inverse = Math.InverseLerp(0.0, 10.0, 5.0);
+        float smooth = Math.SmoothStep(0.0, 1.0, 0.5);
+        float moved = Math.MoveTowards(0.0, 10.0, 2.0);
+        float repeated = Math.Repeat(-1.0, 360.0);
+        float angle = Math.LerpAngle(350.0, 10.0, 0.5);
+
         var inferredInt = 42;
         var inferredFloat = 2.5;
         var inferredScore = Score.FromValue(7.0);

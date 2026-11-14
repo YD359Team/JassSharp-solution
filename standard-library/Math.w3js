@@ -2,6 +2,21 @@ namespace Math
 {
     public class Math
     {
+        public static float Pi()
+        {
+            return 3.141592653589793;
+        }
+
+        public static float DegToRad(float degrees)
+        {
+            return degrees * (Math.Pi() / 180.0);
+        }
+
+        public static float RadToDeg(float radians)
+        {
+            return radians * (180.0 / Math.Pi());
+        }
+
         public static float Min(float a, float b)
         {
             if (a < b) { return a; }
@@ -22,6 +37,41 @@ namespace Math
         public static float Lerp(float a, float b, float t)
         {
             float delta = b - a;
+            return a + delta * t;
+        }
+
+        public static float InverseLerp(float a, float b, float value)
+        {
+            if (a == b) { return 0.0; }
+            return Math.Clamp((value - a) / (b - a), 0.0, 1.0);
+        }
+
+        public static float SmoothStep(float a, float b, float t)
+        {
+            float amount = Math.Clamp(t, 0.0, 1.0);
+            amount = amount * amount * (3.0 - 2.0 * amount);
+            return Math.Lerp(a, b, amount);
+        }
+
+        public static float MoveTowards(float current, float target, float maxDelta)
+        {
+            if (maxDelta <= 0.0) { return current; }
+            float delta = target - current;
+            if (Math.Abs(delta) <= maxDelta) { return target; }
+            if (delta > 0.0) { return current + maxDelta; }
+            return current - maxDelta;
+        }
+
+        public static float Repeat(float value, float length)
+        {
+            if (length <= 0.0) { return 0.0; }
+            return value - math.floor(value / length) * length;
+        }
+
+        public static float LerpAngle(float a, float b, float t)
+        {
+            float delta = Math.Repeat(b - a, 360.0);
+            if (delta > 180.0) { delta = delta - 360.0; }
             return a + delta * t;
         }
 
@@ -74,178 +124,6 @@ namespace Math
         public static float Tan(float value)
         {
             return math.tan(value);
-        }
-    }
-
-    public class Vector2
-    {
-        public float X;
-        public float Y;
-
-        public Vector2(float x, float y)
-        {
-            this.X = x;
-            this.Y = y;
-        }
-
-        public float Length()
-        {
-            return math.sqrt(X * X + Y * Y);
-        }
-
-        public Vector2 Normalized()
-        {
-            float length = Length();
-            if (length == 0.0) { return new Vector2(0.0, 0.0); }
-            return this / length;
-        }
-
-        public float Dot(Vector2 other)
-        {
-            return X * other.X + Y * other.Y;
-        }
-
-        public float Distance(Vector2 other)
-        {
-            Vector2 delta = this - other;
-            return delta.Length();
-        }
-
-        public Vector2 Lerp(Vector2 other, float t)
-        {
-            Vector2 delta = other - this;
-            return this + delta * t;
-        }
-
-        public static Vector2 operator +(Vector2 a, Vector2 b)
-        {
-            return new Vector2(a.X + b.X, a.Y + b.Y);
-        }
-
-        public static Vector2 operator -(Vector2 a, Vector2 b)
-        {
-            return new Vector2(a.X - b.X, a.Y - b.Y);
-        }
-
-        public static Vector2 operator -(Vector2 value)
-        {
-            return new Vector2(-value.X, -value.Y);
-        }
-
-        public static Vector2 operator *(Vector2 value, float scalar)
-        {
-            return new Vector2(value.X * scalar, value.Y * scalar);
-        }
-
-        public static Vector2 operator /(Vector2 value, float scalar)
-        {
-            return new Vector2(value.X / scalar, value.Y / scalar);
-        }
-
-        public static Vector2 operator *(float scalar, Vector2 value)
-        {
-            return new Vector2(value.X * scalar, value.Y * scalar);
-        }
-
-        public static bool operator ==(Vector2 a, Vector2 b)
-        {
-            return a.X == b.X && a.Y == b.Y;
-        }
-
-        public static bool operator !=(Vector2 a, Vector2 b)
-        {
-            return a.X != b.X || a.Y != b.Y;
-        }
-    }
-
-    public class Vector3
-    {
-        public float X;
-        public float Y;
-        public float Z;
-
-        public Vector3(float x, float y, float z)
-        {
-            this.X = x;
-            this.Y = y;
-            this.Z = z;
-        }
-
-        public float Length()
-        {
-            return math.sqrt(X * X + Y * Y + Z * Z);
-        }
-
-        public Vector3 Normalized()
-        {
-            float length = Length();
-            if (length == 0.0) { return new Vector3(0.0, 0.0, 0.0); }
-            return this / length;
-        }
-
-        public float Dot(Vector3 other)
-        {
-            return X * other.X + Y * other.Y + Z * other.Z;
-        }
-
-        public Vector3 Cross(Vector3 other)
-        {
-            return new Vector3(
-                Y * other.Z - Z * other.Y,
-                Z * other.X - X * other.Z,
-                X * other.Y - Y * other.X);
-        }
-
-        public float Distance(Vector3 other)
-        {
-            Vector3 delta = this - other;
-            return delta.Length();
-        }
-
-        public Vector3 Lerp(Vector3 other, float t)
-        {
-            Vector3 delta = other - this;
-            return this + delta * t;
-        }
-
-        public static Vector3 operator +(Vector3 a, Vector3 b)
-        {
-            return new Vector3(a.X + b.X, a.Y + b.Y, a.Z + b.Z);
-        }
-
-        public static Vector3 operator -(Vector3 a, Vector3 b)
-        {
-            return new Vector3(a.X - b.X, a.Y - b.Y, a.Z - b.Z);
-        }
-
-        public static Vector3 operator -(Vector3 value)
-        {
-            return new Vector3(-value.X, -value.Y, -value.Z);
-        }
-
-        public static Vector3 operator *(Vector3 value, float scalar)
-        {
-            return new Vector3(value.X * scalar, value.Y * scalar, value.Z * scalar);
-        }
-
-        public static Vector3 operator /(Vector3 value, float scalar)
-        {
-            return new Vector3(value.X / scalar, value.Y / scalar, value.Z / scalar);
-        }
-
-        public static Vector3 operator *(float scalar, Vector3 value)
-        {
-            return new Vector3(value.X * scalar, value.Y * scalar, value.Z * scalar);
-        }
-
-        public static bool operator ==(Vector3 a, Vector3 b)
-        {
-            return a.X == b.X && a.Y == b.Y && a.Z == b.Z;
-        }
-
-        public static bool operator !=(Vector3 a, Vector3 b)
-        {
-            return a.X != b.X || a.Y != b.Y || a.Z != b.Z;
         }
     }
 }
