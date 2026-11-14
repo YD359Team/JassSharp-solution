@@ -56,7 +56,9 @@ The constructor accepts the owning `unit` and an integer ability rawcode. Use Wa
 | `AddStringLevelArrayField(field, level, value)` / `RemoveStringLevelArrayField(field, level, value)` | Adds or removes a value from a typed per-level array field |
 | `Handle()` | Returns the borrowed native `ability` handle for advanced native API calls |
 
-Level-field and level-array-field indices are zero-based, matching the native API. Array accessors take both a level and an array index; add/remove operations take a level and a value. The wrapper forwards these indices unchanged and does not clamp or validate them. The caller must use a field handle of the matching type and valid indices.\n\nCooldown duration is expressed in game seconds. Negative cooldown durations are clamped to zero. The level arguments to `Cooldown` and `ManaCost` use Warcraft III's zero-based indexing and are clamped to at least zero. This differs from `GetUnitAbilityLevel`, which reports the unit's ability level starting at one.
+Level-field and level-array-field indices are zero-based, matching the native API. Array accessors take both a level and an array index; add/remove operations take a level and a value. The wrapper forwards these indices unchanged and does not clamp or validate them. The caller must use a field handle of the matching type and valid indices.
+
+Cooldown duration is expressed in game seconds. Negative cooldown durations are clamped to zero. The level arguments to `Cooldown` and `ManaCost` use Warcraft III's zero-based indexing and are clamped to at least zero. This differs from `GetUnitAbilityLevel`, which reports the unit's ability level starting at one.
 
 ## Ownership and lifetime
 
