@@ -1,0 +1,14 @@
+namespace Effects
+{
+    using Warcraft3;
+
+    public class SpecialEffects
+    {
+        // Removes an effect using the Warcraft III 3.0.1 native.
+        public static void Remove(effect value)
+        {
+            if (value == null) { return; }
+            BlzRemoveEffect(value);
+        }
+    }
+}
