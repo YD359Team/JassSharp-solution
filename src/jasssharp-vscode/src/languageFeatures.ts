@@ -754,6 +754,12 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             const classes = readClasses(text);
             const functions = readFunctions(text, classes);
             const variables = readVariables(text, classes, functions);
+            const variablesByName = new Map<string, VariableInfo[]>();
+            for (const variable of variables) {
+                const sameName = variablesByName.get(variable.name) ?? [];
+                sameName.push(variable);
+                variablesByName.set(variable.name, sameName);
+            }
             const classNames = new Set(classes.map(c => c.name));
             const functionNames = new Set(functions.map(f => f.name));
             const customMembers = classes.flatMap(cls => readClassMembers(text, cls));
@@ -803,16 +809,15 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
                     const currentClass = classes
                         .filter(cls => cls.bodyStart <= token.start && token.start <= cls.bodyEnd)
                         .sort((a, b) => b.start - a.start)[0];
-                    const visibleVariable = variables
-                        .filter(variable => variable.name === token.text &&
-                            isVariableVisibleAt(variable, token.start, currentFunction, currentClass))
+                    const visibleVariable = (variablesByName.get(token.text) ?? [])
+                        .filter(variable => isVariableVisibleAt(variable, token.start, currentFunction, currentClass))
                         .sort((a, b) => b.offset - a.offset)[0];
 
                     if (visibleVariable) {
                         type = visibleVariable.isParameter ? "parameter" : "variable";
                     } else {
                         const previous = text.slice(0, token.start).trimEnd();
-                    if (previous.endsWith(".")) {
+                        if (previous.endsWith(".")) {
                             if (memberMethods.has(token.text)) type = "method";
                             else if (memberProperties.has(token.text)) type = "property";
                         }
