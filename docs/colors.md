@@ -35,6 +35,7 @@ Warcraft's `playercolor` is a native handle, not an RGB structure. It must not b
 ```csharp
 Color.ApplyPlayerColorToUnit(myUnit, GetPlayerColor(owner));
 Color.ApplyPlayerColorToItem(myItem, GetPlayerColor(owner));
+Color.ApplyPlayerColorToDestructable(myDestructable, GetPlayerColor(owner));
 Color.ApplyPlayerColorToEffect(myEffect, owner);
 ```
 
