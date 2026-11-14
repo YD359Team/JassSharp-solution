@@ -196,6 +196,8 @@ end
             Line($"function {cls.Name}.new({string.Join(", ", cls.Ctor.Params.Select(p => p.Name))})");
             _indent++;
             Line($"local self = setmetatable({{}}, {cls.Name})");
+            foreach (var field in cls.Fields.Where(field => field.IsArray))
+                Line($"self.{field.Name} = {{}}");
             EmitStmts(cls.Ctor.Body.Where(s => s is not ReturnStmt).ToList());
             Line("return self");
             _indent--;
