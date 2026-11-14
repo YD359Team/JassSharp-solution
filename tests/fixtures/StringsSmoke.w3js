@@ -20,11 +20,13 @@ namespace StringsSmoke
             Enabled: {enabled}
             Braces: {{literal}}
             """;
+        string concatenated = $"Interpolated {x}" + " tail";
 
         Print(basic);
         Print(mixed);
         Print(escapedBraces);
         Print(multiline);
         Print(multilineInterpolated);
+        Print(concatenated);
     }
 }
