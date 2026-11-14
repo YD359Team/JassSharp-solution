@@ -92,7 +92,7 @@
   },
   "StaticMethod": {
     "prefix": [
-      "staticmethod",
+      "static",
       "staticmethod"
     ],
     "body": [
