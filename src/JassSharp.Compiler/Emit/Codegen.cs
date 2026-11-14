@@ -944,7 +944,9 @@ end
                 declaredMethod.IsStatic;
 
             if (isDeclaredStaticMethod ||
-                (mem.Object is NameExpr staticOwner && !_locals.ContainsKey(staticOwner.Name)))
+                (mem.Object is NameExpr staticOwner &&
+                 !_locals.ContainsKey(staticOwner.Name) &&
+                 CurrentFieldType(staticOwner.Name) is null))
                 return $"{recv}.{mem.Name}({string.Join(", ", args)})";
 
             if (_lua)
