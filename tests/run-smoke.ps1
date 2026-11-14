@@ -394,6 +394,43 @@ if (-not $luaRaw.Contains("local rawValue = 42") -or -not $luaRaw.Contains("asse
     throw "Lua.Raw block was not emitted verbatim. Output: $luaRaw"
 }
 
+Write-Host "[5h] Verifying Lua.Raw restrictions and the removal of vJASS..."
+$rawExpressionFixture = Join-Path $PSScriptRoot "fixtures/LuaRawExpressionRejectedSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $rawExpressionDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $rawExpressionFixture 2>&1
+    $rawExpressionExitCode = $LASTEXITCODE
+    $rawExpressionText = $rawExpressionDiagnostics -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+if ($rawExpressionExitCode -eq 0 -or -not $rawExpressionText.Contains("Lua.Raw")) {
+    throw "Lua.Raw was accepted as an expression. Exit code: $rawExpressionExitCode. Output: $rawExpressionText"
+}
+
+$vjassDirectiveFixture = Join-Path $PSScriptRoot "fixtures/VjassDirectiveRejectedSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $vjassDirectiveDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $vjassDirectiveFixture 2>&1
+    $vjassDirectiveExitCode = $LASTEXITCODE
+    $vjassDirectiveText = $vjassDirectiveDiagnostics -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+if ($vjassDirectiveExitCode -eq 0) {
+    throw "The removed target-conditional directive was accepted. Output: $vjassDirectiveText"
+}
+
+$vjassTargetOutput = dotnet run --configuration Release --no-build --project $project -- build $doWhileFixture --target vjass 2>&1
+$vjassTargetExitCode = $LASTEXITCODE
+if ($vjassTargetExitCode -eq 0) {
+    throw "The removed vJASS target was accepted. Output: $($vjassTargetOutput -join [Environment]::NewLine)"
+}
+
 Write-Host "[6/20] Generating Lua and validating 2D geometry..."
 $geometryFixture = Join-Path $PSScriptRoot "fixtures/GeometrySmoke.w3js"
 $geometryBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $geometryFixture --target lua
