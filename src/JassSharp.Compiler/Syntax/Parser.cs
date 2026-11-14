@@ -452,6 +452,12 @@ public sealed class Parser(List<Token> tokens)
     {
         var lambda = TryParseLambda();
         if (lambda is not null) return lambda;
+        if (Accept("("))
+        {
+            var grouped = ParseExpr();
+            Expect(")");
+            return grouped;
+        }
         if (CheckId("new")) 
         { 
             var newTok = Eat(TokKind.Id); 
