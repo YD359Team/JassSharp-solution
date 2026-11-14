@@ -517,8 +517,9 @@ function collectLiveAssignmentDiagnostics(document: vscode.TextDocument): vscode
         let incompatible = false;
         if (operator === "=") {
             incompatible = !areEditorTypesCompatible(actualType, target.type);
-        } else if (target.type === "int" && actualType === "float") {
-            incompatible = true;
+        } else if (target.type === "int" || target.type === "float") {
+            incompatible = !["int", "float"].includes(actualType) ||
+                (target.type === "int" && actualType === "float");
         }
 
         if (!incompatible) continue;
