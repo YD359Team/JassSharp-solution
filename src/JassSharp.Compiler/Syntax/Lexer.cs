@@ -89,7 +89,7 @@ public sealed class Lexer(string source)
             var two = _i + 1 < source.Length ? source.Substring(_i, 2) : "";
             if (two is "==" or "!=" or "<=" or ">=" or "&&" or "||" or "+=" or "-=" or "*=" or "/=" or "%=" or "++" or "--" or "=>" or "<<" or ">>" or "&=" or "|=" or "^=" or "<<=" or ">>=")
             {
-                if (two is "<<" or ">>" && Peek(2) == '=')
+                if ((two is "<<" or ">>") && Peek(2) == '=')
                 {
                     var three = source.Substring(_i, 3);
                     list.Add(new Token(TokKind.Sym, three, line, col));
