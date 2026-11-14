@@ -441,7 +441,7 @@ $abilityFragments = @(
     "UnitMakeAbilityPermanent(self._owner, permanent, self._rawcode)",
     "BlzUnitDisableAbility(self._owner, self._rawcode",
     "BlzGetUnitAbilityCooldown(self._owner, self._rawcode, level)",
-    "if level < 0 then",
+    "level < 0",
     "BlzGetUnitAbilityCooldownRemaining(self._owner, self._rawcode)",
     "BlzStartUnitAbilityCooldown(self._owner, self._rawcode",
     "BlzEndUnitAbilityCooldown(self._owner, self._rawcode)",
