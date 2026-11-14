@@ -1,0 +1,18 @@
+namespace CameraControl
+{
+    using Warcraft3;
+
+    public class CameraSettings
+    {
+        // Controls whether the player can lock the camera to a unit with the hotkey.
+        public static void SetHotkeyTargetLockAllowed(bool allowed)
+        {
+            BlzSetCameraAllowsHotkeyTargetLock(allowed);
+        }
+
+        public static bool IsHotkeyTargetLockAllowed()
+        {
+            return BlzGetCameraAllowsHotkeyTargetLock();
+        }
+    }
+}
