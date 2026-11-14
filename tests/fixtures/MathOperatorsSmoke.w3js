@@ -22,11 +22,30 @@ namespace MathOperatorsSmoke
         }
     }
 
+    public class Priority
+    {
+        public int Value;
+
+        public Priority(int value)
+        {
+            this.Value = value;
+        }
+
+        public static bool operator <(Priority left, Priority right)
+        {
+            return left.Value < right.Value;
+        }
+    }
+
     public void OnInit()
     {
         Score firstScore = Score.FromValue(10.0);
         Score secondScore = new Score(5.0);
         Score totalScore = firstScore + secondScore;
+
+        Priority low = new Priority(1);
+        Priority high = new Priority(2);
+        bool isLower = low < high;
 
         Vector2 left = new Vector2(3.0, 4.0);
         Vector2 right = new Vector2(1.0, 2.0);
