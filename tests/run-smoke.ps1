@@ -477,6 +477,8 @@ foreach ($fragment in @(
     "DestroyLightning(self._handle)",
     "BlzUnitExtendedInventorySize(self._owner)",
     "BlzUnitItemInBagSlot(self._owner, slot)",
+    "BlzUnitHasAnyItemEquipped(self._owner)",
+    "ChooseRandomItemExWithFilterAndIncludes(type, level, equipment, tag, includeInvalidMorphs, includeNonPickRandom)",
     "BlzUnitEquipItem(self._owner, value)",
     "BlzUnitUnequipItemFromSlot(self._owner, slot)",
     "BlzResetUnitTalents(target)",
