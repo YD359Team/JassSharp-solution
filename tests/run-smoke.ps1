@@ -19,7 +19,7 @@ $misuseExitCode = $LASTEXITCODE
 $misuseText = $misuseDiagnostics -join "`n"
 $hasStaticCallError = $misuseText.Contains("Factory.Create")
 $hasInstanceCallError = $misuseText.Contains("Factory.Get")
-$hasStaticFieldError = $misuseText.Contains("Value")
+$hasStaticFieldError = $misuseText.Contains("StoredValue")
 $hasErrorSeverity = $misuseText.Contains('"Severity":"error"')
 
 if ($misuseExitCode -eq 0 -or -not $hasErrorSeverity -or -not $hasStaticCallError -or -not $hasInstanceCallError -or -not $hasStaticFieldError) {
