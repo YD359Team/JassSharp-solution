@@ -16,7 +16,8 @@ LightningEffect bolt = new LightningEffect(
 bolt.SetColor(Color.FromBytes(80, 160, 255, 220));
 bolt.Move(
     new Vector3(sourceX, sourceY, sourceZ),
-    new Vector3(targetX, targetY, targetZ));
+    new Vector3(targetX, targetY, targetZ),
+    true);
 
 bolt.Dispose();
 ```
