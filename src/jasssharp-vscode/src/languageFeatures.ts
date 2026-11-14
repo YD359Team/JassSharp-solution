@@ -291,7 +291,7 @@ function findInnermostBlockScope(
         }
     }
 
-    const forPattern = /\\bfor\\s*\\(/g;
+    const forPattern = /\bfor\s*\(/g;
     for (const match of source.matchAll(forPattern)) {
         const loopStart = bodyStart + (match.index ?? 0);
         const openParen = loopStart + match[0].lastIndexOf("(");
