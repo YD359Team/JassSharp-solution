@@ -2,6 +2,7 @@
   <Folder Name="/docs/">
     <File Path="docs/operators-and-math.md" />
     <File Path="docs/collections.md" />
+    <File Path="docs/strings.md" />
   </Folder>
   <Folder Name="/samples/">
     <File Path="samples/fireball.w3js" />
@@ -55,6 +56,7 @@
     <File Path="tests/fixtures/FrameControlsSmoke.w3js" />
     <File Path="tests/fixtures/CollectionsSmoke.w3js" />
     <File Path="tests/fixtures/CollectionsTypeMismatchSmoke.w3js" />
+    <File Path="tests/fixtures/StringsSmoke.w3js" />
     <File Path="tests/fixtures/MathOperatorsSmoke.w3js" />
     <File Path="tests/fixtures/StaticMethodMisuse.w3js" />
     <File Path="tests/fixtures/TypeSafetySmoke.w3js" />
