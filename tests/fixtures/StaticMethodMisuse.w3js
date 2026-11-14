@@ -12,11 +12,11 @@ namespace StaticMethodMisuse
             return 2;
         }
 
-        public int Value;
+        public int StoredValue;
 
         public static int ReadValue()
         {
-            return Value;
+            return StoredValue;
         }
     }
 
