@@ -43,12 +43,12 @@ public sealed class Lexer(string source)
                 if (raw)
                 {
                     Advance(); Advance(); Advance();
-                    list.Add(new Token(TokKind.Interpolated, ReadInterpolatedString("\"\"\"", raw: true, line, col), line, col));
+                    list.Add(new Token(TokKind.Interpolated, ReadInterpolatedString("\"\"\"", true, line, col), line, col));
                 }
                 else
                 {
                     Advance(); // opening quote
-                    list.Add(new Token(TokKind.Interpolated, ReadInterpolatedString("\"", raw: false, line, col), line, col));
+                    list.Add(new Token(TokKind.Interpolated, ReadInterpolatedString("\"", false, line, col), line, col));
                 }
                 continue;
             }
