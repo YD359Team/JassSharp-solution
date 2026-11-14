@@ -109,13 +109,19 @@ namespace FloatingText
             SetTextTagAge(_handle, seconds);
         }
 
+        // Explicitly releases the native texttag. Safe to call more than once.
+        public void Dispose()
+        {
+            if (_disposed) { return; }
+            DestroyTextTag(_handle);
+            _handle = null;
+            _disposed = true;
+        }
+
+        // Destructors are explicit in JASS#; Lua garbage collection does not call this.
         ~FloatingTextTag()
         {
-            if (!_disposed)
-            {
-                DestroyTextTag(_handle);
-                _disposed = true;
-            }
+            Dispose();
         }
     }
 }
