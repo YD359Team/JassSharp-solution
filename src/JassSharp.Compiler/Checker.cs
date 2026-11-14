@@ -542,6 +542,7 @@ public static class Checker
                     break;
 
                 case UnaryExpr unary:
+                {
                     bool isInt32Minimum = unary.Op == "-" &&
                         unary.Inner is NumExpr { Text: "2147483648" };
                     if (!isInt32Minimum)
@@ -552,6 +553,7 @@ public static class Checker
                     else if (IsUserType(InferType(unary.Inner)))
                         Add(unary.Line, unary.Col, "error", $"унарный оператор {unary.Op} не определён для типа {InferType(unary.Inner)}");
                     break;
+                }
             }
         }
 
