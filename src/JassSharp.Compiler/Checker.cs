@@ -533,7 +533,10 @@ public static class Checker
                     break;
 
                 case UnaryExpr unary:
-                    CheckExpression(unary.Inner);
+                    bool isInt32Minimum = unary.Op == "-" &&
+                        unary.Inner is NumExpr { Text: "2147483648" };
+                    if (!isInt32Minimum)
+                        CheckExpression(unary.Inner);
                     var unaryOverload = FindOperator(InferType(unary.Inner), null, unary.Op, [unary.Inner]);
                     if (unaryOverload is not null)
                         CheckArguments(unary, [unary.Inner], unaryOverload.Params.Select(p => p.Type).ToArray());
