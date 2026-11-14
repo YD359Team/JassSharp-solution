@@ -578,6 +578,19 @@ public static class Checker
 
         private void CheckCall(CallExpr call)
         {
+            if (call.Callee is MemberExpr
+                {
+                    Object: NameExpr { Name: "Lua" },
+                    Name: "Raw"
+                } rawLua)
+            {
+                Add(rawLua.Line, rawLua.Col, "error",
+                    "Lua.Raw можно использовать только как отдельную инструкцию с одним строковым литералом");
+                foreach (var argument in call.Args)
+                    CheckExpression(argument);
+                return;
+            }
+
             if (call.Callee is NameExpr name)
             {
                 if (_functions.TryGetValue(name.Name, out var function))
