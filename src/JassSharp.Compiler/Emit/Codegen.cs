@@ -671,7 +671,7 @@ end
             Line($"for {indexName}, {valueName} in pairs({collectionName}._items) do");
             _indent++;
             _locals[loop.Name] = pairType;
-            Line($"local {loop.Name} = {{ Key = {indexName}, Value = {valueName} }}");
+            Line($"local {loop.Name} = {{ Key = {indexName}, Value = __collection_load({valueName}) }}");
         }
         else
             throw new NotSupportedException(
@@ -1267,6 +1267,18 @@ end
         {
             var key = EmitExpr(ix.Index);
             return $"__collection_load({obj}._items[{key}])";
+        }
+
+        // List uses a sentinel so null elements remain representable in Lua tables.
+        if (t is not null && IsGenericType(t, "List"))
+        {
+            if (ix.Index is FromEndExpr listFromEnd)
+            {
+                var k = EmitExpr(listFromEnd.Inner);
+                return $"__collection_load({obj}[#{obj} - {k} + 1])";
+            }
+            var listIndex = EmitExpr(ix.Index);
+            return $"__collection_load({obj}[{listIndex} + 1])";
         }
 
         // array / List
