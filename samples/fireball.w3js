@@ -1,8 +1,8 @@
 namespace MyMap.Spells
 {
-        using Warcraft3;
+    using Warcraft3;
 
-const int FireballId = 'A000';
+    const int FireballId = 'A000';
 
     class Fireball
     {

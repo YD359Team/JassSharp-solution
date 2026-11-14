@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/docs/">
+    <File Path="docs/operators-and-math.md" />
+  </Folder>
   <Folder Name="/samples/">
     <File Path="samples/fireball.w3js" />
     <File Path="samples/jasssharp.json" />
@@ -31,7 +34,10 @@
     <File Path="src/jasssharp-vscode/syntaxes/jasssharp.tmLanguage.json" />
   </Folder>
   <Folder Name="/Элементы решения/">
+    <File Path=".gitattributes" />
+    <File Path=".gitignore" />
     <File Path="build.bat" />
+    <File Path="LICENSE.txt" />
     <File Path="README.md" />
   </Folder>
 </Solution>
