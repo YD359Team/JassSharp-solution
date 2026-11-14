@@ -1,0 +1,81 @@
+namespace VisualRpgSmoke
+{
+    using Colors;
+    using FloatingText;
+    using Lightning;
+    using Inventory;
+    using Math;
+    using Warcraft3;
+
+    void Run(
+        unit hero,
+        unit target,
+        player owner,
+        playercolor teamColor,
+        item equipment,
+        effect specialEffect,
+        framehandle frame,
+        lightning nativeBolt,
+        texttag nativeTag,
+        loadoutslot equipmentSlot,
+        equipmentType equipmentCategory)
+    {
+        Color accent = Color.FromBytes(255, 160, 40, 220);
+        Color percent = Color.FromPercent(20.0, 60.0, 100.0, 100.0);
+        string coloredText = accent.WrapText("Critical hit");
+        int packedColor = accent.ToArgb();
+
+        accent.ApplyToUnitVertexColor(hero);
+        accent.ApplyToEffect(specialEffect);
+        accent.ApplyToLightning(nativeBolt);
+        accent.ApplyToTextTag(nativeTag);
+        accent.ApplyToFrameText(frame);
+        accent.ApplyToFrameVertex(frame);
+        Color.ApplyPlayerColorToUnit(hero, teamColor);
+        Color.ApplyPlayerColorToItem(equipment, teamColor);
+        Color.ApplyPlayerColorToEffect(specialEffect, owner);
+
+        FloatingTextTag popup = new FloatingTextTag(
+            "+250", GetUnitX(target), GetUnitY(target), 40.0,
+            0.023, 2.0, 1.5);
+        popup.SetColor(accent);
+        popup.SetVelocity(0.0, 0.035);
+        popup.AttachToUnit(target, 50.0);
+        popup.SetVisible(true);
+        popup.SetSuspended(false);
+        popup.SetAge(0.0);
+        popup.SetLifespan(2.0, 1.5);
+        popup.Dispose();
+
+        LightningEffect bolt = new LightningEffect(
+            "CLPB", true,
+            new Vector3(GetUnitX(hero), GetUnitY(hero), 40.0),
+            new Vector3(GetUnitX(target), GetUnitY(target), 40.0));
+        bolt.SetColor(percent);
+        bolt.Move(
+            new Vector3(GetUnitX(hero), GetUnitY(hero), 40.0),
+            new Vector3(GetUnitX(target), GetUnitY(target), 40.0),
+            true);
+        bolt.Dispose();
+
+        UnitInventory inventory = new UnitInventory(hero);
+        int bagSize = inventory.BagSize();
+        item bagItem = inventory.BagItem(0);
+        item equippedItem = inventory.EquipmentItem(equipmentSlot);
+        bool inBag = inventory.IsInBag(equipment);
+        bool equipped = inventory.IsEquipped(equipment);
+        bool hasCategory = inventory.HasEquipmentType(equipmentCategory);
+        bool canEquip = inventory.CanEquip(equipmentCategory);
+        bool emptySlot = inventory.HasEmptySlot(equipmentSlot);
+        bool equipResult = inventory.Equip(equipment);
+        inventory.Unequip(equipment);
+        item removed = inventory.UnequipSlot(equipmentSlot);
+        equipmentType itemType = inventory.ItemEquipmentType(equipment);
+        itemTag itemTagValue = inventory.ItemTag(equipment);
+
+        Talents.Reset(hero);
+        float healed = RpgCombat.Heal(target, hero, 125.0, false, true);
+        item eventEquipped = InventoryEvents.EquippedItem();
+        item eventUnequipped = InventoryEvents.UnequippedItem();
+    }
+}
