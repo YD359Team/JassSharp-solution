@@ -11,7 +11,8 @@ using Warcraft3;
 UnitInventory inventory = new UnitInventory(hero);
 int bagSlots = inventory.BagSize();
 item potion = inventory.BagItem(0);
-item weapon = inventory.EquipmentItem(LOADOUT_SLOT_WEAPON);
+loadoutslot weaponSlot = ConvertLoadoutSlot(0);
+item weapon = inventory.EquipmentItem(weaponSlot);
 
 if (inventory.IsEquipped(weapon))
 {
