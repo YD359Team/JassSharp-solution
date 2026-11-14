@@ -374,10 +374,13 @@ function readVariables(text: string, classes = readClasses(text), functions = re
         }
 
         if (inferred) {
-            result.push({
+            const inferredVariable: VariableInfo = {
                 name: declaration.name, type: inferred, offset: declaration.offset, isParameter: false,
                 scopeStart, scopeEnd
-            });
+            };
+            result.push(inferredVariable);
+            priorDeclarations.push(inferredVariable);
+            priorDeclarations.sort((a, b) => a.offset - b.offset);
         }
     }
 
