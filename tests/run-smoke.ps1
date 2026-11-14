@@ -141,6 +141,36 @@ foreach ($fragment in @(
     }
 }
 
+Write-Host "[5b] Building generic collection fixture..."
+$collectionsFixture = Join-Path $PSScriptRoot "fixtures/CollectionsSmoke.w3js"
+$collectionsBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $collectionsFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Generic collections fixture failed to compile: $($collectionsBuildOutput -join [Environment]::NewLine)"
+}
+$collectionsLuaPath = Join-Path $PSScriptRoot "fixtures/bin/CollectionsSmoke.lua"
+if (-not (Test-Path $collectionsLuaPath)) {
+    throw "Expected generated collections Lua file was not created: $collectionsLuaPath"
+}
+$collectionsLua = Get-Content -LiteralPath $collectionsLuaPath -Raw
+foreach ($fragment in @(
+    '__queue_new()',
+    '__queue_enqueue(queue, 10)',
+    '__queue_dequeue(queue)',
+    '__stack_new()',
+    '__stack_push(stack, "first")',
+    '__dictionary_new()',
+    '__dictionary_add(scores, "Player1", 100)',
+    '__dictionary_tryadd(scores, "Player2", 200)',
+    '__dictionary_tryremove(scores, "Player2")',
+    'pairs(__foreachCollection',
+    'Key = __foreachIndex',
+    'Value = __foreachValue'
+)) {
+    if (-not $collectionsLua.Contains($fragment)) {
+        throw "Generated collections Lua is missing expected fragment: $fragment"
+    }
+}
+
 Write-Host "[6/20] Generating Lua and validating 2D geometry..."
 $geometryFixture = Join-Path $PSScriptRoot "fixtures/GeometrySmoke.w3js"
 $geometryBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $geometryFixture --target lua
