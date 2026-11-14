@@ -1,3 +1,4 @@
+using JassSharp;
 using System.Text;
 using System.Text.Json;
 using JassSharp.Emit;
