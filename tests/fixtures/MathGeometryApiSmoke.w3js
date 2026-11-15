@@ -67,6 +67,29 @@ namespace MathGeometryApiSmoke
             UnitInventory inventory = new UnitInventory(null);
             UnitCombatStats stats = new UnitCombatStats(null);
 
+            ability.SetEnabled(true, false);
+            ability.StartCooldown(1.0);
+            ability.EndCooldown();
+            stats.SetStrength(10, true);
+            stats.SetAgility(10, true);
+            stats.SetIntelligence(10, true);
+            stats.SetArmor(5.0);
+            stats.SetBaseDamage(10, 0);
+            stats.SetDamageDiceNumber(1, 0);
+            stats.SetDamageDiceSides(6, 0);
+            stats.SetAttackCooldown(1.5, 0);
+            stats.SetMoveSpeed(300.0);
+            stats.SetMaxLife(100);
+            stats.SetMaxMana(50);
+            stats.SetLife(100.0);
+            stats.SetMana(50.0);
+            stats.SetAbilityCooldownRemaining('A000', 1.0);
+            stats.SetAbilityCooldownPercent('A000', 50.0);
+            stats.AdjustAbilityCooldownPercent('A000', 10.0);
+            stats.AdjustAbilityCooldownRemaining('A000', 1.0);
+            stats.EndAbilityCooldown('A000');
+            stats.StartAbilityCooldown('A000', 1.0);
+
             return !ability.IsPresent()
                 && !ability.Add()
                 && !ability.Remove()
