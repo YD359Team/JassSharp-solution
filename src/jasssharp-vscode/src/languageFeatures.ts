@@ -225,7 +225,7 @@ const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; ret: string
     ]
 };
 
-const DECLARATION_STOPWORDS = new Set(["namespace", "using", "class", "enum", "const", "public", "private", "static", "new", "this", "if", "else", "do", "while", "for", "return", "break", "continue", "true", "false", "null", "var", "in", "is", "as", "get", "set"]);
+const DECLARATION_STOPWORDS = new Set(["namespace", "using", "class", "enum", "const", "public", "private", "static", "new", "this", "if", "else", "do", "while", "for", "return", "break", "true", "false", "null", "var", "in", "is", "as", "get", "set"]);
 
 const BUILTIN_TYPES = new Set((`
 ability abilitybooleanfield abilitybooleanlevelarrayfield abilitybooleanlevelfield abilityintegerfield
