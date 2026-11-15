@@ -555,21 +555,35 @@ end
         string collection = EmitExpr(loop.Collection);
         var savedLocals = _locals;
         _locals = new Dictionary<string, string>(savedLocals, StringComparer.Ordinal);
+        int id = ++_foreachCounter;
+        string label = $"__continue_foreach{id}";
 
         if (collectionType == "group")
         {
-            _locals[loop.Name] = "unit";
+            string breakFlag = $"__foreachBreak{id}";
+            Line($"local {breakFlag} = false");
             Line($"ForGroup({collection}, function()");
             _indent++;
+            Line($"if not {breakFlag} then");
+            _indent++;
             Line($"local {loop.Name} = GetEnumUnit()");
+            Line("do");
+            _indent++;
+            _locals[loop.Name] = "unit";
+            _loopTargets.Push((label, breakFlag));
             EmitStmts(loop.Body, trace);
+            _loopTargets.Pop();
+            _indent--;
+            Line("end");
+            _indent--;
+            Line("end");
+            Line($"::{label}::");
             _indent--;
             Line("end)");
             _locals = savedLocals;
             return;
         }
 
-        int id = ++_foreachCounter;
         string collectionName = $"__foreachCollection{id}";
         string indexName = $"__foreachIndex{id}";
         string valueName = $"__foreachValue{id}";
@@ -614,7 +628,14 @@ end
             throw new NotSupportedException(
                 $"foreach does not support collection type '{collectionType}' (line {loop.Line})");
 
+        Line("do");
+        _indent++;
+        _loopTargets.Push((label, null));
         EmitStmts(loop.Body, trace);
+        _loopTargets.Pop();
+        _indent--;
+        Line("end");
+        Line($"::{label}::");
         _indent--;
         Line("end");
         _locals = savedLocals;
@@ -1055,6 +1076,9 @@ end
     {
         var receiverType = RecvType(m.Object);
         var receiver = EmitExpr(m.Object);
+        if (m.Name == "HandleId" && receiverType is not null &&
+            Warcraft3TypeHierarchy.IsHandleType(receiverType))
+            return $"GetHandleId({receiver})";
         if (m.Name == "Count" && receiverType is not null &&
             TryGetGenericArguments(receiverType, out var collectionName, out _))
         {
