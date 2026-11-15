@@ -1106,6 +1106,17 @@ if ($invalidHandleErrors.Count -lt 2) {
     throw "Expected diagnostics for invalid handle conversion and non-handle HandleId access."
 }
 
+$invalidLoopFixture = Join-Path $PSScriptRoot "fixtures/InvalidLoopControlSmoke.w3js"
+$invalidLoopOutput = dotnet run --configuration Release --no-build --project $project -- check $invalidLoopFixture
+if ($LASTEXITCODE -eq 0) {
+    throw "break/continue outside loops and bare return in a value-returning method must be rejected."
+}
+$invalidLoopDiagnostics = $invalidLoopOutput | ConvertFrom-Json
+$invalidLoopErrors = @($invalidLoopDiagnostics | Where-Object { $_.severity -eq "error" })
+if ($invalidLoopErrors.Count -lt 3) {
+    throw "Expected diagnostics for break, continue and missing return value."
+}
+
 
 Write-Host "[25/25] Verifying class inheritance and interface contracts..."
 $inheritanceFixture = Join-Path $PSScriptRoot "fixtures/InterfacesAndInheritanceSmoke.w3js"
