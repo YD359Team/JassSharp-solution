@@ -26,4 +26,9 @@ dotnet run --configuration Release --no-build --project "$COMPILER" -- \
 "$LUA_BIN" "$ROOT/tests/lua/function-hooks-modules.lua" \
     "$ROOT/tests/fixtures/FunctionHooksModules/bin/FunctionHooksModules.lua"
 
+dotnet run --configuration Release --no-build --project "$COMPILER" -- \
+    build "$ROOT/tests/fixtures/StringsApiSmoke.w3js" --target lua
+"$LUA_BIN" "$ROOT/tests/lua/strings-runtime.lua" \
+    "$ROOT/tests/fixtures/bin/StringsApiSmoke.lua"
+
 echo "All JASS# Lua runtime integration checks passed."
