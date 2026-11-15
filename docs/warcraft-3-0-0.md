@@ -52,7 +52,7 @@ The native declarations are registered in all three required places:
 - `src/JassSharp.Compiler/Runtime/NativeCatalog.cs`
 - `src/jasssharp-vscode/src/completion.ts`
 
-`tests/fixtures/Warcraft300ApiSmoke.w3js` and stage `[21/23]` in `tests/run-smoke.ps1` compile and verify representative calls for the 3.0.0 attack, aura, cooldown and special-effect APIs. The shared smoke script runs this after the Frame API stage.
+`tests/fixtures/Warcraft300ApiSmoke.w3js` and stage `[21/24]` in `tests/run-smoke.ps1` compile and verify representative calls for the 3.0.0 attack, aura, cooldown and special-effect APIs. The shared smoke script runs this after the Frame API stage.
 
 ## Sources
 
