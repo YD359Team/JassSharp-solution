@@ -21,6 +21,7 @@ public sealed class Codegen
     private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<string>> _classBaseCandidates = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _classBases = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Dictionary<string, FnDecl>> _interfaceMethods = new(StringComparer.Ordinal);
 
     public Codegen(bool headless = false)
     {
@@ -35,6 +36,9 @@ public sealed class Codegen
         {
             foreach (var imported in imports)
             {
+                foreach (var contract in imported.Interfaces ?? [])
+                    _interfaceMethods[contract.Name] = contract.Methods.ToDictionary(method => method.Name, StringComparer.Ordinal);
+
                 foreach (var cls in imported.Classes)
                 {
                     _classFields[cls.Name] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
@@ -53,6 +57,9 @@ public sealed class Codegen
                     _methods[fn.Name] = fn;
             }
         }
+
+        foreach (var contract in unit.Interfaces ?? [])
+            _interfaceMethods[contract.Name] = contract.Methods.ToDictionary(method => method.Name, StringComparer.Ordinal);
 
         foreach (var cls in unit.Classes)
         {
@@ -1044,6 +1051,10 @@ end
 
             if (FindClassMethod(receiverType, member.Name) is { } method)
                 return method.ReturnType;
+
+            if (_interfaceMethods.TryGetValue(receiverType, out var contractMethods) &&
+                contractMethods.TryGetValue(member.Name, out var interfaceMethod))
+                return interfaceMethod.ReturnType;
 
             var nativeMember = NativeTable.Find(receiverType, member.Name);
             if (nativeMember?.Kind == MemberKind.Method)
