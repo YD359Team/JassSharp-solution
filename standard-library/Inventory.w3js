@@ -34,7 +34,7 @@ namespace Inventory
 
         public item EquipmentItem(loadoutslot slot)
         {
-            if (_owner == null) { return null; }
+            if (_owner == null || slot == null) { return null; }
             return BlzUnitItemInEquipmentSlot(_owner, slot);
         }
 
