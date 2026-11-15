@@ -23,5 +23,6 @@ Versions follow Semantic Versioning.
 - Added a Windows compiler archive alongside the VS Code VSIX in GitHub Releases.
 
 ### Fixed
+- Frame wrappers now treat null native handles as disposed, avoiding native calls and invalid destruction after failed frame creation.
 - Corrected `Strings.LastIndexOf` for multibyte UTF-8 text and overlapping matches.
 - Headless smoke coverage now proves that a project builds without `main`, `config`, or `OnInit`.
