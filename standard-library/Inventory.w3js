@@ -20,67 +20,75 @@ namespace Inventory
         // Number of extended bag slots exposed by the game runtime.
         public int BagSize()
         {
+            if (_owner == null) { return 0; }
             return BlzUnitExtendedInventorySize(_owner);
         }
 
         // Bag slots use the native zero-based slot index.
         public item BagItem(int slot)
         {
+            if (_owner == null) { return null; }
             if (slot < 0 || slot >= BagSize()) { return null; }
             return BlzUnitItemInBagSlot(_owner, slot);
         }
 
         public item EquipmentItem(loadoutslot slot)
         {
+            if (_owner == null) { return null; }
             return BlzUnitItemInEquipmentSlot(_owner, slot);
         }
 
         public bool IsInBag(item value)
         {
-            if (value == null) { return false; }
+            if (_owner == null || value == null) { return false; }
             return BlzUnitHasItemBagged(_owner, value);
         }
 
         public bool IsEquipped(item value)
         {
-            if (value == null) { return false; }
+            if (_owner == null || value == null) { return false; }
             return BlzUnitHasItemEquipped(_owner, value);
         }
 
         public bool HasAnyEquippedItem()
         {
+            if (_owner == null) { return false; }
             return BlzUnitHasAnyItemEquipped(_owner);
         }
 
         public bool HasEquipmentType(equipmentType value)
         {
+            if (_owner == null || value == null) { return false; }
             return BlzUnitHasItemEquipmentOfType(_owner, value);
         }
 
         public bool CanEquip(equipmentType value)
         {
+            if (_owner == null || value == null) { return false; }
             return BlzUnitCanEquipItemOfEquipmentType(_owner, value);
         }
 
         public bool HasEmptySlot(loadoutslot slot)
         {
+            if (_owner == null || slot == null) { return false; }
             return BlzUnitHasLoadoutSlotEmpty(_owner, slot);
         }
 
         public bool Equip(item value)
         {
-            if (value == null) { return false; }
+            if (_owner == null || value == null) { return false; }
             return BlzUnitEquipItem(_owner, value);
         }
 
         public void Unequip(item value)
         {
-            if (value == null) { return; }
+            if (_owner == null || value == null) { return; }
             BlzUnitUnequipItem(_owner, value);
         }
 
         public item UnequipSlot(loadoutslot slot)
         {
+            if (_owner == null || slot == null) { return null; }
             return BlzUnitUnequipItemFromSlot(_owner, slot);
         }
 
