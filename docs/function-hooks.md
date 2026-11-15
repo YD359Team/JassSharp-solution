@@ -23,6 +23,11 @@ Inside a hook, `original(...)` calls the implementation that was wrapped by that
 A hook can bypass the original implementation by returning directly:
 
 ```csharp
+bool CanUseAbility(unit whichUnit, int abilityId)
+{
+    return whichUnit != null;
+}
+
 hook bool CanUseAbility(unit whichUnit, int abilityId)
 {
     if (whichUnit == null)
@@ -42,6 +47,6 @@ For example, with hooks A and B declared in that order, the call chain is:
 A -> B -> original function
 ```
 
-The compiler emits wrappers in reverse order to preserve this runtime call order. Hook priorities are not used.
+Hooks are registered while modules are loaded and applied once after all modules have been emitted. This preserves declaration order across module boundaries. Hook priorities are not used.
 
 The compiler rejects unknown targets, signature mismatches, and invalid `original(...)` arguments. `original` is reserved within a hook body.
