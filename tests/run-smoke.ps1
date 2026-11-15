@@ -1177,7 +1177,7 @@ if ($invalidInterfaceErrors.Count -lt 2 -or
     throw "Expected diagnostics for a missing interface implementation and conflicting inherited interface signatures."
 }
 
-Write-Host "[27/27] Verifying from-end index semantics and type safety..."
+Write-Host "[26/26] Verifying from-end index semantics and type safety..."
 $fromEndFixture = Join-Path $PSScriptRoot "fixtures/FromEndIndexSmoke.w3js"
 $fromEndCheckOutput = dotnet run --configuration Release --no-build --project $project -- check $fromEndFixture
 if ($LASTEXITCODE -ne 0) {
@@ -1228,7 +1228,7 @@ if ($invalidFromEndExitCode -eq 0 -or
     throw "From-end indexing must reject Dictionary/Queue receivers and non-int offsets. Output: $invalidFromEndText"
 }
 
-Write-Host "[26/26] Verifying parameterized base constructors are rejected..."
+Write-Host "[27/27] Verifying parameterized base constructors are rejected..."
 $baseConstructorFixture = Join-Path $PSScriptRoot "fixtures/InvalidBaseConstructorSmoke.w3js"
 $baseConstructorOutput = dotnet run --configuration Release --no-build --project $project -- check $baseConstructorFixture
 if ($LASTEXITCODE -eq 0) {
