@@ -17,7 +17,7 @@ npm.cmd run package
  
 ## Сборка GitHub Release
 
-Workflow `.github/workflows/release.yml` запускается при push, создании/обновлении Pull Request и публикации GitHub Release. На push и Pull Request он проверяет компилятор и расширение, а VSIX сохраняет как workflow artifact. При публикации Release он дополнительно прикладывает VSIX к релизу. Он:
+Workflow `.github/workflows/release.yml` запускается при push, создании/обновлении Pull Request и публикации GitHub Release. На push и Pull Request он проверяет компилятор и расширение, а VSIX сохраняет как workflow artifact. При публикации Release он дополнительно прикладывает VSIX к релизу. Выполняемые шаги:
 
 1. Собирает компилятор и запускает `tests/run-smoke.ps1`.
 2. Устанавливает зависимости расширения через `npm ci` и компилирует TypeScript.
