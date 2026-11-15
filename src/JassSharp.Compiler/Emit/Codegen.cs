@@ -33,7 +33,6 @@ public sealed class Codegen
             {
                 foreach (var cls in imported.Classes)
                 {
-                    _classes.Add(cls.Name);
                     _classFields[cls.Name] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
                     foreach (var method in cls.Methods)
                     {
