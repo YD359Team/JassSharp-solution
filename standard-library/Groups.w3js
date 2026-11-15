@@ -11,7 +11,7 @@ namespace Groups
         public UnitGroup()
         {
             _handle = CreateGroup();
-            _disposed = false;
+            _disposed = _handle == null;
         }
 
         public bool IsDisposed()
@@ -22,14 +22,14 @@ namespace Groups
         // Returns the native GroupAddUnit result.
         public bool Add(unit value)
         {
-            if (_disposed) { return false; }
+            if (_disposed || value == null) { return false; }
             return GroupAddUnit(_handle, value);
         }
 
         // Returns the native GroupRemoveUnit result.
         public bool Remove(unit value)
         {
-            if (_disposed) { return false; }
+            if (_disposed || value == null) { return false; }
             return GroupRemoveUnit(_handle, value);
         }
 
@@ -55,7 +55,7 @@ namespace Groups
         // Executes callback once per member. Use GetEnumUnit() inside the callback.
         public void ForEach(code callback)
         {
-            if (_disposed) { return; }
+            if (_disposed || callback == null) { return; }
             ForGroup(_handle, callback);
         }
 
@@ -63,7 +63,7 @@ namespace Groups
         {
             if (!_disposed)
             {
-                DestroyGroup(_handle);
+                if (_handle != null) { DestroyGroup(_handle); }
                 _disposed = true;
             }
         }
