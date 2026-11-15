@@ -85,6 +85,20 @@
     "declaration": {
       "patterns": [
         {
+          "name": "meta.interface.jasssharp",
+          "begin": "\\b(interface)\\s+([A-Za-z_]\\w*)",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.type.interface.jasssharp"
+            },
+            "2": {
+              "name": "entity.name.type.interface.jasssharp"
+            }
+          },
+          "end": "(?=\\{)",
+          "patterns": []
+        },
+        {
           "name": "meta.class.jasssharp",
           "begin": "\\b(class)\\s+([A-Za-z_]\\w*)",
           "beginCaptures": {
@@ -114,7 +128,7 @@
     },
     "keyword": {
       "name": "keyword.control.jasssharp",
-      "match": "\\b(namespace|using|class|enum|const|public|private|static|if|else|do|while|for|foreach|return|break|new|this|in|is|as|get|set)\\b"
+      "match": "\\b(namespace|using|class|interface|enum|const|public|private|static|if|else|do|while|for|foreach|return|break|continue|new|this|in|is|as|get|set)\\b"
     },
     "type": {
       "name": "storage.type.jasssharp",
