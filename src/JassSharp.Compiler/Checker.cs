@@ -1075,7 +1075,7 @@ public static class Checker
 
         private static bool IsWarcraftSymbol(string name) =>
             NativeCatalog.Natives.Contains(name) ||
-            NativeCatalog.Constants.Contains(name) ||
+            (NativeCatalog.Constants.Contains(name) || Warcraft3AdditionalConstants.Constants.Contains(name)) ||
             NativeSigs.Map.ContainsKey(name);
 
         private void ValidateDeclaredType(string type, int line, int col, bool allowVoid)
@@ -1091,7 +1091,7 @@ public static class Checker
                    _globals.ContainsKey(name) ||
                    _classes.Contains(name) ||
                    (_hasWarcraft3 && NativeCatalog.Natives.Contains(name)) ||
-                   (_hasWarcraft3 && NativeCatalog.Constants.Contains(name)) ||
+                   (_hasWarcraft3 && (NativeCatalog.Constants.Contains(name) || Warcraft3AdditionalConstants.Constants.Contains(name))) ||
                    (_hasWarcraft3 && NativeSigs.Map.ContainsKey(name)) ||
                    name is "J" or "math" or "string" or "table" or "utf8" or "error" or "Print";
         }
