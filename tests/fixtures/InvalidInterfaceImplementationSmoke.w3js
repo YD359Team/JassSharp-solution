@@ -1,0 +1,16 @@
+namespace InvalidInterfaceImplementationSmoke
+{
+    interface IRequired
+    {
+        void Execute();
+    }
+
+    class MissingImplementation : IRequired
+    {
+    }
+
+    public void Verify()
+    {
+        MissingImplementation value = new MissingImplementation();
+    }
+}
