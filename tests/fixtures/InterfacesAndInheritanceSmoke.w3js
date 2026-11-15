@@ -12,7 +12,7 @@ namespace InterfacesAndInheritanceSmoke
 
     class EntityBase
     {
-        private int _id;
+        public int _id;
 
         EntityBase()
         {
