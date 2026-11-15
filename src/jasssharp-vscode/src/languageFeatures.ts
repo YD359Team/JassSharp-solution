@@ -1,7 +1,7 @@
 import * as vscode from "vscode";
 import { execFile } from "child_process";
 import * as path from "path";
-import { MEMBERS } from "./members";
+import { MEMBERS, HANDLE_TYPES } from "./members";
 import { CONSTANTS } from "./constants";
 import { NATIVES } from "./completion";
 
@@ -1012,6 +1012,10 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
                 const classInfo = readClasses(fullText).find(c => c.name === receiverType);
                 const custom = classInfo ? readClassMembers(fullText, classInfo) : [];
                 const standard = STANDARD_LIBRARY_MEMBERS[receiverType] ?? [];
+                if (hasWarcraft3Using(fullText) && HANDLE_TYPES.has(receiverType)) {
+                    addCompletion(items, seen, "HandleId", vscode.CompletionItemKind.Property,
+                        `${receiverType}.HandleId : int (GetHandleId)`, range, "00");
+                }
                 for (const member of [...(hasWarcraft3Using(fullText) ? MEMBERS : []).filter(m => m.type === receiverType), ...standard]) {
                     const isMethod = member.kind === "Method";
                     addCompletion(items, seen, member.name,
