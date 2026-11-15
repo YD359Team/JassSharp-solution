@@ -1307,9 +1307,11 @@ if ($invalidFunctionHooksExitCode -eq 0 -or
 
 Write-Host "[29/29] Verifying inline-hook rejection and cross-module hook ordering..."
 $inlineFixture = Join-Path $PSScriptRoot "fixtures/InvalidInlineFunctionHookSmoke.w3js"
-$inlineOutput = dotnet run --configuration Release --no-build --project $project -- check $inlineFixture
-if ($LASTEXITCODE -eq 0 -or -not (($inlineOutput -join "`n").Contains("нельзя перехватывать inline-функцию Fast"))) {
-    throw "Hooks targeting [Inline] functions must be rejected."
+$inlineOutput = dotnet run --configuration Release --no-build --project $project -- check $inlineFixture 2>&1
+$inlineExitCode = $LASTEXITCODE
+$inlineText = $inlineOutput -join "`n"
+if ($inlineExitCode -eq 0 -or -not $inlineText.Contains("нельзя перехватывать inline-функцию Fast")) {
+    throw "Hooks targeting [Inline] functions must be rejected. Exit code: $inlineExitCode. Output: $inlineText"
 }
 
 $multiModuleProject = Join-Path $PSScriptRoot "fixtures/FunctionHooksModules"
