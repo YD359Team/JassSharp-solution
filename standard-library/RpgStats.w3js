@@ -155,6 +155,7 @@ namespace RpgStats
         // Ability level indices are zero-based, as in BlzGetUnitAbilityCooldown.
         public float AbilityCooldown(int abilityRawcode, int level)
         {
+            if (level < 0) { level = 0; }
             return BlzGetUnitAbilityCooldown(_owner, abilityRawcode, level);
         }
 
@@ -165,6 +166,7 @@ namespace RpgStats
 
         public void SetAbilityCooldownRemaining(int abilityRawcode, float seconds)
         {
+            if (seconds < 0.0) { seconds = 0.0; }
             BlzSetUnitAbilityCooldownRemaining(_owner, abilityRawcode, seconds);
         }
 
