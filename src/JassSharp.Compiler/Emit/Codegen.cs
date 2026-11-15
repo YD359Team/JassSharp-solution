@@ -29,7 +29,7 @@ public sealed class Codegen
         _headless = headless;
     }
 
-    public string Emit(NsUnit unit, IEnumerable<NsUnit>? imports = null)
+    public string Emit(NsUnit unit, IEnumerable<NsUnit>? imports = null, bool finalizeHooks = true)
     {
         _namespaceName = unit.Name;
 
@@ -98,6 +98,8 @@ public sealed class Codegen
                 _inlineMethods[kv.Key] = kv.Value;
 
         var hasInit = unit.Functions.Any(f => f.Name == "OnInit");
+        if (unit.Functions.Any(function => function.IsHook))
+            EmitHookRuntime();
         Line($"-- {unit.Name}  (JASS# → Lua)");
         if (unit.Usings.Count > 0)
             Line("-- usings: " + string.Join(", ", unit.Usings));
@@ -224,7 +226,40 @@ function __dictionary_containskey(d, key)
     return rawget(d._items, key) ~= nil
 end
 ");
+        if (finalizeHooks)
+            Line("if __jasssharp_apply_hooks then __jasssharp_apply_hooks() end");
         return string.Join("\n", _lines) + "\n";
+    }
+
+    private void EmitHookRuntime()
+    {
+        Line("if not __jasssharp_hook_registry then");
+        _indent++;
+        Line("__jasssharp_hook_registry = {}");
+        Line("function __jasssharp_register_hook(name, factory)");
+        _indent++;
+        Line("local chain = __jasssharp_hook_registry[name]");
+        Line("if not chain then chain = {}; __jasssharp_hook_registry[name] = chain end");
+        Line("chain[#chain + 1] = factory");
+        _indent--;
+        Line("end");
+        Line("function __jasssharp_apply_hooks()");
+        _indent++;
+        Line("if __jasssharp_hooks_applied then return end");
+        Line("__jasssharp_hooks_applied = true");
+        Line("for name, chain in pairs(__jasssharp_hook_registry) do");
+        _indent++;
+        Line("local current = _G[name]");
+        Line("if type(current) ~= \"function\" then error(\"JASS# hook target is not a function: \" .. name) end");
+        Line("for i = #chain, 1, -1 do current = chain[i](current) end");
+        Line("_G[name] = current");
+        _indent--;
+        Line("end");
+        _indent--;
+        Line("end");
+        _indent--;
+        Line("end");
+        Line("");
     }
 
     private void EmitLuaEntry(bool hasInit)
@@ -436,33 +471,29 @@ end
 
     private void EmitHooksLua(IEnumerable<FnDecl> hooks)
     {
-        int hookId = 0;
-        foreach (var group in hooks.GroupBy(hook => hook.Name, StringComparer.Ordinal))
+        foreach (var hook in hooks)
         {
-            // Wrappers are emitted in reverse so calls enter hooks in declaration order.
-            foreach (var hook in group.Reverse())
-            {
-                string originalName = $"__jasssharp_original_{hookId++}";
-                string parameters = string.Join(", ", hook.Params.Select(parameter => parameter.Name));
+            string parameters = string.Join(", ", hook.Params.Select(parameter => parameter.Name));
+            Line($"__jasssharp_register_hook(\"{hook.Name}\", function(__jasssharp_original)");
+            _indent++;
+            Line($"return function({parameters})");
+            _indent++;
+            Line("local original = __jasssharp_original");
 
-                Line($"local {originalName} = {hook.Name}");
-                Line($"function {hook.Name}({parameters})");
-                _indent++;
-                Line($"local original = {originalName}");
+            _className = null;
+            _currentMethodIsStatic = false;
+            _locals = hook.Params.ToDictionary(
+                parameter => parameter.Name,
+                parameter => parameter.Type,
+                StringComparer.Ordinal);
+            _locals["original"] = "function";
 
-                _className = null;
-                _currentMethodIsStatic = false;
-                _locals = hook.Params.ToDictionary(
-                    parameter => parameter.Name,
-                    parameter => parameter.Type,
-                    StringComparer.Ordinal);
-                _locals["original"] = "function";
-
-                EmitStmts(hook.Body, hook.Attributes?.Contains("Trace") == true);
-                _indent--;
-                Line("end");
-                Line("");
-            }
+            EmitStmts(hook.Body, hook.Attributes?.Contains("Trace") == true);
+            _indent--;
+            Line("end");
+            _indent--;
+            Line("end)");
+            Line("");
         }
     }
 
