@@ -145,7 +145,7 @@ static class MapBuild
                     if (diagnostics.Any(diagnostic => diagnostic.Severity == "error"))
                         return Fail($"semantic analysis failed for '{file}'");
 
-                    string emitted = new LuaEmitter().Emit(unit, imports);
+                    string emitted = new LuaEmitter().Emit(unit, imports, finalizeHooks: false);
 
                     if (target == "lua" && unit.Functions.Any(fn => fn.Name == "OnInit"))
                     {
@@ -166,6 +166,7 @@ static class MapBuild
                 }
             }
 
+            chunks.Add(LuaEmitter.EmitHookFinalizer());
             string generatedScript = string.Join("\n", chunks);
             const string scriptName = "war3map.lua";
 
@@ -321,7 +322,7 @@ static class MapBuild
                 if (diagnostics.Any(diagnostic => diagnostic.Severity == "error"))
                     return Fail($"headless semantic analysis failed for '{file}'");
 
-                chunks.Add(new LuaEmitter().Emit(unit, imports, headless: true));
+                chunks.Add(new LuaEmitter().Emit(unit, imports, headless: true, finalizeHooks: false));
             }
             catch (ParseException ex)
             {
@@ -340,6 +341,7 @@ static class MapBuild
         if (!string.IsNullOrWhiteSpace(outputDirectory))
             Directory.CreateDirectory(outputDirectory);
 
+        chunks.Add(LuaEmitter.EmitHookFinalizer());
         File.WriteAllText(outputPath, string.Join("\n", chunks), Utf8NoBom);
         Console.WriteLine(outputPath);
         return 0;
