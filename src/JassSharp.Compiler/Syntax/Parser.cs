@@ -386,6 +386,12 @@ public sealed class Parser(List<Token> tokens)
             Accept(";");
             return new BreakStmt(breakToken.Line, breakToken.Col);
         }
+        if (CheckId("continue"))
+        {
+            var continueToken = Eat(TokKind.Id);
+            Accept(";");
+            return new ContinueStmt(continueToken.Line, continueToken.Col);
+        }
         if (CheckId("return"))
         {
             Eat(TokKind.Id);
