@@ -79,6 +79,7 @@
     <File Path=".gitattributes" />
     <File Path=".gitignore" />
     <File Path="build.bat" />
+    <File Path="CHANGELOG.md" />
     <File Path="LICENSE.txt" />
     <File Path="README.md" />
   </Folder>
