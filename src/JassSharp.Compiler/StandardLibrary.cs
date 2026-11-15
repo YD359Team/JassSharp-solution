@@ -40,10 +40,10 @@ internal static class StandardLibrary
             yield return new NsUnit(
                 group.Key,
                 units.SelectMany(unit => unit.Usings).Distinct(StringComparer.Ordinal).ToList(),
+                units.SelectMany(unit => unit.Consts).ToList(),
                 units.SelectMany(unit => unit.Classes).ToList(),
                 units.SelectMany(unit => unit.Functions).ToList(),
                 units.SelectMany(unit => unit.Fields).ToList(),
-                units.SelectMany(unit => unit.Consts).ToList(),
                 units.SelectMany(unit => unit.Enums).ToList());
         }
     }
