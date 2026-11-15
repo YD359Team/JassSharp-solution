@@ -1315,7 +1315,6 @@ export const NATIVES: { name: string; sig: string; doc: string }[] = [
     { name: "SetMusicVolume", sig: "SetMusicVolume(int)", doc: "" },
     { name: "SetMusicPlayPosition", sig: "SetMusicPlayPosition(int)", doc: "" },
     { name: "SetThematicMusicVolume", sig: "SetThematicMusicVolume(int)", doc: "" },
-    { name: "BlzSetThematicMusicAbsoluteVolume", sig: "BlzSetThematicMusicAbsoluteVolume(int)", doc: "" },
     { name: "SetThematicMusicAbsoluteVolume", sig: "SetThematicMusicAbsoluteVolume(int)", doc: "Sets the absolute thematic music volume." },
     { name: "SetThematicMusicPlayPosition", sig: "SetThematicMusicPlayPosition(int)", doc: "" },
     { name: "SetSoundDuration", sig: "SetSoundDuration(sound, int)", doc: "" },
