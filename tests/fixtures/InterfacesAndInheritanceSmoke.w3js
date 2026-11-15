@@ -5,7 +5,12 @@ namespace InterfacesAndInheritanceSmoke
         int Id();
     }
 
-    interface IActor : IEntity
+    interface ITraceable
+    {
+        string Trace();
+    }
+
+    interface IActor : IEntity, ITraceable
     {
         void Act(int amount);
     }
@@ -35,6 +40,11 @@ namespace InterfacesAndInheritanceSmoke
         {
             _id = _id + amount;
         }
+
+        public string Trace()
+        {
+            return "unit-actor";
+        }
     }
 
     public void Verify()
@@ -47,6 +57,7 @@ namespace InterfacesAndInheritanceSmoke
         int id = baseObject.Id();
         actorContract.Act(3);
         var inheritedId = actorContract.Id();
+        string trace = actorContract.Trace();
         return;
     }
 }
