@@ -1271,6 +1271,11 @@ foreach ($fragment in @(
     "local original = __jasssharp_original",
     "return original(whichUnit, abilityId)",
     "function __jasssharp_apply_hooks()",
+    "if __jasssharp_hooks_applied then error(\"JASS# hook registered after finalization: \" .. name) end",
+    "local replacements = {}",
+    "replacements[name] = current",
+    "for name, replacement in pairs(replacements) do _G[name] = replacement end",
+    "__jasssharp_hooks_applied = true",
     "for i = #chain, 1, -1 do current = chain[i](current) end"
 )) {
     if (-not $functionHooksLua.Contains($fragment)) {
