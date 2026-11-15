@@ -596,7 +596,18 @@ public static class Checker
 
             if (call.Callee is NameExpr name)
             {
-                if (_functions.TryGetValue(name.Name, out var function))
+                if (_currentClass is not null &&
+                    _classMethods.TryGetValue(_currentClass, out var currentClassMethods) &&
+                    currentClassMethods.TryGetValue(name.Name, out var currentClassMethod))
+                {
+                    CheckArguments(name, call.Args, currentClassMethod.Params.Select(p => p.Type).ToArray());
+                    if (!currentClassMethod.IsStatic && _currentMethodIsStatic)
+                    {
+                        Add(name.Line, name.Col, "error",
+                            $"нестатический метод {_currentClass}.{name.Name} нельзя вызывать из статического метода без экземпляра");
+                    }
+                }
+                else if (_functions.TryGetValue(name.Name, out var function))
                 {
                     CheckArguments(name, call.Args, function.Params.Select(p => p.Type).ToArray());
                 }
