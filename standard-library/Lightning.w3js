@@ -42,7 +42,7 @@ namespace Lightning
 
         public bool SetColor(Color value)
         {
-            if (_disposed) { return false; }
+            if (_disposed || value == null) { return false; }
             return value.ApplyToLightning(_handle);
         }
 
