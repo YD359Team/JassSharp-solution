@@ -33,6 +33,7 @@ public static class Checker
         private string? _currentClass;
         private bool _currentMethodIsStatic;
         private string _expectedReturnType = "void";
+        private int _loopDepth;
 
         public List<Diagnostic> Diagnostics { get; } = [];
 
@@ -200,7 +201,14 @@ public static class Checker
         {
             switch (statement)
             {
-                case BreakStmt:
+                case BreakStmt jump:
+                    if (_loopDepth == 0)
+                        Add(jump.Line, jump.Col, "error", "break доступен только внутри цикла");
+                    break;
+
+                case ContinueStmt jump:
+                    if (_loopDepth == 0)
+                        Add(jump.Line, jump.Col, "error", "continue доступен только внутри цикла");
                     break;
 
                 case VarStmt variable:
@@ -301,13 +309,17 @@ public static class Checker
                 case WhileStmt loop:
                     CheckCondition(loop.Cond);
                     PushScope();
+                    _loopDepth++;
                     CheckStatements(loop.Body);
+                    _loopDepth--;
                     PopScope();
                     break;
 
                 case DoWhileStmt loop:
                     PushScope();
+                    _loopDepth++;
                     CheckStatements(loop.Body);
+                    _loopDepth--;
                     PopScope();
                     CheckCondition(loop.Cond);
                     break;
@@ -346,7 +358,9 @@ public static class Checker
 
                     PushScope();
                     Declare(loop.Name, itemType, loop.Line, loop.Col);
+                    _loopDepth++;
                     CheckStatements(loop.Body);
+                    _loopDepth--;
                     PopScope();
                     break;
                 }
@@ -359,7 +373,9 @@ public static class Checker
                         CheckCondition(loop.Cond);
                     if (loop.Step is not null)
                         CheckStatement(loop.Step);
+                    _loopDepth++;
                     CheckStatements(loop.Body);
+                    _loopDepth--;
                     PopScope();
                     break;
 
