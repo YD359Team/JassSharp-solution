@@ -31,4 +31,9 @@ dotnet run --configuration Release --no-build --project "$COMPILER" -- \
 "$LUA_BIN" "$ROOT/tests/lua/strings-runtime.lua" \
     "$ROOT/tests/fixtures/bin/StringsApiSmoke.lua"
 
+dotnet run --configuration Release --no-build --project "$COMPILER" -- \
+    build "$ROOT/tests/fixtures/MathGeometryApiSmoke.w3js" --target lua
+"$LUA_BIN" "$ROOT/tests/lua/math-geometry-runtime.lua" \
+    "$ROOT/tests/fixtures/bin/MathGeometryApiSmoke.lua"
+
 echo "All JASS# Lua runtime integration checks passed."
