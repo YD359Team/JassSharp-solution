@@ -16,14 +16,15 @@ namespace FloatingText
             _disposed = _handle == null;
             _lifespan = lifespan;
             if (_lifespan < 0.0) { _lifespan = 0.0; }
-            if (_disposed) { return; }
-
-            SetTextTagText(_handle, text, size);
-            SetTextTagPos(_handle, x, y, z);
-            SetTextTagPermanent(_handle, false);
-            SetTextTagLifespan(_handle, _lifespan);
-            SetTextTagFadepoint(_handle, FloatingTextTag.ClampFadepoint(fadepoint, _lifespan));
-            SetTextTagVisibility(_handle, true);
+            if (!_disposed)
+            {
+                SetTextTagText(_handle, text, size);
+                SetTextTagPos(_handle, x, y, z);
+                SetTextTagPermanent(_handle, false);
+                SetTextTagLifespan(_handle, _lifespan);
+                SetTextTagFadepoint(_handle, FloatingTextTag.ClampFadepoint(fadepoint, _lifespan));
+                SetTextTagVisibility(_handle, true);
+            }
         }
 
         private static float ClampFadepoint(float value, float lifespan)
