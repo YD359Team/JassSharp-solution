@@ -550,6 +550,25 @@ public static class Checker
                     CheckExpression(index.Index);
                     var indexType = InferType(index.Index);
                     var indexedType = InferType(index.Object);
+
+                    if (index.Index is FromEndExpr fromEndIndex)
+                    {
+                        var offsetType = InferType(fromEndIndex.Inner);
+                        if (offsetType is not null && offsetType != "int")
+                            Add(fromEndIndex.Inner.Line, fromEndIndex.Inner.Col, "error",
+                                $"индекс с конца требует смещение типа int, получен {offsetType}");
+
+                        bool supportsFromEnd = indexedType == "string" ||
+                            indexedType is not null && indexedType.EndsWith("[]", StringComparison.Ordinal);
+                        if (indexedType is not null &&
+                            TryGetGenericArguments(indexedType, out var fromEndCollectionName, out _))
+                            supportsFromEnd = fromEndCollectionName == "List";
+
+                        if (indexedType is not null && !supportsFromEnd)
+                            Add(index.Line, index.Col, "error",
+                                $"индексация с конца не поддерживается для типа {indexedType}");
+                    }
+
                     bool dictionaryIndexer = indexedType is not null &&
                         TryGetGenericArguments(indexedType, out var dictionaryCollectionName, out _) &&
                         dictionaryCollectionName == "Dictionary";
