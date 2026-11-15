@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   build-and-package:
-    name: Validate and package VS Code extension
+    name: Validate and package JASS#
     runs-on: windows-latest
 
     steps:
@@ -90,11 +90,22 @@ jobs:
               throw "VS Code extension packaging failed."
           }
 
-      - name: Upload VSIX build artifact
+      - name: Publish compiler
+        shell: pwsh
+        run: |
+          dotnet publish src/JassSharp.Compiler/JassSharp.Compiler.csproj --configuration Release --output artifacts/compiler
+          if ($LASTEXITCODE -ne 0) {
+              throw "Compiler publish failed."
+          }
+          Compress-Archive -Path artifacts/compiler/* -DestinationPath artifacts/jasssharp-compiler-win-x64.zip -Force
+
+      - name: Upload release assets
         uses: actions/upload-artifact@v4
         with:
-          name: jasssharp-vsix
-          path: src/jasssharp-vscode/*.vsix
+          name: jasssharp-release-assets
+          path: |
+            src/jasssharp-vscode/*.vsix
+            artifacts/jasssharp-compiler-win-x64.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -120,7 +131,7 @@ jobs:
         run: bash ./tests/run-lua-runtime-smoke.sh
 
   publish-release:
-    name: Attach VSIX and publish changelog notes
+    name: Attach binaries and publish changelog notes
     if: github.event_name == 'release'
     needs: [build-and-package, lua-runtime-integration]
     runs-on: ubuntu-latest
@@ -144,16 +155,16 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           node .github/scripts/extract-release-notes.cjs "$VERSION" CHANGELOG.md "$RUNNER_TEMP/release-notes.md"
 
-      - name: Download packaged VSIX
+      - name: Download release assets
         uses: actions/download-artifact@v4
         with:
-          name: jasssharp-vsix
+          name: jasssharp-release-assets
           path: dist
 
-      - name: Attach VSIX and update GitHub Release notes
+      - name: Attach binaries and update GitHub Release notes
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name }}
           body_path: ${{ runner.temp }}/release-notes.md
-          files: dist/*.vsix
+          files: dist/*
           fail_on_unmatched_files: true
