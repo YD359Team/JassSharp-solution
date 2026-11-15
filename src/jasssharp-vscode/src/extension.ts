@@ -3,6 +3,7 @@ import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { registerLanguageFeatures } from "./languageFeatures";
+import { registerFormatting } from "./formatting";
 
 let log: vscode.OutputChannel;
 const checkTimers = new Map<string, NodeJS.Timeout>();
@@ -15,6 +16,13 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(diagnostics);
 
     registerLanguageFeatures(context);
+    registerFormatting(context);
+
+    const buildButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 101);
+    buildButton.command = "jasssharp.buildLua";
+    buildButton.text = "$(tools) Build Lua";
+    buildButton.tooltip = "JASS#: собрать Lua";
+    context.subscriptions.push(buildButton);
 
     const runButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
     runButton.command = "jasssharp.runMap";
@@ -32,6 +40,9 @@ export function activate(context: vscode.ExtensionContext) {
         const editor = vscode.window.activeTextEditor;
         const mode = readProject(editor?.document)?.mode ?? "wc3";
         void vscode.commands.executeCommand("setContext", "jasssharp.mode", mode);
+        if (editor?.document.languageId === "jasssharp") buildButton.show();
+        else buildButton.hide();
+
         if (editor?.document.languageId === "jasssharp" && mode !== "headless") {
             runButton.show();
             editorButton.show();
@@ -47,7 +58,8 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.workspace.onDidChangeConfiguration(event => {
             if (event.affectsConfiguration("jasssharp.projectFile")) updateButtons();
         }),
-        vscode.workspace.onDidSaveTextDocument(() => updateButtons())
+        vscode.workspace.onDidSaveTextDocument(() => updateButtons()),
+        vscode.workspace.onDidChangeTextDocument(() => updateButtons())
     );
 
     context.subscriptions.push(

@@ -58,8 +58,7 @@ public sealed class Parser(List<Token> tokens)
                 {
                     var ps = ParseParams();
                     Expect(")");
-                    Expect("{");
-                    ns.Functions.Add(new FnDecl(typeName, id, ps, ParseBlock(), attrs));
+                    ns.Functions.Add(new FnDecl(typeName, id, ps, ParseMethodBody(typeName), attrs));
                 }
                 else
                 {
@@ -157,8 +156,7 @@ public sealed class Parser(List<Token> tokens)
                 Expect("(");
                 var operatorParams = ParseParams();
                 Expect(")");
-                Expect("{");
-                methods.Add(new FnDecl(type, "__operator_" + OperatorIdentifier(opToken.Text), operatorParams, ParseBlock(), attrs, isStatic, opToken.Text));
+                methods.Add(new FnDecl(type, "__operator_" + OperatorIdentifier(opToken.Text), operatorParams, ParseMethodBody(type), attrs, isStatic, opToken.Text));
                 continue;
             }
             var memberToken = Eat(TokKind.Id);
@@ -169,8 +167,7 @@ public sealed class Parser(List<Token> tokens)
             {
                 var ps = ParseParams();
                 Expect(")");
-                Expect("{");
-                methods.Add(new FnDecl(type, id, ps, ParseBlock(), attrs, isStatic));
+                methods.Add(new FnDecl(type, id, ps, ParseMethodBody(type), attrs, isStatic));
             }
             else
             {
@@ -179,6 +176,21 @@ public sealed class Parser(List<Token> tokens)
             }
         }
         return new ClassDecl(name, fields, ctor, methods, baseTypes);
+    }
+
+    private List<Stmt> ParseMethodBody(string returnType)
+    {
+        if (Accept("=>"))
+        {
+            var expression = ParseExpr();
+            Expect(";");
+            return returnType == "void"
+                ? [new ExprStmt(expression)]
+                : [new ReturnStmt(expression)];
+        }
+
+        Expect("{");
+        return ParseBlock();
     }
 
     private InterfaceDecl ParseInterface()

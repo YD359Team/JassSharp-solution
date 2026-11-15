@@ -45,21 +45,32 @@ jobs:
         shell: pwsh
         run: npm.cmd ci
 
-      - name: Set extension version from release tag
+      - name: Verify release tag and synchronize extension version
         if: github.event_name == 'release'
         working-directory: src/jasssharp-vscode
         shell: pwsh
         env:
           RELEASE_TAG: ${{ github.event.release.tag_name }}
         run: |
-          $version = $env:RELEASE_TAG -replace '^v', ''
-          if ($version -notmatch '^\d+\.\d+\.\d+([-.+][0-9A-Za-z.-]+)?$') {
-              throw "Release tag '$($env:RELEASE_TAG)' must contain a semantic version, for example v0.2.0."
+          [xml]$versionDocument = Get-Content -LiteralPath "$env:GITHUB_WORKSPACE/Version.props" -Raw
+          $version = $versionDocument.Project.PropertyGroup.Version
+          $releaseVersion = $env:RELEASE_TAG -replace '^v', ''
+          if ($releaseVersion -ne $version) {
+              throw "Release tag '$($env:RELEASE_TAG)' does not match Version.props ($version)."
           }
 
-          npm.cmd version $version --no-git-tag-version --allow-same-version
+          npm.cmd run sync-version
           if ($LASTEXITCODE -ne 0) {
-              throw "Could not set VS Code extension version to $version."
+              throw "Could not synchronize VS Code extension version to $version."
+          }
+
+      - name: Test VS Code extension and brace formatter
+        working-directory: src/jasssharp-vscode
+        shell: pwsh
+        run: |
+          npm.cmd test
+          if ($LASTEXITCODE -ne 0) {
+              throw "VS Code extension tests failed."
           }
 
       - name: Compile and package VSIX

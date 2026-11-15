@@ -661,6 +661,12 @@ foreach ($fragment in $forbiddenHeadlessFragments) {
 if (-not $headlessLua.Contains('print("headless mode")')) {
     throw "Headless Print call was not translated to Lua print."
 }
+if (-not $headlessLua.Contains("function Add(left, right)")) {
+    throw "Headless compilation unexpectedly required a Warcraft III entry point or omitted ordinary functions."
+}
+if (-not $headlessLua.Contains("return (left + right)")) {
+    throw "Headless expression-bodied function was not emitted as a Lua return."
+}
 
 $missingUsingFixture = Join-Path $headlessProject "src/HeadlessWarcraftMissingUsing.w3js"
 $missingUsingOutput = dotnet run --configuration Release --no-build --project $project -- check $missingUsingFixture 2>&1
@@ -1148,7 +1154,9 @@ foreach ($fragment in @(
     "UnitActor.new()",
     "actorContract:Act(3)",
     "actorContract:Id()",
-    "actorContract:Trace()"
+    "actorContract:Trace()",
+    "function UnitActor:Add(left, right)",
+    "return (left + right)"
 )) {
     if (-not $inheritanceLua.Contains($fragment)) {
         throw "Generated inheritance Lua is missing expected fragment: $fragment"

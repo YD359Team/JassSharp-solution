@@ -53,6 +53,8 @@ namespace InterfacesAndInheritanceSmoke
         {
             return "unit-actor";
         }
+
+        public int Add(int left, int right) => left + right;
     }
 
     public void Verify()
@@ -66,6 +68,7 @@ namespace InterfacesAndInheritanceSmoke
         actorContract.Act(3);
         var inheritedId = actorContract.Id();
         string trace = actorContract.Trace();
+        int sum = actor.Add(2, 3);
         return;
     }
 }

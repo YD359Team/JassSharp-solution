@@ -1,6 +1,8 @@
 namespace HeadlessSmoke
 {
-    public void OnInit()
+    public int Add(int left, int right) => left + right;
+
+    public void Run()
     {
         Print("headless mode");
     }

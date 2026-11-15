@@ -84,7 +84,7 @@
       }
     },
     {
-      "beforeText": "^\\s*\\{\\s*$",
+      "beforeText": "^.*\\{\\s*$",
       "afterText": "^\\s*\\}\\s*$",
       "action": {
         "indentAction": 0,
