@@ -1012,7 +1012,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
                 const classInfo = readClasses(fullText).find(c => c.name === receiverType);
                 const custom = classInfo ? readClassMembers(fullText, classInfo) : [];
                 const standard = STANDARD_LIBRARY_MEMBERS[receiverType] ?? [];
-                if (hasWarcraft3Using(fullText) && HANDLE_TYPES.has(receiverType)) {
+                if (hasWarcraft3Using(fullText) && HANDLE_TYPES.has(receiverType.toLowerCase())) {
                     addCompletion(items, seen, "HandleId", vscode.CompletionItemKind.Property,
                         `${receiverType}.HandleId : int (GetHandleId)`, range, "00");
                 }
