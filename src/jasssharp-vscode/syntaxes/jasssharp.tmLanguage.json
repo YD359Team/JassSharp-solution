@@ -114,7 +114,7 @@
     },
     "keyword": {
       "name": "keyword.control.jasssharp",
-      "match": "\\b(namespace|using|class|enum|const|public|private|static|if|else|do|while|for|foreach|return|break|continue|new|this|in|is|as|get|set)\\b"
+      "match": "\\b(namespace|using|class|enum|const|public|private|static|if|else|do|while|for|foreach|return|break|new|this|in|is|as|get|set)\\b"
     },
     "type": {
       "name": "storage.type.jasssharp",
