@@ -1222,7 +1222,7 @@ catch {
 $invalidFromEndErrors = @($invalidFromEndDiagnostics | Where-Object { $_.severity -eq "error" })
 $invalidFromEndMessages = @($invalidFromEndErrors | ForEach-Object { $_.message }) -join "`n"
 if ($invalidFromEndExitCode -eq 0 -or
-    -not $invalidFromEndMessages.Contains("индексация с конца не поддерживается для типа Dictionary<string, int>") -or
+    -not $invalidFromEndMessages.Contains("индексация с конца не поддерживается для типа Dictionary<string,int>") -or
     -not $invalidFromEndMessages.Contains("индексация с конца не поддерживается для типа Queue<int>") -or
     -not $invalidFromEndMessages.Contains("индекс с конца требует смещение типа int")) {
     throw "From-end indexing must reject Dictionary/Queue receivers and non-int offsets. Output: $invalidFromEndText"
