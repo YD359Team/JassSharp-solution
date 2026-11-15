@@ -22,6 +22,7 @@ public sealed class Codegen
     private readonly Dictionary<string, List<string>> _classBaseCandidates = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _classBases = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, FnDecl>> _interfaceMethods = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<string>> _interfaceBases = new(StringComparer.Ordinal);
 
     public Codegen(bool headless = false)
     {
@@ -37,7 +38,10 @@ public sealed class Codegen
             foreach (var imported in imports)
             {
                 foreach (var contract in imported.Interfaces ?? [])
+                {
                     _interfaceMethods[contract.Name] = contract.Methods.ToDictionary(method => method.Name, StringComparer.Ordinal);
+                    _interfaceBases[contract.Name] = contract.BaseInterfaces;
+                }
 
                 foreach (var cls in imported.Classes)
                 {
@@ -59,7 +63,10 @@ public sealed class Codegen
         }
 
         foreach (var contract in unit.Interfaces ?? [])
+        {
             _interfaceMethods[contract.Name] = contract.Methods.ToDictionary(method => method.Name, StringComparer.Ordinal);
+            _interfaceBases[contract.Name] = contract.BaseInterfaces;
+        }
 
         foreach (var cls in unit.Classes)
         {
@@ -863,6 +870,26 @@ end
         return TryGetClassField(_className, name, out var type) ? type : null;
     }
 
+    private FnDecl? FindInterfaceMethod(string interfaceName, string methodName)
+    {
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var pending = new Stack<string>();
+        pending.Push(interfaceName);
+        while (pending.Count > 0)
+        {
+            string current = pending.Pop();
+            if (!visited.Add(current))
+                continue;
+            if (_interfaceMethods.TryGetValue(current, out var methods) &&
+                methods.TryGetValue(methodName, out var method))
+                return method;
+            if (_interfaceBases.TryGetValue(current, out var parents))
+                foreach (string parent in parents)
+                    pending.Push(parent);
+        }
+        return null;
+    }
+
     private FnDecl? FindClassMethod(string className, string methodName)
     {
         string? current = className;
@@ -1048,8 +1075,7 @@ end
             if (FindClassMethod(receiverType, member.Name) is { } method)
                 return method.ReturnType;
 
-            if (_interfaceMethods.TryGetValue(receiverType, out var contractMethods) &&
-                contractMethods.TryGetValue(member.Name, out var interfaceMethod))
+            if (FindInterfaceMethod(receiverType, member.Name) is { } interfaceMethod)
                 return interfaceMethod.ReturnType;
 
             var nativeMember = NativeTable.Find(receiverType, member.Name);
