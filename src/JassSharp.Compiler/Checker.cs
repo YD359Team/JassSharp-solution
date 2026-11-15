@@ -24,6 +24,11 @@ public static class Checker
         private readonly string? _file;
         private readonly bool _hasWarcraft3;
         private readonly HashSet<string> _classes = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _interfaces = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, ClassDecl> _classDeclarations = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, InterfaceDecl> _interfaceDeclarations = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string?> _classBaseTypes = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, List<string>> _classInterfaces = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FnDecl> _functions = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _globals = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
@@ -53,9 +58,16 @@ public static class Checker
 
         private void AddUnit(NsUnit unit)
         {
+            foreach (var contract in unit.Interfaces ?? [])
+            {
+                _interfaces.Add(contract.Name);
+                _interfaceDeclarations[contract.Name] = contract;
+            }
+
             foreach (var cls in unit.Classes)
             {
                 _classes.Add(cls.Name);
+                _classDeclarations[cls.Name] = cls;
                 if (!_classFields.ContainsKey(cls.Name))
                     _classFields[cls.Name] = new Dictionary<string, string>(StringComparer.Ordinal);
                 if (!_classMethods.ContainsKey(cls.Name))
@@ -95,6 +107,8 @@ public static class Checker
 
         public void Run()
         {
+            ValidateInheritance();
+
             foreach (var field in _unit.Fields)
                 ValidateDeclaredType(field.Type, 1, 1, allowVoid: false);
             foreach (var constant in _unit.Consts)
@@ -982,6 +996,245 @@ public static class Checker
             return false;
         }
 
+        private bool IsCompatible(string actual, string expected)
+        {
+            if (actual == expected || actual == "null")
+                return true;
+            if (expected == "float" && actual == "int")
+                return true;
+            if (Warcraft3TypeHierarchy.IsAssignableFrom(actual, expected))
+                return true;
+
+            if (_classes.Contains(actual) && _classes.Contains(expected))
+            {
+                string? current = actual;
+                var visited = new HashSet<string>(StringComparer.Ordinal);
+                while (current is not null && visited.Add(current))
+                {
+                    if (current == expected)
+                        return true;
+                    current = _classBaseTypes.GetValueOrDefault(current);
+                }
+            }
+
+            if (_classes.Contains(actual) && _interfaces.Contains(expected))
+                return ClassImplementsInterface(actual, expected);
+
+            if (_interfaces.Contains(actual) && _interfaces.Contains(expected))
+                return InterfaceExtends(actual, expected);
+
+            return false;
+        }
+
+        private void ValidateInheritance()
+        {
+            foreach (var contract in _interfaceDeclarations.Values)
+            {
+                foreach (string parent in contract.BaseInterfaces)
+                    if (!_interfaces.Contains(parent))
+                        Add(1, 1, "error", $"interface {contract.Name} extends unknown interface {parent}");
+
+                foreach (var duplicate in contract.Methods.GroupBy(method => method.Name, StringComparer.Ordinal)
+                             .Where(group => group.Count() > 1))
+                    Add(1, 1, "error", $"interface {contract.Name} declares duplicate method {duplicate.Key}");
+            }
+
+            foreach (var cls in _classDeclarations.Values)
+            {
+                var bases = cls.BaseTypes ?? [];
+                var classBases = bases.Where(_classes.Contains).ToList();
+                var interfaceBases = bases.Where(_interfaces.Contains).ToList();
+
+                foreach (string baseName in bases)
+                    if (!_classes.Contains(baseName) && !_interfaces.Contains(baseName))
+                        Add(1, 1, "error", $"type {cls.Name} inherits unknown type {baseName}");
+
+                if (classBases.Count > 1)
+                    Add(1, 1, "error", $"class {cls.Name} can inherit only one class");
+                if (classBases.Count == 1 && bases.Count > 0 && bases[0] != classBases[0])
+                    Add(1, 1, "error", $"base class {classBases[0]} must be first in class {cls.Name}'s inheritance list");
+
+                _classBaseTypes[cls.Name] = classBases.FirstOrDefault();
+                _classInterfaces[cls.Name] = interfaceBases;
+
+                if (_classBaseTypes[cls.Name] is { } baseClass &&
+                    _classDeclarations.TryGetValue(baseClass, out var baseDeclaration) &&
+                    baseDeclaration.Ctor is { Params.Count: > 0 })
+                    Add(1, 1, "error",
+                        $"base class {baseClass} must have a parameterless constructor; implicit base constructor calls do not accept arguments");
+            }
+
+            foreach (var cls in _classDeclarations.Values)
+            {
+                foreach (string interfaceName in GetImplementedInterfaces(cls.Name))
+                {
+                    foreach (var required in GetInterfaceMethods(interfaceName))
+                    {
+                        if (!TryGetClassMethod(cls.Name, required.Name, out var implementation))
+                        {
+                            Add(1, 1, "error",
+                                $"class {cls.Name} does not implement {interfaceName}.{required.Name}()");
+                            continue;
+                        }
+
+                        bool sameSignature = !implementation.IsStatic &&
+                            implementation.ReturnType == required.ReturnType &&
+                            implementation.Params.Count == required.Params.Count &&
+                            implementation.Params.Select(parameter => parameter.Type)
+                                .SequenceEqual(required.Params.Select(parameter => parameter.Type), StringComparer.Ordinal);
+                        if (!sameSignature)
+                            Add(1, 1, "error",
+                                $"method {cls.Name}.{required.Name} does not match {interfaceName}.{required.Name}()");
+                    }
+                }
+            }
+
+            foreach (var cls in _classDeclarations.Values)
+            {
+                string? current = cls.Name;
+                var visited = new HashSet<string>(StringComparer.Ordinal);
+                while (current is not null && visited.Add(current))
+                    current = _classBaseTypes.GetValueOrDefault(current);
+                if (current is not null)
+                    Add(1, 1, "error", $"class inheritance cycle detected at {current}");
+            }
+
+            foreach (var contract in _interfaceDeclarations.Values)
+                if (InterfaceHasCycle(contract.Name))
+                    Add(1, 1, "error", $"interface inheritance cycle detected at {contract.Name}");
+        }
+
+        private bool InterfaceHasCycle(string start)
+        {
+            var active = new HashSet<string>(StringComparer.Ordinal);
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            return Visit(start);
+
+            bool Visit(string current)
+            {
+                if (active.Contains(current))
+                    return true;
+                if (!visited.Add(current))
+                    return false;
+                active.Add(current);
+                if (_interfaceDeclarations.TryGetValue(current, out var contract))
+                    foreach (string parent in contract.BaseInterfaces)
+                        if (_interfaces.Contains(parent) && Visit(parent))
+                            return true;
+                active.Remove(current);
+                return false;
+            }
+        }
+
+        private bool TryGetClassMethod(string className, string methodName, out FnDecl method)
+        {
+            string? current = className;
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            while (current is not null && visited.Add(current))
+            {
+                if (_classMethods.TryGetValue(current, out var methods) &&
+                    methods.TryGetValue(methodName, out method!))
+                    return true;
+                current = _classBaseTypes.GetValueOrDefault(current);
+            }
+
+            method = null!;
+            return false;
+        }
+
+        private bool TryGetClassField(string className, string fieldName, out string type)
+        {
+            string? current = className;
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            while (current is not null && visited.Add(current))
+            {
+                if (_classFields.TryGetValue(current, out var fields) &&
+                    fields.TryGetValue(fieldName, out type!))
+                    return true;
+                current = _classBaseTypes.GetValueOrDefault(current);
+            }
+
+            type = null!;
+            return false;
+        }
+
+        private bool TryGetInterfaceMethod(string interfaceName, string methodName, out FnDecl method)
+        {
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            var pending = new Stack<string>();
+            pending.Push(interfaceName);
+            while (pending.Count > 0)
+            {
+                string current = pending.Pop();
+                if (!visited.Add(current) || !_interfaceDeclarations.TryGetValue(current, out var contract))
+                    continue;
+                var found = contract.Methods.FirstOrDefault(candidate => candidate.Name == methodName);
+                if (found is not null)
+                {
+                    method = found;
+                    return true;
+                }
+                foreach (string parent in contract.BaseInterfaces)
+                    pending.Push(parent);
+            }
+
+            method = null!;
+            return false;
+        }
+
+        private IEnumerable<FnDecl> GetInterfaceMethods(string interfaceName)
+        {
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            var pending = new Stack<string>();
+            pending.Push(interfaceName);
+            while (pending.Count > 0)
+            {
+                string current = pending.Pop();
+                if (!visited.Add(current) || !_interfaceDeclarations.TryGetValue(current, out var contract))
+                    continue;
+                foreach (var method in contract.Methods)
+                    yield return method;
+                foreach (string parent in contract.BaseInterfaces)
+                    pending.Push(parent);
+            }
+        }
+
+        private IEnumerable<string> GetImplementedInterfaces(string className)
+        {
+            var visitedClasses = new HashSet<string>(StringComparer.Ordinal);
+            string? current = className;
+            while (current is not null && visitedClasses.Add(current))
+            {
+                if (_classInterfaces.TryGetValue(current, out var interfaces))
+                    foreach (string interfaceName in interfaces)
+                        yield return interfaceName;
+                current = _classBaseTypes.GetValueOrDefault(current);
+            }
+        }
+
+        private bool ClassImplementsInterface(string className, string interfaceName) =>
+            GetImplementedInterfaces(className).Any(candidate =>
+                candidate == interfaceName || InterfaceExtends(candidate, interfaceName));
+
+        private bool InterfaceExtends(string child, string parent)
+        {
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            var pending = new Stack<string>();
+            pending.Push(child);
+            while (pending.Count > 0)
+            {
+                string current = pending.Pop();
+                if (!visited.Add(current))
+                    continue;
+                if (current == parent)
+                    return true;
+                if (_interfaceDeclarations.TryGetValue(current, out var contract))
+                    foreach (string parentName in contract.BaseInterfaces)
+                        pending.Push(parentName);
+            }
+            return false;
+        }
+
         private bool IsKnownType(string type, bool allowVoid)
         {
             string baseType = StripArrayRanks(type);
@@ -1002,7 +1255,7 @@ public static class Checker
                 return true;
             if (allowVoid && baseType == "void")
                 return true;
-            if (_classes.Contains(baseType))
+            if (_classes.Contains(baseType) || _interfaces.Contains(baseType))
                 return true;
             return _hasWarcraft3 &&
                 (NativeCatalog.Types.Contains(baseType) || baseType is "integer" or "real" or "nothing" or "code");
@@ -1113,6 +1366,7 @@ public static class Checker
             return _functions.ContainsKey(name) ||
                    _globals.ContainsKey(name) ||
                    _classes.Contains(name) ||
+                   _interfaces.Contains(name) ||
                    (_hasWarcraft3 && NativeCatalog.Natives.Contains(name)) ||
                    (_hasWarcraft3 && (NativeCatalog.Constants.Contains(name) || Warcraft3AdditionalConstants.Constants.Contains(name))) ||
                    (_hasWarcraft3 && NativeSigs.Map.ContainsKey(name)) ||
@@ -1155,12 +1409,4 @@ public static class Checker
             Diagnostics.Add(new Diagnostic(line, col, severity, message, _file));
     }
 
-    private static bool IsCompatible(string actual, string expected)
-    {
-        if (actual == expected || actual == "null")
-            return true;
-        if (expected == "float" && actual == "int")
-            return true;
-        return Warcraft3TypeHierarchy.IsAssignableFrom(actual, expected);
-    }
 }
