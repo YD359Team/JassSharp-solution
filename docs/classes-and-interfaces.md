@@ -81,6 +81,8 @@ The checker verifies:
 - Class and interface inheritance graphs are acyclic.
 - Every required interface method is implemented by the class or a base class.
 - Implementations are instance methods with matching return and parameter types.
+- Inherited interfaces may form a diamond, but two inherited declarations with the same method name must have identical signatures; conflicting contracts are rejected.
+- A derived class may replace an inherited method only with the same return type, parameter types and static/instance kind. Method overloading and signature-changing hiding are not supported.
 - Interface methods are callable through variables typed as the interface.
 - Interface types cannot be instantiated with `new`.
 
