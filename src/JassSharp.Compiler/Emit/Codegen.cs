@@ -104,8 +104,8 @@ function __list_remove(t, v)
     v = __collection_store(v)
     for i = 1, #t do
         if t[i] == v then
-        table.remove(t, i)
-        return true
+            table.remove(t, i)
+            return true
         end
     end
     return false
@@ -160,7 +160,7 @@ function __dictionary_new()
     local items = {}
     setmetatable(items, {
         __index = function(_, key)
-        error("The given key was not present in the dictionary: " .. tostring(key))
+            error("The given key was not present in the dictionary: " .. tostring(key))
         end
     })
     return { _items = items, _count = 0 }
