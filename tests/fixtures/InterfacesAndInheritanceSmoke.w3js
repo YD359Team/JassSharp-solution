@@ -46,7 +46,7 @@ namespace InterfacesAndInheritanceSmoke
 
         int id = baseObject.Id();
         actorContract.Act(3);
-        int inheritedId = entityContract.Id();
+        var inheritedId = actorContract.Id();
         return;
     }
 }
