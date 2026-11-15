@@ -1044,4 +1044,31 @@ foreach ($native in @(
     }
 }
 
+
+Write-Host "[23/23] Verifying Warcraft III object-data field constants..."
+$objectFieldsFixture = Join-Path $PSScriptRoot "fixtures/WarcraftObjectDataFieldsSmoke.w3js"
+$objectFieldsBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $objectFieldsFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Warcraft III object-data field fixture failed to compile: $($objectFieldsBuildOutput -join [Environment]::NewLine)"
+}
+$objectFieldsLuaPath = Join-Path $PSScriptRoot "fixtures/bin/WarcraftObjectDataFieldsSmoke.lua"
+if (-not (Test-Path $objectFieldsLuaPath)) {
+    throw "Expected generated object-data field Lua file was not created: $objectFieldsLuaPath"
+}
+$objectFieldsLua = Get-Content -LiteralPath $objectFieldsLuaPath -Raw
+foreach ($constant in @(
+    "ABILITY_IF_ALLOWED_TARGETS",
+    "ABILITY_RF_CAST_POINT",
+    "ABILITY_ILF_BUFFID",
+    "ITEM_IF_GOLD_COST",
+    "UNIT_IF_GOLD_COST",
+    "UNIT_RF_SPEED_MAX",
+    "UNIT_BF_REPULSE",
+    "UNIT_WEAPON_RF_MOTION_BUFFER"
+)) {
+    if (-not $objectFieldsLua.Contains($constant)) {
+        throw "Generated object-data field Lua is missing constant: $constant"
+    }
+}
+
 Write-Host "All JASS# compiler smoke checks passed."
