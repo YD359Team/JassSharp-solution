@@ -909,6 +909,37 @@ if ($abilityLua.Contains("function UnitAbility:Dispose()") -or $abilityLua.Conta
     throw "UnitAbility is a non-owning wrapper and must not generate disposal code."
 }
 
+
+Write-Host "[22/22] Verifying Warcraft III Reforged 3.0.1 native signatures..."
+$wc301Fixture = Join-Path $PSScriptRoot "fixtures/Warcraft301ApiSmoke.w3js"
+$wc301BuildOutput = dotnet run --configuration Release --no-build --project $project -- build $wc301Fixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Warcraft III 3.0.1 API fixture failed to compile: $($wc301BuildOutput -join [Environment]::NewLine)"
+}
+$wc301LuaPath = Join-Path $PSScriptRoot "fixtures/bin/Warcraft301ApiSmoke.lua"
+if (-not (Test-Path $wc301LuaPath)) {
+    throw "Expected generated Warcraft III 3.0.1 API Lua file was not created: $wc301LuaPath"
+}
+$wc301Lua = Get-Content -LiteralPath $wc301LuaPath -Raw
+foreach ($native in @(
+    "BlzResetUnitTalents(",
+    "ChooseRandomItemExWithFilterAndIncludes(",
+    "BlzUnitHeal(",
+    "BlzRemoveEffect(",
+    "BlzGetCameraAllowsHotkeyTargetLock(",
+    "BlzSetCameraAllowsHotkeyTargetLock(",
+    "SetThematicMusicAbsoluteVolume(",
+    "BlzIsItemEquipped(",
+    "BlzIsItemInBag(",
+    "BlzUnitCanEquipItemOfEquipmentType(",
+    "BlzUnitHasAnyItemEquiped(",
+    "BlzUnitEquipItem("
+)) {
+    if (-not $wc301Lua.Contains($native)) {
+        throw "Generated Warcraft III 3.0.1 API Lua is missing native call: $native"
+    }
+}
+
 Write-Host "All JASS# compiler smoke checks passed."
 Write-Host "[20/20] Verifying Warcraft III Frame API wrappers, ownership, events, and coordinates..."
 $frameFixture = Join-Path $PSScriptRoot "fixtures/FrameSmoke.w3js"
