@@ -1,0 +1,13 @@
+namespace InvalidLoopControlSmoke
+{
+    public void InvalidJumps()
+    {
+        break;
+        continue;
+    }
+
+    public int MissingReturnValue()
+    {
+        return;
+    }
+}
