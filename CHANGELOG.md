@@ -19,6 +19,7 @@ Versions follow Semantic Versioning.
 - Added explicit command activation and editor toolbar/context-menu entries.
 - Added Lua runtime integration tests for hook execution, early returns, native delegation, cross-module ordering, and one-time finalization.
 - Added automatic GitHub Release notes extraction from the matching version section in `CHANGELOG.md`.
+- Added a Windows compiler archive alongside the VS Code VSIX in GitHub Releases.
 
 ### Fixed
 - Headless smoke coverage now proves that a project builds without `main`, `config`, or `OnInit`.
