@@ -98,10 +98,31 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+  lua-runtime-integration:
+    name: Execute generated Lua hook chains
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 11.0.x
+
+      - name: Install Lua 5.3
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes lua5.3
+
+      - name: Run Lua runtime integration tests
+        run: bash ./tests/run-lua-runtime-smoke.sh
+
   publish-release:
     name: Attach VSIX and publish changelog notes
     if: github.event_name == 'release'
-    needs: build-and-package
+    needs: [build-and-package, lua-runtime-integration]
     runs-on: ubuntu-latest
     permissions:
       contents: write
