@@ -781,7 +781,8 @@ public static class Checker
                     if (receiverType is null)
                         return null;
 
-                    if (member.Name == "Length" && receiverType == "string")
+                    if (member.Name == "Length" &&
+                        (receiverType == "string" || receiverType.EndsWith("[]", StringComparison.Ordinal)))
                         return "int";
 
                     if (member.Name == "Count" && IsCollectionType(receiverType))
