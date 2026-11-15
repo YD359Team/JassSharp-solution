@@ -213,8 +213,11 @@ try
         generatedParts.Add(new LuaEmitter().Emit(
             imported,
             imports.Where(dependency => dependency.Name != imported.Name),
-            headless: mode == "headless"));
-    generatedParts.Add(new LuaEmitter().Emit(unit, imports, headless: mode == "headless"));
+            headless: mode == "headless",
+            finalizeHooks: false));
+    generatedParts.Add(new LuaEmitter().Emit(
+        unit, imports, headless: mode == "headless", finalizeHooks: false));
+    generatedParts.Add(LuaEmitter.EmitHookFinalizer());
     File.WriteAllText(outputPath, string.Join("\n", generatedParts), new UTF8Encoding(false));
     Console.WriteLine(outputPath);
 }
