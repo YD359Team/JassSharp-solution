@@ -1,0 +1,31 @@
+namespace Warcraft300ApiSmoke
+{
+    using Warcraft3;
+
+    public void OnInit()
+    {
+        unit target = GetTriggerUnit();
+        effect special = AddSpecialEffect("Abilities\\Spells\\Human\\HolyBolt\\HolyBoltSpecialArt.mdl", 0.0, 0.0);
+        int abilityId = AbilityId("AHbz");
+
+        // Attack and special-effect animation controls added with Reforged 3.0.
+        BlzResetUnitAttack(target, 0);
+        BlzSetSpecialEffectAnimationBlendTime(special, 0.15);
+        BlzQueueSpecialEffectAnimation(special, "stand");
+        BlzSetSpecialEffectAnimation(special, "stand");
+        BlzUnitEnableAuras(target, true, true);
+
+        // Ability cooldown duration and percentage APIs.
+        float cooldownPercent = BlzGetUnitAbilityCooldownPercent(target, abilityId);
+        float cooldownRemaining = BlzGetUnitAbilityCooldownRemaining(target, abilityId);
+        float cooldown = BlzGetUnitAbilityCooldown(target, abilityId, 0);
+        BlzSetUnitAbilityCooldownRemaining(target, abilityId, 1.5);
+        BlzSetUnitAbilityCooldownPercent(target, abilityId, 50.0);
+        BlzAdjustUnitAbilityCooldownRemaining(target, abilityId, 0.5);
+        BlzAdjustUnitAbilityCooldownPercent(target, abilityId, 10.0);
+        BlzStartUnitAbilityCooldown(target, abilityId, 2.0);
+        BlzEndUnitAbilityCooldown(target, abilityId);
+
+        DestroyEffect(special);
+    }
+}
