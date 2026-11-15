@@ -1,6 +1,12 @@
 local generatedPath = assert(arg[1], "generated Lua path is required")
 dofile(generatedPath)
 
+assert(Strings.Length("AéBC") == 4,
+    "Strings.Length must count Unicode code points")
+assert(Strings.Substring("AéBC", 1, 2) == "éB",
+    "Substring must use Unicode code-point offsets")
+assert(Strings.IndexOf("AéBC", "é") == 1,
+    "IndexOf must return a Unicode code-point index")
 assert(Strings.LastIndexOf("one two one", "one") == 8,
     "ASCII LastIndexOf returned the wrong zero-based index")
 assert(Strings.LastIndexOf("éxé", "é") == 2,
