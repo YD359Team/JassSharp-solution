@@ -1,0 +1,16 @@
+namespace FromEndIndexSmoke
+{
+    public void Verify()
+    {
+        int[] values = new int[];
+        values[0] = 10;
+        int lastArrayValue = values[^1];
+
+        List<int> items = new List<int>();
+        items.Add(20);
+        int lastListValue = items[^1];
+
+        string text = "JASS#";
+        string lastCharacter = text[^1];
+    }
+}
