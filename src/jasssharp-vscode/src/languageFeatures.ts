@@ -230,7 +230,7 @@ const DECLARATION_STOPWORDS = new Set(["namespace", "using", "class", "enum", "c
 const BUILTIN_TYPES = new Set((`
 ability abilitybooleanfield abilitybooleanlevelarrayfield abilitybooleanlevelfield abilityintegerfield
 abilityintegerlevelarrayfield abilityintegerlevelfield abilityrealfield abilityreallevelarrayfield
-abilityreallevelfield abilitystringfield abilitystringlevelarrayfield abilitystringlevelfield agent aidifficulty equipmenttype
+abilityreallevelfield abilitystringfield abilitystringlevelarrayfield abilitystringlevelfield agent aidifficulty equipmenttype equipmentType itemTag
 alliancetype animtype armortype attacktype boolexpr buff button camerafield camerasetup code commandbuttoneffect
 conditionfunc damagetype defeatcondition defensetype destructable dialog dialogevent effect effecttype event eventid
 fgamestate filterfunc fogmodifier fogstate fogstyle force frameeventtype framehandle framepointtype gamecache
