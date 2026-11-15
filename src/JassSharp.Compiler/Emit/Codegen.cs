@@ -661,7 +661,7 @@ end
         {
             var prop = NativeTable.Find(rt, p.Name);
             if (prop?.Kind != MemberKind.Method) return false;
-            var args = p.Args.Select((a, i) => CodeArg(p.Name, i, a)).ToList();
+            var args = p.Args.Select(EmitExpr).ToList();
             var call = Apply(prop.Read, recv, args);
             Line(call);
         }
@@ -1131,7 +1131,7 @@ end
             var rt = RecvType(mem.Object);
             var prop = rt is null ? null : NativeTable.Find(rt, mem.Name);
             var recv = EmitExpr(mem.Object);
-            var args = c.Args.Select((a, i) => CodeArg(mem.Name, i, a)).ToList();
+            var args = c.Args.Select(EmitExpr).ToList();
             if (prop?.Kind == MemberKind.Method) return Apply(prop.Read, recv, args);
 
             bool isDeclaredStaticMethod =
@@ -1148,7 +1148,7 @@ end
             return $"{recv}:{mem.Name}({string.Join(", ", args)})";
         }
         if (c.Callee is NameExpr id)
-            return $"{id.Name}({string.Join(", ", c.Args.Select((a, i) => CodeArg(id.Name, i, a)))})";
+            return $"{id.Name}({string.Join(", ", c.Args.Select(EmitExpr))})";
         return $"{EmitExpr(c.Callee)}({string.Join(", ", c.Args.Select(EmitExpr))})";
     }
 
@@ -1209,11 +1209,6 @@ end
         }
         var idx = EmitExpr(ix.Index);
         return $"{obj}[{idx} + 1]";
-    }
-
-    private string CodeArg(string method, int index, Expr arg)
-    {
-        return EmitExpr(arg);
     }
 
     private string Apply(string tpl, string recv, List<string> args)
