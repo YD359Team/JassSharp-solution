@@ -1314,6 +1314,7 @@ export const NATIVES: { name: string; sig: string; doc: string }[] = [
     { name: "EndThematicMusic", sig: "EndThematicMusic()", doc: "" },
     { name: "SetMusicVolume", sig: "SetMusicVolume(int)", doc: "" },
     { name: "SetMusicPlayPosition", sig: "SetMusicPlayPosition(int)", doc: "" },
+    { name: "SetThematicMusicAbsoluteVolume", sig: "SetThematicMusicAbsoluteVolume(int)", doc: "Sets the absolute thematic music volume (Warcraft III 3.0.1)." },
     { name: "SetThematicMusicVolume", sig: "SetThematicMusicVolume(int)", doc: "" },
     { name: "SetThematicMusicAbsoluteVolume", sig: "SetThematicMusicAbsoluteVolume(int)", doc: "Sets the absolute thematic music volume." },
     { name: "SetThematicMusicPlayPosition", sig: "SetThematicMusicPlayPosition(int)", doc: "" },
