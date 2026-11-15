@@ -1160,6 +1160,6 @@ public static class Checker
             return true;
         if (expected == "float" && actual == "int")
             return true;
-        return false;
+        return Warcraft3TypeHierarchy.IsAssignableFrom(actual, expected);
     }
 }
