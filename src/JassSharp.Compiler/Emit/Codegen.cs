@@ -57,7 +57,7 @@ public sealed class Codegen
                 }
                 foreach (var en in imported.Enums)
                     _enums[en.Name] = en;
-                foreach (var fn in imported.Functions)
+                foreach (var fn in imported.Functions.Where(function => !function.IsHook))
                     _methods[fn.Name] = fn;
             }
         }
@@ -89,7 +89,7 @@ public sealed class Codegen
 
         foreach (var en in unit.Enums)
             _enums[en.Name] = en;
-        foreach (var fn in unit.Functions)
+        foreach (var fn in unit.Functions.Where(function => !function.IsHook))
             _methods[fn.Name] = fn;
 
         // collect inline
@@ -112,7 +112,8 @@ public sealed class Codegen
         foreach (var en in unit.Enums) EmitEnum(en);
         if (unit.Consts.Count > 0) Line("");
         foreach (var cls in GetClassEmissionOrder(unit.Classes)) EmitClassLua(cls);
-        foreach (var fn in unit.Functions) EmitFnLua(fn);
+        foreach (var fn in unit.Functions.Where(function => !function.IsHook)) EmitFnLua(fn);
+        EmitHooksLua(unit.Functions.Where(function => function.IsHook));
         if (!_headless)
             EmitLuaEntry(hasInit);
 
@@ -432,6 +433,38 @@ end
     }
 
     private string? _namespaceName;
+
+    private void EmitHooksLua(IEnumerable<FnDecl> hooks)
+    {
+        int hookId = 0;
+        foreach (var group in hooks.GroupBy(hook => hook.Name, StringComparer.Ordinal))
+        {
+            // Wrappers are emitted in reverse so calls enter hooks in declaration order.
+            foreach (var hook in group.Reverse())
+            {
+                string originalName = $"__jasssharp_original_{hookId++}";
+                string parameters = string.Join(", ", hook.Params.Select(parameter => parameter.Name));
+
+                Line($"local {originalName} = {hook.Name}");
+                Line($"function {hook.Name}({parameters})");
+                _indent++;
+                Line($"local original = {originalName}");
+
+                _className = null;
+                _currentMethodIsStatic = false;
+                _locals = hook.Params.ToDictionary(
+                    parameter => parameter.Name,
+                    parameter => parameter.Type,
+                    StringComparer.Ordinal);
+                _locals["original"] = "function";
+
+                EmitStmts(hook.Body, hook.Attributes?.Contains("Trace") == true);
+                _indent--;
+                Line("end");
+                Line("");
+            }
+        }
+    }
 
     private void EmitFnLua(FnDecl fn)
     {
