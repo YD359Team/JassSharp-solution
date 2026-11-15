@@ -1,0 +1,33 @@
+namespace FunctionHooksSmoke
+{
+    using Warcraft3;
+
+    int Compute(int value)
+    {
+        return value + 1;
+    }
+
+    hook int Compute(int value)
+    {
+        if (value < 0)
+            return 0;
+
+        return original(value) + 10;
+    }
+
+    hook int Compute(int value)
+    {
+        return original(value) * 2;
+    }
+
+    hook int GetUnitAbilityLevel(unit whichUnit, int abilityId)
+    {
+        return original(whichUnit, abilityId);
+    }
+
+    public void Verify(unit whichUnit)
+    {
+        int result = Compute(2);
+        int abilityLevel = GetUnitAbilityLevel(whichUnit, 1);
+    }
+}
