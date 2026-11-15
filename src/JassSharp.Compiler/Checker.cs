@@ -219,6 +219,11 @@ public static class Checker
                 {
                     targetSignature = new NativeSig(target.Name, target.ReturnType,
                         target.Params.Select(parameter => parameter.Type).ToArray(), "");
+                    if (target.Attributes?.Contains("Inline") == true)
+                    {
+                        Add(1, 1, "error",
+                            $"нельзя перехватывать inline-функцию {hook.Name}: вызовы могут быть встроены в вызывающий код");
+                    }
                 }
                 else if (_hasWarcraft3 && NativeSigs.Map.TryGetValue(hook.Name, out var native))
                 {
