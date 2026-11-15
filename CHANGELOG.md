@@ -7,6 +7,10 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+### Documentation
+- Added project scaffolding instructions and directory layouts for Warcraft III and headless projects.
+- Documented the current restriction on parameterized base constructors and added a regression check.
+
 ### Added
 - Centralized the compiler and VS Code extension version in `Version.props`.
 - Added expression-bodied methods, operators, and namespace-level functions.

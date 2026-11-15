@@ -1,0 +1,21 @@
+namespace InvalidBaseConstructorSmoke
+{
+    class Entity
+    {
+        Entity(int id)
+        {
+        }
+    }
+
+    class Unit : Entity
+    {
+        Unit()
+        {
+        }
+    }
+
+    public void Verify()
+    {
+        Unit unit = new Unit();
+    }
+}

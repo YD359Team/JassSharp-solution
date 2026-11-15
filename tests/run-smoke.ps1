@@ -1177,5 +1177,16 @@ if ($invalidInterfaceErrors.Count -lt 2 -or
     throw "Expected diagnostics for a missing interface implementation and conflicting inherited interface signatures."
 }
 
+Write-Host "[26/26] Verifying parameterized base constructors are rejected..."
+$baseConstructorFixture = Join-Path $PSScriptRoot "fixtures/InvalidBaseConstructorSmoke.w3js"
+$baseConstructorOutput = dotnet run --configuration Release --no-build --project $project -- check $baseConstructorFixture
+if ($LASTEXITCODE -eq 0) {
+    throw "A derived class must not silently call a parameterized base constructor without arguments."
+}
+$baseConstructorText = $baseConstructorOutput -join "`n"
+if (-not $baseConstructorText.Contains("base class Entity must have a parameterless constructor")) {
+    throw "Expected a diagnostic explaining the parameterless base-constructor requirement."
+}
+
 $global:LASTEXITCODE = 0
 Write-Host "All JASS# compiler smoke checks passed."

@@ -70,40 +70,123 @@ dotnet run --project src/JassSharp.Compiler -- build samples/fireball.w3js --tar
 
 ## Режимы проекта
 
-Режим задаётся необязательным свойством `mode` в `jasssharp.json`. Если свойство отсутствует, используется `wc3`.
+Режим задаётся свойством `mode` в корневом `jasssharp.json`. Если файл или свойство `mode` отсутствует, CLI по умолчанию использует `wc3`. Для нового проекта рекомендуется явно задавать режим.
 
-### Warcraft III — `wc3`
+### Создание проекта Warcraft III — `wc3`
 
-Обычный режим сборки карты. Использует конфигурацию карты, игровые пути и MPQ-инструменты. Минимальная конфигурация:
+Рекомендуемая структура:
 
-```json
+```text
+MyWarcraftMap/
+├── jasssharp.json
+├── src/
+│   └── Main.w3js
+├── map/
+│   ├── war3map.w3i
+│   ├── war3map.doo
+│   ├── war3map.w3u
+│   └── ... остальные файлы распакованной карты
+├── tools/
+│   └── mpqtool.exe
+├── obj/                 # создаётся компилятором
+└── bin/                 # создаётся компилятором
+```
+
+Создай каталоги и конфигурацию PowerShell-командами:
+
+```powershell
+$project = "MyWarcraftMap"
+New-Item -ItemType Directory -Force "$project/src", "$project/map", "$project/tools" | Out-Null
+
+@'
 {
   "mode": "wc3",
   "map": "map",
   "target": "lua",
-  "entry": "src/Main.w3js"
+  "entry": "src/Main.w3js",
+  "mpqTool": "tools/mpqtool.exe",
+  "game": ""
+}
+'@ | Set-Content -Encoding utf8 "$project/jasssharp.json"
+```
+
+Скопируй в `map/` **содержимое распакованной карты**, включая обязательный `war3map.w3i`, и добавь используемый MPQ packer по пути из `mpqTool`. Вместо каталога карты можно указать готовый файл `.w3x` в поле `map`; для изменения существующего архива нужен `mpqcli` или `MPQEditor` (путь задаётся через `mpqcli` или `mpqEditor`, либо инструмент должен находиться в `PATH`). Само поле `game` можно оставить пустым: путь к исполняемому файлу Warcraft III требуется только при запуске сборки с флагом `--run`. Альтернатива — переменная окружения `JASSSHARP_GAME`.
+
+Минимальный `src/Main.w3js`:
+
+```csharp
+namespace MyWarcraftMap
+{
+    using Warcraft3;
+
+    void OnInit()
+    {
+        // Инициализация логики карты
+    }
 }
 ```
 
-### Автономная трансляция — `headless`
+Сборка выполняется из корня проекта:
 
-Режим для использования JASS# как самостоятельного транслятора. Не требует установленной игры, пути к Warcraft III, карты или MPQ-инструментов.
+```powershell
+dotnet run --project <путь-к-JassSharp>/src/JassSharp.Compiler -- map --project .
+```
 
-```json
+Результат — `bin/JassSharpMap.w3x`. Чтобы после сборки запустить карту в игре, укажи `game` в конфиге и добавь `--run`. Если `entry` не задан, компилятор собирает все файлы `.w3js` внутри `src/` и его подкаталогов.
+
+### Создание автономного проекта — `headless`
+
+Этот режим не требует Warcraft III, карты, World Editor или MPQ-инструментов.
+
+Структура:
+
+```text
+MyLuaProject/
+├── jasssharp.json
+├── src/
+│   └── Main.w3js
+└── bin/                 # создаётся компилятором
+```
+
+Создание каталогов и `jasssharp.json`:
+
+```powershell
+$project = "MyLuaProject"
+New-Item -ItemType Directory -Force "$project/src" | Out-Null
+
+@'
 {
   "mode": "headless",
+  "target": "lua",
   "entry": "src/Main.w3js",
   "output": "bin/Main.lua"
 }
+'@ | Set-Content -Encoding utf8 "$project/jasssharp.json"
 ```
 
-Запуск:
+Пример `src/Main.w3js`:
+
+```csharp
+namespace MyLuaProject
+{
+    public int Add(int left, int right) => left + right;
+
+    public void Run()
+    {
+        Print(Add(2, 3));
+    }
+}
+```
+
+Запуск сборки из корня проекта:
 
 ```powershell
-dotnet run --project src/JassSharp.Compiler -- map --project .
+dotnet run --project <путь-к-JassSharp>/src/JassSharp.Compiler -- map --project .
 ```
 
-Если `entry` не задан, обрабатываются все файлы `.w3js` в `src`. Если `output` не задан, результат записывается в `bin/<имя-проекта>.lua`. В headless-режиме не создаются Warcraft III entry points `config()` и `main()`; исходники не обязаны объявлять `main`, `config` или `OnInit`. Обычные функции остаются доступными в Lua-модуле, но автоматически не вызываются. Встроенный `Print(...)` преобразуется в Lua `print(...)`.
+Результат — `bin/Main.lua`. Если `entry` не задан, компилятор обрабатывает все файлы `.w3js` внутри `src/` и его подкаталогов. Если `output` не задан, используется `bin/<имя-проекта>.lua`.
+
+В headless-режиме не создаются Warcraft III entry points `config()` и `main()`; исходники не обязаны объявлять `main`, `config` или `OnInit`. Обычные функции остаются доступными в Lua-модуле, но автоматически не вызываются. Встроенный `Print(...)` преобразуется в Lua `print(...)`. Команда `map --run` в этом режиме не поддерживается.
 
 ### Модуль Warcraft III
 
