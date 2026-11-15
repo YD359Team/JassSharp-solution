@@ -1590,8 +1590,21 @@ static class MapBuild
             .ThenBy(path => path, StringComparer.Ordinal)
             .ToList();
 
-        Dictionary<string, NsUnit> unitsByName = new(StringComparer.Ordinal);
-        Dictionary<string, string> fileByName = new(StringComparer.Ordinal);
+        StringComparison pathComparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        bool IsStandardLibraryFile(string file)
+        {
+            string relativePath = Path.GetRelativePath(standardLibraryDirectory, file);
+            return !Path.IsPathRooted(relativePath) &&
+                   relativePath != ".." &&
+                   !relativePath.StartsWith(".." + Path.DirectorySeparatorChar, pathComparison) &&
+                   !relativePath.StartsWith(".." + Path.AltDirectorySeparatorChar, pathComparison);
+        }
+
+        Dictionary<string, List<(string File, NsUnit Unit, bool IsStandardLibrary)>> groupedUnits =
+            new(StringComparer.Ordinal);
         Dictionary<string, NsUnit> unitsByFile = new(pathComparer);
 
         foreach (string file in candidates)
@@ -1616,16 +1629,39 @@ static class MapBuild
                     ex);
             }
 
-            if (unitsByName.TryGetValue(unit.Name, out _))
+            bool isStandardLibrary = IsStandardLibraryFile(file);
+            if (!groupedUnits.TryGetValue(unit.Name, out var entries))
             {
-                string previousFile = fileByName[unit.Name];
-                throw new InvalidDataException(
-                    $"duplicate namespace '{unit.Name}' in '{previousFile}' and '{file}'");
+                entries = new List<(string File, NsUnit Unit, bool IsStandardLibrary)>();
+                groupedUnits.Add(unit.Name, entries);
             }
 
-            unitsByName.Add(unit.Name, unit);
-            fileByName.Add(unit.Name, file);
+            entries.Add((file, unit, isStandardLibrary));
             unitsByFile.Add(file, unit);
+        }
+
+        Dictionary<string, NsUnit> unitsByName = new(StringComparer.Ordinal);
+        Dictionary<string, List<string>> filesByName = new(StringComparer.Ordinal);
+
+        foreach (var (namespaceName, entries) in groupedUnits)
+        {
+            var projectEntries = entries.Where(entry => !entry.IsStandardLibrary).ToList();
+            var standardEntries = entries.Where(entry => entry.IsStandardLibrary).ToList();
+
+            if (projectEntries.Count > 1)
+            {
+                throw new InvalidDataException(
+                    $"duplicate namespace '{namespaceName}' in '{projectEntries[0].File}' and '{projectEntries[1].File}'");
+            }
+
+            if (projectEntries.Count > 0 && standardEntries.Count > 0)
+            {
+                throw new InvalidDataException(
+                    $"project namespace '{namespaceName}' in '{projectEntries[0].File}' conflicts with a built-in standard-library namespace");
+            }
+
+            unitsByName.Add(namespaceName, StandardLibrary.MergeUnits(entries.Select(entry => entry.Unit)));
+            filesByName.Add(namespaceName, entries.Select(entry => entry.File).ToList());
         }
 
         List<string> ordered = new();
@@ -1672,7 +1708,8 @@ static class MapBuild
 
             importStack.RemoveAt(importStack.Count - 1);
             visitState[namespaceName] = 2;
-            ordered.Add(fileByName[namespaceName]);
+            foreach (string file in filesByName[namespaceName])
+                ordered.Add(file);
         }
 
         foreach (string fullPath in rootFiles
