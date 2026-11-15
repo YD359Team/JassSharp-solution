@@ -1260,10 +1260,18 @@ $nativeWrapper = $functionHooksLua.IndexOf('__jasssharp_register_hook("GetUnitAb
 $replaceValueWrapper = $functionHooksLua.IndexOf('__jasssharp_register_hook("ReplaceValue"')
 $secondHookBody = $functionHooksLua.IndexOf("return (original(value) * 2)")
 $firstHookBody = $functionHooksLua.IndexOf("if (value < 0)")
-$firstHookReturn = $functionHooksLua.IndexOf("return 0", $firstHookBody)
-$firstOriginalCall = $functionHooksLua.IndexOf("original(value)", $firstHookBody)
-$replaceValueBody = $functionHooksLua.IndexOf("return 42", $replaceValueWrapper)
-$replaceValueOriginalCall = $functionHooksLua.IndexOf("original(", $replaceValueWrapper)
+$firstHookReturn = -1
+$firstOriginalCall = -1
+if ($firstHookBody -ge 0) {
+    $firstHookReturn = $functionHooksLua.IndexOf("return 0", $firstHookBody)
+    $firstOriginalCall = $functionHooksLua.IndexOf("original(value)", $firstHookBody)
+}
+$replaceValueBody = -1
+$replaceValueOriginalCall = -1
+if ($replaceValueWrapper -ge 0) {
+    $replaceValueBody = $functionHooksLua.IndexOf("return 42", $replaceValueWrapper)
+    $replaceValueOriginalCall = $functionHooksLua.IndexOf("original(", $replaceValueWrapper)
+}
 foreach ($fragment in @(
     '__jasssharp_register_hook("Compute", function(__jasssharp_original)',
     '__jasssharp_register_hook("GetUnitAbilityLevel", function(__jasssharp_original)',
