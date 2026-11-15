@@ -405,7 +405,6 @@ public static class NativeCatalog
         "BlzSetTerrainFogStyle",
         "BlzSetTerrainFogZEnd",
         "BlzSetTerrainFogZStart",
-        "BlzSetThematicMusicAbsoluteVolume",
         "SetThematicMusicAbsoluteVolume",
         "BlzSetUnitAbilityCooldown",
         "BlzSetUnitAbilityCooldownPercent",
