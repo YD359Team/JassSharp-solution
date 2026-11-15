@@ -23,6 +23,7 @@ Lua — единственный backend JASS#. Условная компиля�
 - [Warcraft III 3.0.0 API](docs/warcraft-3-0-0.md) — управление атаками, аурами, перезарядками способностей и анимациями спецэффектов.
 - [Warcraft III 3.0.1 API](docs/warcraft-3-0-1.md) — новые функции лечения, талантов, экипировки, эффектов и управления камерой.
 - [Object-data field constants](docs/object-data-fields.md) — константы полей способностей, предметов и юнитов для generic field natives.
+- [Reforged gameplay stats](docs/reforged-gameplay-stats.md) — аудит Ability Amp, Ability Vamp, Ability Speed, Mana Efficiency, критических характеристик и Resolve; неподтверждённые native API намеренно не добавлены.
 
 ## Frame API и Lua backend
 
