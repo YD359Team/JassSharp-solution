@@ -22,6 +22,7 @@ GitHub Release должен использовать тег `v<Version>`, сов
 - Вывод типа локальной переменной через `var`.
 - Проверка совместимости типов и диагностика некорректных присваиваний.
 - Перегрузка арифметических, сравнительных и пользовательских операторов.
+- Function Hooks для глобальных функций и нативных функций Warcraft III с типизированным `original(...)` и детерминированной цепочкой перехватчиков.
 - Массивы и jagged arrays (`T[][]`) с нулевой индексацией в исходном коде.
 - Циклы `while`, `do while`, `for` и `foreach` (Lua backend).
 - Пространства имён, `using` и разрешение зависимостей между исходными файлами.
@@ -37,6 +38,7 @@ Lua — единственный backend JASS#. Условная компиля�
 - [Reforged gameplay stats](docs/reforged-gameplay-stats.md) — аудит Ability Amp, Ability Vamp, Ability Speed, Mana Efficiency, критических характеристик и Resolve; неподтверждённые native API намеренно не добавлены.
 - [Warcraft III handle types and control flow](docs/handle-types-and-control-flow.md) — иерархия handle, свойство `HandleId`, `break`, `continue` и `return;`.
 - [Classes and interfaces](docs/classes-and-interfaces.md) — наследование классов, реализация и наследование интерфейсов, проверка контрактов и Lua codegen.
+- [Function hooks](docs/function-hooks.md) — перехват глобальных и нативных функций, вызов `original(...)` и порядок цепочки хуков.
 
 ## Frame API и Lua backend
 
