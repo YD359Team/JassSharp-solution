@@ -1697,6 +1697,7 @@ static class MapBuild
     {
         string sourceDirectory = Path.Combine(projectDir, "src");
         Dictionary<string, NsUnit> units = new(StringComparer.Ordinal);
+        Dictionary<string, string> unitSources = new(StringComparer.Ordinal);
 
         IEnumerable<string> files = Directory.Exists(sourceDirectory)
             ? EnumerateProjectSources(sourceDirectory)
@@ -1730,12 +1731,18 @@ static class MapBuild
             }
 
             units.Add(parsed.Name, parsed);
+            unitSources.Add(parsed.Name, file);
         }
 
         foreach (NsUnit standardUnit in StandardLibrary.LoadUnits())
         {
             if (units.TryGetValue(standardUnit.Name, out _))
-                throw new InvalidDataException($"namespace '{standardUnit.Name}' conflicts with a built-in standard-library namespace");
+            {
+                string sourceFile = unitSources[standardUnit.Name];
+                throw new InvalidDataException(
+                    $"project source '{sourceFile}' declares namespace '{standardUnit.Name}', which conflicts with a built-in standard-library namespace");
+            }
+
             units.Add(standardUnit.Name, standardUnit);
         }
 
