@@ -48,7 +48,7 @@ async function fetchSymbols(projectDir: string, currentFile: string): Promise<Sy
 
 const KEYWORDS = [
     "namespace", "using", "class", "void", "int", "float", "bool", "string", "const",
-    "new", "this", "if", "else", "do", "while", "for", "foreach", "return", "break", "continue", "true", "false", "null", "var",
+    "new", "this", "if", "else", "do", "while", "for", "foreach", "return", "break", "true", "false", "null", "var",
 ];
 
 const TYPES = [
