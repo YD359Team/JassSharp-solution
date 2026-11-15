@@ -17,9 +17,10 @@ Versions follow Semantic Versioning.
 - Added C#-style Allman brace formatting on type and document formatting.
 - Added an always-available Lua build status-bar command, including in headless projects.
 - Added explicit command activation and editor toolbar/context-menu entries.
-- Added Lua runtime integration tests for hook execution, early returns, native delegation, cross-module ordering, and one-time finalization.
+- Added Lua runtime integration tests for hook execution, early returns, native delegation, cross-module ordering, one-time finalization, and Unicode string indexing.
 - Added tag-driven GitHub Releases: CI validates the version, extracts release notes from `CHANGELOG.md`, and publishes assets only after all test jobs pass.
 - Added a Windows compiler archive alongside the VS Code VSIX in GitHub Releases.
 
 ### Fixed
+- Corrected `Strings.LastIndexOf` for multibyte UTF-8 text and overlapping matches.
 - Headless smoke coverage now proves that a project builds without `main`, `config`, or `OnInit`.
