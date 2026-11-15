@@ -1257,11 +1257,17 @@ $functionHooksLua = Get-Content -LiteralPath $functionHooksLuaPath -Raw
 $firstComputeWrapper = $functionHooksLua.IndexOf('__jasssharp_register_hook("Compute"')
 $secondComputeWrapper = $functionHooksLua.IndexOf('__jasssharp_register_hook("Compute"', $firstComputeWrapper + 1)
 $nativeWrapper = $functionHooksLua.IndexOf('__jasssharp_register_hook("GetUnitAbilityLevel"')
+$replaceValueWrapper = $functionHooksLua.IndexOf('__jasssharp_register_hook("ReplaceValue"')
 $secondHookBody = $functionHooksLua.IndexOf("return (original(value) * 2)")
 $firstHookBody = $functionHooksLua.IndexOf("if (value < 0)")
+$firstHookReturn = $functionHooksLua.IndexOf("return 0", $firstHookBody)
+$firstOriginalCall = $functionHooksLua.IndexOf("original(value)", $firstHookBody)
+$replaceValueBody = $functionHooksLua.IndexOf("return 42", $replaceValueWrapper)
+$replaceValueOriginalCall = $functionHooksLua.IndexOf("original(", $replaceValueWrapper)
 foreach ($fragment in @(
     '__jasssharp_register_hook("Compute", function(__jasssharp_original)',
     '__jasssharp_register_hook("GetUnitAbilityLevel", function(__jasssharp_original)',
+    '__jasssharp_register_hook("ReplaceValue", function(__jasssharp_original)',
     "local original = __jasssharp_original",
     "return original(whichUnit, abilityId)",
     "function __jasssharp_apply_hooks()",
@@ -1272,10 +1278,12 @@ foreach ($fragment in @(
     }
 }
 if ($firstComputeWrapper -lt 0 -or $secondComputeWrapper -le $firstComputeWrapper -or
-    $nativeWrapper -le $secondComputeWrapper -or $firstHookBody -lt 0 -or
-    $secondHookBody -le $firstHookBody -or
-    $functionHooksLua.IndexOf("if __jasssharp_apply_hooks then __jasssharp_apply_hooks() end") -lt $nativeWrapper) {
-    throw "Function hooks must register in declaration order and finalize after registration."
+    $nativeWrapper -le $secondComputeWrapper -or $replaceValueWrapper -le $nativeWrapper -or
+    $firstHookBody -lt 0 -or $firstHookReturn -le $firstHookBody -or
+    $firstOriginalCall -le $firstHookReturn -or $secondHookBody -le $firstHookBody -or
+    $replaceValueBody -le $replaceValueWrapper -or $replaceValueOriginalCall -ge 0 -or
+    $functionHooksLua.IndexOf("if __jasssharp_apply_hooks then __jasssharp_apply_hooks() end") -lt $replaceValueWrapper) {
+    throw "Function hooks must preserve declaration order, allow early return without original(), and finalize after registration."
 }
 
 $invalidFunctionHooksFixture = Join-Path $PSScriptRoot "fixtures/InvalidFunctionHooksSmoke.w3js"
