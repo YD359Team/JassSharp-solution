@@ -92,7 +92,7 @@ jobs:
       - name: Publish compiler
         shell: pwsh
         run: |
-          dotnet publish src/JassSharp.Compiler/JassSharp.Compiler.csproj --configuration Release --output artifacts/compiler
+          dotnet publish src/JassSharp.Compiler/JassSharp.Compiler.csproj --configuration Release --runtime win-x64 --self-contained false --output artifacts/compiler
           if ($LASTEXITCODE -ne 0) {
               throw "Compiler publish failed."
           }
