@@ -23,6 +23,7 @@ public sealed record VarStmt(string Type, string Name, Expr? Init, int Line = 1,
 public sealed record AssignStmt(Expr Target, Expr Value) : Stmt;
 public sealed record ExprStmt(Expr Expr) : Stmt;
 public sealed record ReturnStmt(Expr? Expr) : Stmt;
+public sealed record BreakStmt(int Line = 1, int Col = 1) : Stmt;
 public sealed record IfStmt(Expr Cond, List<Stmt> Then, List<Stmt>? Else) : Stmt;
 public sealed record WhileStmt(Expr Cond, List<Stmt> Body) : Stmt;
 public sealed record DoWhileStmt(List<Stmt> Body, Expr Cond, int Line = 1, int Col = 1) : Stmt;
