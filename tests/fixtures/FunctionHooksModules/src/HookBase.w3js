@@ -1,0 +1,12 @@
+namespace HookBase
+{
+    int Compute(int value)
+    {
+        return value + 1;
+    }
+
+    hook int Compute(int value)
+    {
+        return original(value) + 10;
+    }
+}
