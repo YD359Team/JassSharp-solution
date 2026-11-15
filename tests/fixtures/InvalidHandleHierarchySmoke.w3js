@@ -1,0 +1,10 @@
+namespace InvalidHandleHierarchySmoke
+{
+    using Warcraft3;
+
+    public void Verify(widget value)
+    {
+        unit invalid = value;
+        int invalidId = 42.HandleId;
+    }
+}
