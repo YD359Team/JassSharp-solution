@@ -472,10 +472,6 @@ end
             }
             switch (s)
             {
-                case BreakStmt:
-                    Line("break");
-                    break;
-
                 case VarStmt v:
                     var inferredType = v.Type == "var" && v.Init is not null
                         ? InferType(v.Init) ?? throw new InvalidOperationException($"Не удалось вывести тип переменной {v.Name}")
