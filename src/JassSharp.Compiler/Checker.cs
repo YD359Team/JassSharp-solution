@@ -135,6 +135,16 @@ public static class Checker
                 }
             }
 
+            foreach (var contract in _unit.Interfaces ?? [])
+            {
+                foreach (var method in contract.Methods)
+                {
+                    ValidateDeclaredType(method.ReturnType, 1, 1, allowVoid: true);
+                    foreach (var parameter in method.Params)
+                        ValidateDeclaredType(parameter.Type, 1, 1, allowVoid: false);
+                }
+            }
+
             foreach (var cls in _unit.Classes)
             {
                 ValidateOperators(cls);
@@ -435,9 +445,12 @@ public static class Checker
                     foreach (var parameter in lambda.Params)
                         Declare(parameter.Name, parameter.Type, lambda.Line, lambda.Col, reportDuplicate: false);
                     var previousReturn = _expectedReturnType;
+                    var previousLoopDepth = _loopDepth;
                     _expectedReturnType = "?";
+                    _loopDepth = 0;
                     CheckStatements(lambda.Body);
                     _expectedReturnType = previousReturn;
+                    _loopDepth = previousLoopDepth;
                     PopScope();
                     break;
 
@@ -496,7 +509,9 @@ public static class Checker
                     break;
 
                 case NewExpr creation:
-                    if (TryGetGenericArguments(creation.Type, out var constructedCollection, out _) &&
+                    if (_interfaces.Contains(creation.Type))
+                        Add(creation.Line, creation.Col, "error", $"interface {creation.Type} cannot be instantiated");
+                    else if (TryGetGenericArguments(creation.Type, out var constructedCollection, out _) &&
                         constructedCollection == "KeyValuePair")
                         Add(creation.Line, creation.Col, "error", "KeyValuePair can only be obtained by iterating a Dictionary");
                     else if (TryGetGenericArguments(creation.Type, out constructedCollection, out _) &&
