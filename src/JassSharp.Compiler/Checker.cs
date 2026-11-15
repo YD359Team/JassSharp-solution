@@ -510,7 +510,8 @@ public static class Checker
                     if (InferType(member.Object) is { } receiverType &&
                         !HasMember(receiverType, member.Name))
                     {
-                        Add(member.Line, member.Col, "warning",
+                        string severity = member.Name == "HandleId" ? "error" : "warning";
+                        Add(member.Line, member.Col, severity,
                             $"тип {receiverType} не содержит члена {member.Name}");
                     }
                     break;
