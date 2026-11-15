@@ -13,7 +13,8 @@ public sealed class Parser(List<Token> tokens)
         Expect("{");
         var usings = new List<string>();
         var fields = new List<FieldDecl>();
-        var ns = new NsUnit(name, usings, [], [], [], fields, []);
+        var interfaces = new List<InterfaceDecl>();
+        var ns = new NsUnit(name, usings, [], [], [], fields, [], interfaces);
         while (!Accept("}"))
         {
             if (Peek.Kind == TokKind.Eof) throw new ParseException("незакрытый namespace", Peek.Line, Peek.Col);
@@ -37,6 +38,11 @@ public sealed class Parser(List<Token> tokens)
             {
                 Eat(TokKind.Id);
                 ns.Classes.Add(ParseClass(attrs));
+            }
+            else if (CheckId("interface"))
+            {
+                Eat(TokKind.Id);
+                interfaces.Add(ParseInterface());
             }
             else if (CheckId("enum"))
             {
@@ -88,6 +94,15 @@ public sealed class Parser(List<Token> tokens)
     private ClassDecl ParseClass(HashSet<string> classAttrs)
     {
         var name = Eat(TokKind.Id).Text;
+        var baseTypes = new List<string>();
+        if (Accept(":"))
+        {
+            do
+            {
+                baseTypes.Add(Eat(TokKind.Id).Text);
+            }
+            while (Accept(","));
+        }
         Expect("{");
         var fields = new List<FieldDecl>();
         var methods = new List<FnDecl>();
@@ -163,7 +178,40 @@ public sealed class Parser(List<Token> tokens)
                 fields.Add(new FieldDecl(type, id, isArray));
             }
         }
-        return new ClassDecl(name, fields, ctor, methods);
+        return new ClassDecl(name, fields, ctor, methods, baseTypes);
+    }
+
+    private InterfaceDecl ParseInterface()
+    {
+        var name = Eat(TokKind.Id).Text;
+        var baseInterfaces = new List<string>();
+        if (Accept(":"))
+        {
+            do
+            {
+                baseInterfaces.Add(Eat(TokKind.Id).Text);
+            }
+            while (Accept(","));
+        }
+
+        Expect("{");
+        var methods = new List<FnDecl>();
+        while (!Accept("}"))
+        {
+            if (Peek.Kind == TokKind.Eof)
+                throw new ParseException($"незакрытый interface {name}", Peek.Line, Peek.Col);
+
+            SkipVis();
+            string returnType = ParseTypeName();
+            string methodName = Eat(TokKind.Id).Text;
+            Expect("(");
+            var parameters = ParseParams();
+            Expect(")");
+            Expect(";");
+            methods.Add(new FnDecl(returnType, methodName, parameters, []));
+        }
+
+        return new InterfaceDecl(name, baseInterfaces, methods);
     }
 
     private static string OperatorIdentifier(string op) => op switch
