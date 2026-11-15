@@ -30,6 +30,7 @@ public static class Checker
         private readonly Dictionary<string, string?> _classBaseTypes = new(StringComparer.Ordinal);
         private readonly Dictionary<string, List<string>> _classInterfaces = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FnDecl> _functions = new(StringComparer.Ordinal);
+        private readonly HashSet<string> _inlineFunctions = new(StringComparer.Ordinal);
         private readonly List<FnDecl> _hooks = [];
         private NativeSig? _hookOriginalSignature;
         private readonly Dictionary<string, string> _globals = new(StringComparer.Ordinal);
@@ -103,6 +104,8 @@ public static class Checker
                 else
                 {
                     _functions[fn.Name] = fn;
+                    if (fn.Attributes?.Contains("Inline") == true)
+                        _inlineFunctions.Add(fn.Name);
                 }
             }
 
@@ -219,7 +222,7 @@ public static class Checker
                 {
                     targetSignature = new NativeSig(target.Name, target.ReturnType,
                         target.Params.Select(parameter => parameter.Type).ToArray(), "");
-                    if (target.Attributes?.Contains("Inline") == true)
+                    if (_inlineFunctions.Contains(hook.Name))
                     {
                         Add(1, 1, "error",
                             $"нельзя перехватывать inline-функцию {hook.Name}: вызовы могут быть встроены в вызывающий код");
