@@ -1153,4 +1153,5 @@ if ($invalidInterfaceErrors.Count -lt 1) {
     throw "Expected a diagnostic for the missing interface implementation."
 }
 
+$global:LASTEXITCODE = 0
 Write-Host "All JASS# compiler smoke checks passed."
