@@ -33,7 +33,6 @@ namespace Lightning
         public bool Move(Vector3 start, Vector3 end, bool checkVisibility)
         {
             if (_disposed) { return false; }
-            _checkVisibility = checkVisibility;
             return MoveLightningEx(
                 _handle,
                 checkVisibility,
