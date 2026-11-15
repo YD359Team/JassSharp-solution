@@ -1147,6 +1147,7 @@ foreach ($fragment in @(
     "EntityBase.__init(self)",
     "UnitActor.new()",
     "actorContract:Act(3)",
+    "actorContract:Id()",
     "actorContract:Trace()"
 )) {
     if (-not $inheritanceLua.Contains($fragment)) {
