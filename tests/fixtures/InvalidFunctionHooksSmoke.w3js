@@ -12,6 +12,7 @@ namespace InvalidFunctionHooksSmoke
 
     hook int Compute(int value)
     {
+        bool invalidReturnType = original(value);
         return original(1.0);
     }
 
