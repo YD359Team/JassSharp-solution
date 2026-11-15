@@ -34,6 +34,17 @@
     ],
     "description": "Объявить класс"
   },
+  "Interface": {
+    "prefix": "interface",
+    "body": [
+      "public interface ${1:IContract}",
+      "{",
+      "    ${2:void} ${3:Execute}(${4});",
+      "    $0",
+      "}"
+    ],
+    "description": "Объявить интерфейс и сигнатуры его методов"
+  },
   "ClassWithConstructor": {
     "prefix": [
       "classctor",
