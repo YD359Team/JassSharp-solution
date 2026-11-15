@@ -14,6 +14,10 @@ static class MapBuild
 {
     private const int ProcessTimeoutMs = 120_000;
     private static readonly UTF8Encoding Utf8NoBom = new(false);
+    private static readonly HashSet<string> ExcludedSourceDirectories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "bin", "obj", ".git", ".vs", "node_modules", "packages", "artifacts", "dist", "coverage"
+    };
 
     public static int Run(string project, bool launch, string? configName = null)
     {
@@ -1695,7 +1699,7 @@ static class MapBuild
         Dictionary<string, NsUnit> units = new(StringComparer.Ordinal);
 
         IEnumerable<string> files = Directory.Exists(sourceDirectory)
-            ? Directory.EnumerateFiles(sourceDirectory, "*.w3js", SearchOption.AllDirectories)
+            ? EnumerateProjectSources(sourceDirectory)
                 .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
                 .ThenBy(path => path, StringComparer.Ordinal)
             : Enumerable.Empty<string>();
@@ -1740,6 +1744,22 @@ static class MapBuild
         units.Add("Warcraft3", new NsUnit("Warcraft3", [], [], [], [], [], []));
 
         return units;
+    }
+
+    private static IEnumerable<string> EnumerateProjectSources(string directory)
+    {
+        foreach (string file in Directory.EnumerateFiles(directory, "*.w3js", SearchOption.TopDirectoryOnly))
+            yield return file;
+
+        foreach (string childDirectory in Directory.EnumerateDirectories(directory, "*", SearchOption.TopDirectoryOnly))
+        {
+            string directoryName = Path.GetFileName(childDirectory);
+            if (ExcludedSourceDirectories.Contains(directoryName))
+                continue;
+
+            foreach (string file in EnumerateProjectSources(childDirectory))
+                yield return file;
+        }
     }
 
     public static List<NsUnit> ResolveImports(NsUnit unit, Dictionary<string, NsUnit> all)
