@@ -1260,20 +1260,22 @@ $nativeWrapper = $functionHooksLua.IndexOf("local __jasssharp_original_2 = GetUn
 $secondHookBody = $functionHooksLua.IndexOf("return (original(value) * 2)")
 $firstHookBody = $functionHooksLua.IndexOf("if (value < 0)")
 foreach ($fragment in @(
-    "local original = __jasssharp_original_0",
-    "local original = __jasssharp_original_1",
-    "local original = __jasssharp_original_2",
-    "function GetUnitAbilityLevel(whichUnit, abilityId)",
-    "return original(whichUnit, abilityId)"
+    "__jasssharp_register_hook(\"Compute\", function(__jasssharp_original)",
+    "__jasssharp_register_hook(\"GetUnitAbilityLevel\", function(__jasssharp_original)",
+    "local original = __jasssharp_original",
+    "return original(whichUnit, abilityId)",
+    "function __jasssharp_apply_hooks()",
+    "for i = #chain, 1, -1 do current = chain[i](current) end"
 )) {
     if (-not $functionHooksLua.Contains($fragment)) {
         throw "Generated function hooks Lua is missing expected fragment: $fragment"
     }
 }
 if ($firstComputeWrapper -lt 0 -or $secondComputeWrapper -le $firstComputeWrapper -or
-    $nativeWrapper -le $secondComputeWrapper -or $secondHookBody -lt 0 -or
-    $firstHookBody -le $secondHookBody) {
-    throw "Function hooks must wrap in reverse emission order so runtime calls follow declaration order."
+    $nativeWrapper -le $secondComputeWrapper -or $firstHookBody -lt 0 -or
+    $secondHookBody -le $firstHookBody -or
+    $functionHooksLua.IndexOf("if __jasssharp_apply_hooks then __jasssharp_apply_hooks() end") -lt $nativeWrapper) {
+    throw "Function hooks must register in declaration order and finalize after registration."
 }
 
 $invalidFunctionHooksFixture = Join-Path $PSScriptRoot "fixtures/InvalidFunctionHooksSmoke.w3js"
@@ -1301,6 +1303,34 @@ if ($invalidFunctionHooksExitCode -eq 0 -or
     -not $invalidFunctionHooksMessages.Contains("original доступен только внутри hook") -or
     -not $invalidFunctionHooksMessages.Contains("нельзя объявить hook для неизвестной функции Missing")) {
     throw "Function hooks must reject mismatched signatures, invalid original arguments, and unknown targets. Output: $invalidFunctionHooksText"
+}
+
+Write-Host "[29/29] Verifying inline-hook rejection and cross-module hook ordering..."
+$inlineFixture = Join-Path $PSScriptRoot "fixtures/InvalidInlineFunctionHookSmoke.w3js"
+$inlineOutput = dotnet run --configuration Release --no-build --project $project -- check $inlineFixture
+if ($LASTEXITCODE -eq 0 -or -not (($inlineOutput -join "`n").Contains("нельзя перехватывать inline-функцию Fast"))) {
+    throw "Hooks targeting [Inline] functions must be rejected."
+}
+
+$multiModuleProject = Join-Path $PSScriptRoot "fixtures/FunctionHooksModules"
+$multiModuleOutput = dotnet run --configuration Release --no-build --project $project -- map --project $multiModuleProject
+if ($LASTEXITCODE -ne 0) {
+    throw "Cross-module function hooks project failed to build: $($multiModuleOutput -join [Environment]::NewLine)"
+}
+$multiModuleLuaPath = Join-Path $multiModuleProject "bin/FunctionHooksModules.lua"
+if (-not (Test-Path $multiModuleLuaPath)) {
+    throw "Expected cross-module hook Lua output was not created: $multiModuleLuaPath"
+}
+$multiModuleLua = Get-Content -LiteralPath $multiModuleLuaPath -Raw
+$baseHookRegistration = $multiModuleLua.IndexOf('__jasssharp_register_hook("Compute"')
+$rootHookRegistration = $multiModuleLua.IndexOf('__jasssharp_register_hook("Compute"', $baseHookRegistration + 1)
+$hookFinalizer = $multiModuleLua.IndexOf("if __jasssharp_apply_hooks then __jasssharp_apply_hooks() end")
+$baseHookBody = $multiModuleLua.IndexOf("return original(value) + 10")
+$rootHookBody = $multiModuleLua.IndexOf("return original(value) * 2")
+if ($baseHookRegistration -lt 0 -or $rootHookRegistration -le $baseHookRegistration -or
+    $baseHookBody -lt 0 -or $rootHookBody -le $baseHookBody -or
+    $hookFinalizer -le $rootHookBody) {
+    throw "Cross-module hooks must register in dependency/declaration order and apply only after all module chunks."
 }
 
 $global:LASTEXITCODE = 0
