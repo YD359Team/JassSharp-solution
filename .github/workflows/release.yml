@@ -40,6 +40,15 @@ jobs:
           cache: npm
           cache-dependency-path: src/jasssharp-vscode/package-lock.json
 
+      - name: Synchronize extension version from Version.props
+        working-directory: src/jasssharp-vscode
+        shell: pwsh
+        run: |
+          npm.cmd run sync-version
+          if ($LASTEXITCODE -ne 0) {
+              throw "Could not synchronize VS Code extension version."
+          }
+
       - name: Install extension dependencies
         working-directory: src/jasssharp-vscode
         shell: pwsh
@@ -59,10 +68,6 @@ jobs:
               throw "Release tag '$($env:RELEASE_TAG)' does not match Version.props ($version)."
           }
 
-          npm.cmd run sync-version
-          if ($LASTEXITCODE -ne 0) {
-              throw "Could not synchronize VS Code extension version to $version."
-          }
 
       - name: Test VS Code extension and brace formatter
         working-directory: src/jasssharp-vscode
