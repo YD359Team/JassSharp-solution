@@ -26,6 +26,9 @@ assert(MathGeometryApiSmoke.CircleIntersectsRect(3, 0, 1, 0, 0, 2, 2),
 near(MathGeometryApiSmoke.SegmentDistance(0, 0, 2, 0, 3, 0), 1, 0.00001,
     "segment closest point must clamp beyond endpoint")
 
+assert(MathGeometryApiSmoke.VerifyNullGameplayWrappers(),
+    "gameplay wrappers must not call natives with null owners or missing abilities")
+
 assert(MathGeometryApiSmoke.VerifyNullFrameWrappers(),
     "all frame wrappers must treat null native handles as disposed")
 
