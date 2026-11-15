@@ -30,7 +30,7 @@ namespace Timers
         // A periodic timer invokes callback every timeout seconds until paused or disposed.
         public void StartPeriodic(float timeout, code callback)
         {
-            if (_disposed) { return; }
+            if (_disposed || callback == null) { return; }
             TimerStart(_handle, Math.Max(timeout, 0.0), true, callback);
         }
 
@@ -68,7 +68,7 @@ namespace Timers
         {
             if (!_disposed)
             {
-                DestroyTimer(_handle);
+                if (_handle != null) { DestroyTimer(_handle); }
                 _disposed = true;
             }
         }
