@@ -872,6 +872,9 @@ end
         if (receiverType is null)
             return null;
 
+        if (expression.Name == "HandleId" && Warcraft3TypeHierarchy.IsHandleType(receiverType))
+            return "int";
+
         if (expression.Name == "Count" &&
             (IsGenericType(receiverType, "List") ||
              IsGenericType(receiverType, "Queue") ||
