@@ -7,6 +7,7 @@ import { NATIVES } from "./completion";
 
 interface NamespaceSymbols {
     classes: string[];
+    interfaces: string[];
     functions: string[];
     consts: string[];
     fields: string[];
@@ -65,9 +66,9 @@ const BITWISE_OPERATORS = [
 ] as const;
 
 const KEYWORDS = new Set([
-    "namespace", "using", "class", "enum", "const", "public", "private", "static",
+    "namespace", "using", "class", "interface", "enum", "const", "public", "private", "static",
     "void", "int", "integer", "float", "real", "bool", "boolean", "string", "code",
-    "new", "this", "if", "else", "do", "while", "for", "foreach", "return", "break",
+    "new", "this", "if", "else", "do", "while", "for", "foreach", "return", "break", "continue",
     "true", "false", "null", "var", "in", "is", "as", "get", "set"
 ]);
 
@@ -1045,6 +1046,8 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
                     if (!ns) continue;
                     for (const name of ns.classes)
                         addCompletion(items, seen, name, vscode.CompletionItemKind.Class, `${namespace} class`, range, "02");
+                    for (const name of ns.interfaces)
+                        addCompletion(items, seen, name, vscode.CompletionItemKind.Interface, `${namespace} interface`, range, "02");
                     for (const name of ns.functions)
                         addCompletion(items, seen, name, vscode.CompletionItemKind.Function, `${namespace} function`, range, "02", new vscode.SnippetString(`${name}($0)`));
                     for (const name of ns.consts)
