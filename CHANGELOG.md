@@ -18,7 +18,7 @@ Versions follow Semantic Versioning.
 - Added an always-available Lua build status-bar command, including in headless projects.
 - Added explicit command activation and editor toolbar/context-menu entries.
 - Added Lua runtime integration tests for hook execution, early returns, native delegation, cross-module ordering, and one-time finalization.
-- Added automatic GitHub Release notes extraction from the matching version section in `CHANGELOG.md`.
+- Added tag-driven GitHub Releases: CI validates the version, extracts release notes from `CHANGELOG.md`, and publishes assets only after all test jobs pass.
 - Added a Windows compiler archive alongside the VS Code VSIX in GitHub Releases.
 
 ### Fixed
