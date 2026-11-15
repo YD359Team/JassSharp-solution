@@ -22,6 +22,29 @@ internal static class StandardLibrary
             .ToArray();
     }
 
+    internal static NsUnit MergeUnits(IEnumerable<NsUnit> sourceUnits)
+    {
+        List<NsUnit> units = sourceUnits.ToList();
+        if (units.Count == 0)
+            throw new ArgumentException("at least one namespace unit is required", nameof(sourceUnits));
+
+        string namespaceName = units[0].Name;
+        if (units.Any(unit => !string.Equals(unit.Name, namespaceName, StringComparison.Ordinal)))
+            throw new ArgumentException("all namespace units must have the same name", nameof(sourceUnits));
+
+        if (units.Count == 1)
+            return units[0];
+
+        return new NsUnit(
+            namespaceName,
+            units.SelectMany(unit => unit.Usings).Distinct(StringComparer.Ordinal).ToList(),
+            units.SelectMany(unit => unit.Consts).ToList(),
+            units.SelectMany(unit => unit.Classes).ToList(),
+            units.SelectMany(unit => unit.Functions).ToList(),
+            units.SelectMany(unit => unit.Fields).ToList(),
+            units.SelectMany(unit => unit.Enums).ToList());
+    }
+
     public static IEnumerable<NsUnit> LoadUnits()
     {
         var parsedUnits = LoadSources()
@@ -29,23 +52,7 @@ internal static class StandardLibrary
             .GroupBy(unit => unit.Name, StringComparer.Ordinal);
 
         foreach (var group in parsedUnits)
-        {
-            var units = group.ToList();
-            if (units.Count == 1)
-            {
-                yield return units[0];
-                continue;
-            }
-
-            yield return new NsUnit(
-                group.Key,
-                units.SelectMany(unit => unit.Usings).Distinct(StringComparer.Ordinal).ToList(),
-                units.SelectMany(unit => unit.Consts).ToList(),
-                units.SelectMany(unit => unit.Classes).ToList(),
-                units.SelectMany(unit => unit.Functions).ToList(),
-                units.SelectMany(unit => unit.Fields).ToList(),
-                units.SelectMany(unit => unit.Enums).ToList());
-        }
+            yield return MergeUnits(group);
     }
 
     private static NsUnit ParseUnit((string FileName, string Source) source)
