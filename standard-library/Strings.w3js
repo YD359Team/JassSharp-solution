@@ -59,16 +59,19 @@ namespace Strings
         {
             int total = utf8.len(value);
             if (searchValue == "") { return total; }
+
             int cursor = 1;
             int last = -1;
             while (true)
             {
                 int found = string.find(value, searchValue, cursor, true);
                 if (found == null) { break; }
+
+                // found is a byte offset. Convert only the valid UTF-8 prefix
+                // before the match, then advance one byte to preserve overlapping
+                // matches. A UTF-8 search string cannot begin at a continuation byte.
                 last = utf8.len(string.sub(value, 1, found - 1));
-                int prefixLength = utf8.len(string.sub(value, 1, found));
-                cursor = utf8.offset(value, prefixLength + 1);
-                if (cursor == null) { break; }
+                cursor = found + 1;
             }
             return last;
         }
