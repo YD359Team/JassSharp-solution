@@ -19,6 +19,8 @@ public sealed class Codegen
     private readonly Dictionary<string, List<FnDecl>> _operatorMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EnumDecl> _enums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, List<string>> _classBaseCandidates = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _classBases = new(StringComparer.Ordinal);
 
     public Codegen(bool headless = false)
     {
@@ -36,6 +38,7 @@ public sealed class Codegen
                 foreach (var cls in imported.Classes)
                 {
                     _classFields[cls.Name] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
+                    _classBaseCandidates[cls.Name] = cls.BaseTypes ?? [];
                     foreach (var method in cls.Methods)
                     {
                         if (method.Operator is { } op)
@@ -54,6 +57,7 @@ public sealed class Codegen
         foreach (var cls in unit.Classes)
         {
             _classFields[cls.Name] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
+            _classBaseCandidates[cls.Name] = cls.BaseTypes ?? [];
             foreach (var m in cls.Methods)
             {
                 if (m.Operator is { } op)
@@ -62,6 +66,13 @@ public sealed class Codegen
                     _methods[cls.Name + "." + m.Name] = m;
             }
         }
+        foreach (var candidate in _classBaseCandidates)
+        {
+            string? baseClass = candidate.Value.FirstOrDefault(_classFields.ContainsKey);
+            if (baseClass is not null)
+                _classBases[candidate.Key] = baseClass;
+        }
+
         foreach (var en in unit.Enums)
             _enums[en.Name] = en;
         foreach (var fn in unit.Functions)
@@ -86,7 +97,7 @@ public sealed class Codegen
             Line($"local {c.Name} = {EmitExpr(c.Value)}");
         foreach (var en in unit.Enums) EmitEnum(en);
         if (unit.Consts.Count > 0) Line("");
-        foreach (var cls in unit.Classes) EmitClassLua(cls);
+        foreach (var cls in GetClassEmissionOrder(unit.Classes)) EmitClassLua(cls);
         foreach (var fn in unit.Functions) EmitFnLua(fn);
         if (!_headless)
             EmitLuaEntry(hasInit);
@@ -224,25 +235,58 @@ end
         Line("end");
     }
 
+    private IEnumerable<ClassDecl> GetClassEmissionOrder(IEnumerable<ClassDecl> classes)
+    {
+        var byName = classes.ToDictionary(cls => cls.Name, StringComparer.Ordinal);
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var ordered = new List<ClassDecl>();
+
+        void Visit(ClassDecl cls)
+        {
+            if (!visited.Add(cls.Name))
+                return;
+            if (_classBases.TryGetValue(cls.Name, out var baseName) &&
+                byName.TryGetValue(baseName, out var baseClass))
+                Visit(baseClass);
+            ordered.Add(cls);
+        }
+
+        foreach (var cls in classes)
+            Visit(cls);
+        return ordered;
+    }
+
     private void EmitClassLua(ClassDecl cls)
     {
         _className = cls.Name;
         Line($"{cls.Name} = {{}}");
         Line($"{cls.Name}.__index = {cls.Name}");
-        if (cls.Ctor is not null)
-        {
-            _currentMethodIsStatic = false;
-            _locals = cls.Ctor.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
-            Line($"function {cls.Name}.new({string.Join(", ", cls.Ctor.Params.Select(p => p.Name))})");
-            _indent++;
-            Line($"local self = setmetatable({{}}, {cls.Name})");
-            foreach (var field in cls.Fields.Where(field => field.IsArray))
-                Line($"self.{field.Name} = {{}}");
-            EmitStmts(cls.Ctor.Body.Where(s => s is not ReturnStmt).ToList());
-            Line("return self");
-            _indent--;
-            Line("end");
-        }
+        if (_classBases.TryGetValue(cls.Name, out var baseClassName))
+            Line($"setmetatable({cls.Name}, {{ __index = {baseClassName} }})");
+
+        var constructor = cls.Ctor;
+        var constructorParameters = constructor?.Params ?? [];
+        _currentMethodIsStatic = false;
+        _locals = constructorParameters.ToDictionary(parameter => parameter.Name, parameter => parameter.Type, StringComparer.Ordinal);
+        Line($"function {cls.Name}.__init(self{(constructorParameters.Count == 0 ? "" : ", " + string.Join(", ", constructorParameters.Select(parameter => parameter.Name)))})");
+        _indent++;
+        if (_classBases.TryGetValue(cls.Name, out baseClassName))
+            Line($"{baseClassName}.__init(self)");
+        foreach (var field in cls.Fields.Where(field => field.IsArray))
+            Line($"self.{field.Name} = {{}}");
+        if (constructor is not null)
+            EmitStmts(constructor.Body.Where(statement => statement is not ReturnStmt).ToList());
+        _indent--;
+        Line("end");
+
+        Line($"function {cls.Name}.new({string.Join(", ", constructorParameters.Select(parameter => parameter.Name))})");
+        _indent++;
+        Line($"local self = setmetatable({{}}, {cls.Name})");
+        Line($"{cls.Name}.__init(self{(constructorParameters.Count == 0 ? "" : ", " + string.Join(", ", constructorParameters.Select(parameter => parameter.Name)))})");
+        Line("return self");
+        _indent--;
+        Line("end");
+
         foreach (var m in cls.Methods)
         {
             _currentMethodIsStatic = m.IsStatic;
@@ -813,10 +857,35 @@ end
         if (_currentMethodIsStatic || _className is null || _locals.ContainsKey(name))
             return null;
 
-        return _classFields.TryGetValue(_className, out var fields) &&
-               fields.TryGetValue(name, out var type)
-            ? type
-            : null;
+        return TryGetClassField(_className, name, out var type) ? type : null;
+    }
+
+    private FnDecl? FindClassMethod(string className, string methodName)
+    {
+        string? current = className;
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (current is not null && visited.Add(current))
+        {
+            if (_methods.TryGetValue(current + "." + methodName, out var method))
+                return method;
+            current = _classBases.GetValueOrDefault(current);
+        }
+        return null;
+    }
+
+    private bool TryGetClassField(string className, string fieldName, out string type)
+    {
+        string? current = className;
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        while (current is not null && visited.Add(current))
+        {
+            if (_classFields.TryGetValue(current, out var fields) &&
+                fields.TryGetValue(fieldName, out type!))
+                return true;
+            current = _classBases.GetValueOrDefault(current);
+        }
+        type = null!;
+        return false;
     }
 
     private bool ShouldEmitCurrentField(string name) =>
@@ -886,8 +955,7 @@ end
             genericName == "KeyValuePair" && genericArgs.Count == 2)
             return expression.Name switch { "Key" => genericArgs[0], "Value" => genericArgs[1], _ => null };
 
-        if (_classFields.TryGetValue(receiverType, out var fields) &&
-            fields.TryGetValue(expression.Name, out var fieldType))
+        if (TryGetClassField(receiverType, expression.Name, out var fieldType))
             return fieldType;
 
         var member = NativeTable.Find(receiverType, expression.Name);
@@ -954,8 +1022,7 @@ end
         if (expression.Callee is MemberExpr member)
         {
             if (member.Object is NameExpr className &&
-                _methods.TryGetValue(className.Name + "." + member.Name, out var staticMethod) &&
-                staticMethod.IsStatic)
+                FindClassMethod(className.Name, member.Name) is { IsStatic: true } staticMethod)
                 return staticMethod.ReturnType;
 
             var receiverType = RecvType(member.Object);
@@ -975,7 +1042,7 @@ end
                 if (collectionName == "Dictionary" && (member.Name is "Remove" or "TryAdd" or "TryRemove" or "ContainsKey")) return "bool";
             }
 
-            if (_methods.TryGetValue(receiverType + "." + member.Name, out var method))
+            if (FindClassMethod(receiverType, member.Name) is { } method)
                 return method.ReturnType;
 
             var nativeMember = NativeTable.Find(receiverType, member.Name);
@@ -1215,8 +1282,7 @@ end
 
             bool isDeclaredStaticMethod =
                 rt is not null &&
-                _methods.TryGetValue(rt + "." + mem.Name, out var declaredMethod) &&
-                declaredMethod.IsStatic;
+                FindClassMethod(rt, mem.Name) is { IsStatic: true };
 
             if (isDeclaredStaticMethod ||
                 (mem.Object is NameExpr staticOwner &&
@@ -1230,7 +1296,7 @@ end
         {
             var arguments = string.Join(", ", c.Args.Select(EmitExpr));
             if (_className is not null &&
-                _methods.TryGetValue(_className + "." + id.Name, out var classMethod))
+                FindClassMethod(_className, id.Name) is { } classMethod)
             {
                 return classMethod.IsStatic
                     ? $"{_className}.{id.Name}({arguments})"
