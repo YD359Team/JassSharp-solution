@@ -5,12 +5,35 @@ namespace InvalidInterfaceImplementationSmoke
         void Execute();
     }
 
+    interface IIntegerValue
+    {
+        int Value();
+    }
+
+    interface IStringValue
+    {
+        string Value();
+    }
+
+    interface IConflictingValue : IIntegerValue, IStringValue
+    {
+    }
+
     class MissingImplementation : IRequired
     {
+    }
+
+    class ConflictingImplementation : IConflictingValue
+    {
+        public int Value()
+        {
+            return 1;
+        }
     }
 
     public void Verify()
     {
         MissingImplementation value = new MissingImplementation();
+        ConflictingImplementation conflicting = new ConflictingImplementation();
     }
 }
