@@ -59,7 +59,7 @@ namespace FloatingText
 
         public void AttachToUnit(unit target, float zOffset)
         {
-            if (_disposed) { return; }
+            if (_disposed || target == null) { return; }
             SetTextTagPosUnit(_handle, target, zOffset);
         }
 
@@ -72,7 +72,7 @@ namespace FloatingText
 
         public void SetColor(Color value)
         {
-            if (_disposed) { return; }
+            if (_disposed || value == null) { return; }
             value.ApplyToTextTag(_handle);
         }
 
