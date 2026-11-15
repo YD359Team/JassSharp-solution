@@ -18,10 +18,9 @@ public sealed class Codegen
     private readonly Dictionary<string, EnumDecl> _enums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
 
-    public Codegen(IEnumerable<string> classes, bool headless = false)
+    public Codegen(bool headless = false)
     {
         _headless = headless;
-        _classes = new HashSet<string>(classes, StringComparer.Ordinal);
     }
 
     public string Emit(NsUnit unit, IEnumerable<NsUnit>? imports = null)
