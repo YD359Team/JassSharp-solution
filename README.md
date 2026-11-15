@@ -6,7 +6,7 @@ JASS# — язык с C#-подобным синтаксисом для разр
 
 ## Возможности
 
-- Классы, поля, методы, конструкторы и статические методы.
+- Классы, поля, методы, конструкторы, статические методы, наследование классов и интерфейсов.
 - Типовая совместимость Warcraft III с наследованием `handle → agent → widget → unit/item/destructable` и доступом `value.HandleId` для handle-подтипов.
 - Управление потоком `break`, `continue` и `return;` в циклах и методах без возвращаемого значения.
 - Примитивные типы `int`, `float`, `bool`, `string`, а также типы Warcraft III.
@@ -27,6 +27,7 @@ Lua — единственный backend JASS#. Условная компиля�
 - [Object-data field constants](docs/object-data-fields.md) — константы полей способностей, предметов и юнитов для generic field natives.
 - [Reforged gameplay stats](docs/reforged-gameplay-stats.md) — аудит Ability Amp, Ability Vamp, Ability Speed, Mana Efficiency, критических характеристик и Resolve; неподтверждённые native API намеренно не добавлены.
 - [Warcraft III handle types and control flow](docs/handle-types-and-control-flow.md) — иерархия handle, свойство `HandleId`, `break`, `continue` и `return;`.
+- [Classes and interfaces](docs/classes-and-interfaces.md) — наследование классов, реализация и наследование интерфейсов, проверка контрактов и Lua codegen.
 
 ## Frame API и Lua backend
 
