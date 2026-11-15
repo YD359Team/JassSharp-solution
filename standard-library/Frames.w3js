@@ -13,7 +13,7 @@ namespace Frames
         {
             _handle = handle;
             _ownsHandle = ownsHandle;
-            _disposed = false;
+            _disposed = handle == null;
         }
 
         public static Frame Create(string template, framehandle parent, int priority, int context)
@@ -361,7 +361,7 @@ namespace Frames
         {
             _handle = handle;
             _ownsHandle = ownsHandle;
-            _disposed = false;
+            _disposed = handle == null;
         }
 
         public static ButtonFrame Create(string name, framehandle parent, string inherits, int context)
@@ -403,7 +403,7 @@ namespace Frames
         {
             _handle = handle;
             _ownsHandle = ownsHandle;
-            _disposed = false;
+            _disposed = handle == null;
         }
 
         public static TextFrame Create(string name, framehandle parent, string inherits, int context)
@@ -450,7 +450,7 @@ namespace Frames
         {
             _handle = handle;
             _ownsHandle = ownsHandle;
-            _disposed = false;
+            _disposed = handle == null;
         }
 
         public static SliderFrame Create(string name, framehandle parent, string inherits, int context)
@@ -503,7 +503,7 @@ namespace Frames
         {
             _handle = handle;
             _ownsHandle = ownsHandle;
-            _disposed = false;
+            _disposed = handle == null;
         }
 
         public static EditBoxFrame Create(string name, framehandle parent, string inherits, int context)
@@ -554,7 +554,7 @@ namespace Frames
         {
             _handle = handle;
             _ownsHandle = ownsHandle;
-            _disposed = false;
+            _disposed = handle == null;
         }
 
         public static CheckBoxFrame Create(string name, framehandle parent, string inherits, int context)
@@ -610,7 +610,7 @@ namespace Frames
         {
             _handle = handle;
             _ownsHandle = ownsHandle;
-            _disposed = false;
+            _disposed = handle == null;
         }
 
         public static PopupFrame Create(string name, framehandle parent, string inherits, int context)
@@ -659,7 +659,7 @@ namespace Frames
         {
             _handle = handle;
             _ownsHandle = ownsHandle;
-            _disposed = false;
+            _disposed = handle == null;
         }
 
         public static MenuFrame Create(string name, framehandle parent, string inherits, int context)
