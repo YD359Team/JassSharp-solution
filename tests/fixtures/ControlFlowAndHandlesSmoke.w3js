@@ -7,6 +7,12 @@ namespace ControlFlowAndHandlesSmoke
         widget asWidget = source;
         agent asAgent = source;
         handle asHandle = source;
+        player owner = GetTriggerPlayer();
+        agent ownerAgent = owner;
+        eventid eventReference = ConvertGameEvent(0);
+        effect temporaryEffect = AddSpecialEffect("Abilities\\\\Spells\\\\Human\\\\HolyBolt\\\\HolyBoltSpecialArt.mdl", 0.0, 0.0);
+        agent effectAgent = temporaryEffect;
+        gamestate gameState = ConvertIGameState(0);
 
         int unitId = source.HandleId;
         int widgetId = widgetValue.HandleId;
