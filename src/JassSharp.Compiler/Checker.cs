@@ -723,9 +723,16 @@ public static class Checker
 
             if (call.Callee is NameExpr name)
             {
-                if (name.Name == "original" && _hookOriginalSignature is { } originalSignature)
+                if (name.Name == "original")
                 {
-                    CheckArguments(name, call.Args, originalSignature.Params);
+                    if (_hookOriginalSignature is { } originalSignature)
+                        CheckArguments(name, call.Args, originalSignature.Params);
+                    else
+                    {
+                        Add(name.Line, name.Col, "error", "original доступен только внутри hook");
+                        foreach (var argument in call.Args)
+                            CheckExpression(argument);
+                    }
                     return;
                 }
                 if (_currentClass is not null &&
