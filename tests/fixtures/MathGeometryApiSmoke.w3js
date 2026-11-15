@@ -2,6 +2,7 @@ namespace MathGeometryApiSmoke
 {
     using Math;
     using Geometry;
+    using Frames;
 
     public class MathGeometryApiSmoke
     {
@@ -54,6 +55,27 @@ namespace MathGeometryApiSmoke
         {
             return new LineSegment2(new Vector2(ax, ay), new Vector2(bx, by))
                 .DistanceToPoint(new Vector2(px, py));
+        }
+
+        public static bool VerifyNullFrameWrappers()
+        {
+            Frame frame = new Frame(null, true);
+            ButtonFrame button = new ButtonFrame(null, true);
+            TextFrame text = new TextFrame(null, true);
+            SliderFrame slider = new SliderFrame(null, true);
+            EditBoxFrame editBox = new EditBoxFrame(null, true);
+            CheckBoxFrame checkBox = new CheckBoxFrame(null, true);
+            PopupFrame popup = new PopupFrame(null, true);
+            MenuFrame menu = new MenuFrame(null, true);
+
+            return frame.IsDisposed() && frame.Handle() == null
+                && button.IsDisposed() && button.Handle() == null
+                && text.IsDisposed() && text.Handle() == null
+                && slider.IsDisposed() && slider.Handle() == null
+                && editBox.IsDisposed() && editBox.Handle() == null
+                && checkBox.IsDisposed() && checkBox.Handle() == null
+                && popup.IsDisposed() && popup.Handle() == null
+                && menu.IsDisposed() && menu.Handle() == null;
         }
     }
 }
