@@ -1239,5 +1239,67 @@ if (-not $baseConstructorText.Contains("base class Entity must have a parameterl
     throw "Expected a diagnostic explaining the parameterless base-constructor requirement."
 }
 
+Write-Host "[28/28] Verifying function hook signatures, original calls, and deterministic chaining..."
+$functionHooksFixture = Join-Path $PSScriptRoot "fixtures/FunctionHooksSmoke.w3js"
+$functionHooksCheck = dotnet run --configuration Release --no-build --project $project -- check $functionHooksFixture
+if ($LASTEXITCODE -ne 0) {
+    throw "Valid function hooks fixture failed semantic analysis: $($functionHooksCheck -join [Environment]::NewLine)"
+}
+$functionHooksBuild = dotnet run --configuration Release --no-build --project $project -- build $functionHooksFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Valid function hooks fixture failed to compile: $($functionHooksBuild -join [Environment]::NewLine)"
+}
+$functionHooksLuaPath = Join-Path $PSScriptRoot "fixtures/bin/FunctionHooksSmoke.lua"
+if (-not (Test-Path $functionHooksLuaPath)) {
+    throw "Expected generated function hooks Lua file was not created: $functionHooksLuaPath"
+}
+$functionHooksLua = Get-Content -LiteralPath $functionHooksLuaPath -Raw
+$firstComputeWrapper = $functionHooksLua.IndexOf("local __jasssharp_original_0 = Compute")
+$secondComputeWrapper = $functionHooksLua.IndexOf("local __jasssharp_original_1 = Compute")
+$nativeWrapper = $functionHooksLua.IndexOf("local __jasssharp_original_2 = GetUnitAbilityLevel")
+$secondHookBody = $functionHooksLua.IndexOf("return (original(value) * 2)")
+$firstHookBody = $functionHooksLua.IndexOf("if (value < 0)")
+foreach ($fragment in @(
+    "local original = __jasssharp_original_0",
+    "local original = __jasssharp_original_1",
+    "local original = __jasssharp_original_2",
+    "function GetUnitAbilityLevel(whichUnit, abilityId)",
+    "return original(whichUnit, abilityId)"
+)) {
+    if (-not $functionHooksLua.Contains($fragment)) {
+        throw "Generated function hooks Lua is missing expected fragment: $fragment"
+    }
+}
+if ($firstComputeWrapper -lt 0 -or $secondComputeWrapper -le $firstComputeWrapper -or
+    $nativeWrapper -le $secondComputeWrapper -or $secondHookBody -lt 0 -or
+    $firstHookBody -le $secondHookBody) {
+    throw "Function hooks must wrap in reverse emission order so runtime calls follow declaration order."
+}
+
+$invalidFunctionHooksFixture = Join-Path $PSScriptRoot "fixtures/InvalidFunctionHooksSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $invalidFunctionHooksOutput = dotnet run --configuration Release --no-build --project $project -- check $invalidFunctionHooksFixture 2>&1
+    $invalidFunctionHooksExitCode = $LASTEXITCODE
+    $invalidFunctionHooksText = $invalidFunctionHooksOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $invalidFunctionHooksDiagnostics = ConvertFrom-Json -InputObject $invalidFunctionHooksText
+}
+catch {
+    throw "Could not parse function hooks diagnostics as JSON. Exit code: $invalidFunctionHooksExitCode. Output: $invalidFunctionHooksText"
+}
+$invalidFunctionHooksMessages = @($invalidFunctionHooksDiagnostics | Where-Object { $_.severity -eq "error" } | ForEach-Object { $_.message }) -join "`n"
+if ($invalidFunctionHooksExitCode -eq 0 -or
+    -not $invalidFunctionHooksMessages.Contains("сигнатура hook не совпадает") -or
+    -not $invalidFunctionHooksMessages.Contains("аргумент 1: ожидался тип int, получен float") -or
+    -not $invalidFunctionHooksMessages.Contains("нельзя объявить hook для неизвестной функции Missing")) {
+    throw "Function hooks must reject mismatched signatures, invalid original arguments, and unknown targets. Output: $invalidFunctionHooksText"
+}
+
 $global:LASTEXITCODE = 0
 Write-Host "All JASS# compiler smoke checks passed."
