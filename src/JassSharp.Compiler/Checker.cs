@@ -643,8 +643,7 @@ public static class Checker
             if (call.Callee is NameExpr name)
             {
                 if (_currentClass is not null &&
-                    _classMethods.TryGetValue(_currentClass, out var currentClassMethods) &&
-                    currentClassMethods.TryGetValue(name.Name, out var currentClassMethod))
+                    TryGetClassMethod(_currentClass, name.Name, out var currentClassMethod))
                 {
                     CheckArguments(name, call.Args, currentClassMethod.Params.Select(p => p.Type).ToArray());
                     if (!currentClassMethod.IsStatic && _currentMethodIsStatic)
@@ -687,8 +686,7 @@ public static class Checker
             var receiverType = InferType(member.Object);
 
             if (receiverType is not null &&
-                _classMethods.TryGetValue(receiverType, out var methods) &&
-                methods.TryGetValue(member.Name, out var instanceMethod))
+                TryGetClassMethod(receiverType, member.Name, out var instanceMethod))
             {
                 CheckArguments(member, call.Args, instanceMethod.Params.Select(p => p.Type).ToArray());
                 if (instanceMethod.IsStatic)
@@ -697,10 +695,16 @@ public static class Checker
                 return;
             }
 
+            if (receiverType is not null && _interfaces.Contains(receiverType) &&
+                TryGetInterfaceMethod(receiverType, member.Name, out var interfaceMethod))
+            {
+                CheckArguments(member, call.Args, interfaceMethod.Params.Select(p => p.Type).ToArray());
+                return;
+            }
+
             if (member.Object is NameExpr className &&
                 !_scopes.Any(scope => scope.ContainsKey(className.Name)) &&
-                _classMethods.TryGetValue(className.Name, out var staticMethods) &&
-                staticMethods.TryGetValue(member.Name, out var classMethod))
+                TryGetClassMethod(className.Name, member.Name, out var classMethod))
             {
                 CheckArguments(member, call.Args, classMethod.Params.Select(p => p.Type).ToArray());
                 if (!classMethod.IsStatic)
@@ -799,8 +803,7 @@ public static class Checker
                 case CallExpr { Callee: MemberExpr member }:
                 {
                     if (member.Object is NameExpr className &&
-                        _classMethods.TryGetValue(className.Name, out var staticMethods) &&
-                        staticMethods.TryGetValue(member.Name, out var staticMethod) &&
+                        TryGetClassMethod(className.Name, member.Name, out var staticMethod) &&
                         staticMethod.IsStatic)
                         return staticMethod.ReturnType;
 
@@ -821,9 +824,12 @@ public static class Checker
                         if (collectionName == "Dictionary" && (member.Name is "Remove" or "TryAdd" or "TryRemove" or "ContainsKey")) return "bool";
                     }
 
-                    if (_classMethods.TryGetValue(receiverType, out var methods) &&
-                        methods.TryGetValue(member.Name, out var method))
+                    if (TryGetClassMethod(receiverType, member.Name, out var method))
                         return method.ReturnType;
+
+                    if (_interfaces.Contains(receiverType) &&
+                        TryGetInterfaceMethod(receiverType, member.Name, out var interfaceMethod))
+                        return interfaceMethod.ReturnType;
 
                     var nativeMember = _hasWarcraft3 ? NativeTable.Find(receiverType, member.Name) : null;
                     if (nativeMember?.Kind != MemberKind.Method)
@@ -855,8 +861,7 @@ public static class Checker
                         pairCollection == "KeyValuePair" && pairArgs.Count == 2)
                         return member.Name switch { "Key" => pairArgs[0], "Value" => pairArgs[1], _ => null };
 
-                    if (_classFields.TryGetValue(receiverType, out var fields) &&
-                        fields.TryGetValue(member.Name, out var fieldType2))
+                    if (TryGetClassField(receiverType, member.Name, out var fieldType2))
                         return fieldType2;
 
                     var nativeMember = _hasWarcraft3 ? NativeTable.Find(receiverType, member.Name) : null;
@@ -986,8 +991,9 @@ public static class Checker
                 return memberName == "Count";
             if (TryGetGenericArguments(type, out var pairName, out _) && pairName == "KeyValuePair")
                 return memberName is "Key" or "Value";
-            return (_classFields.TryGetValue(type, out var fields) && fields.ContainsKey(memberName)) ||
-                   (_classMethods.TryGetValue(type, out var methods) && methods.ContainsKey(memberName)) ||
+            return TryGetClassField(type, memberName, out _) ||
+                   TryGetClassMethod(type, memberName, out _) ||
+                   (_interfaces.Contains(type) && TryGetInterfaceMethod(type, memberName, out _)) ||
                    (_hasWarcraft3 && NativeTable.Find(type, memberName) is not null);
         }
 
@@ -1003,8 +1009,7 @@ public static class Checker
         private bool TryGetCurrentField(string name, out string type)
         {
             if (_currentClass is not null &&
-                _classFields.TryGetValue(_currentClass, out var fields) &&
-                fields.TryGetValue(name, out type!))
+                TryGetClassField(_currentClass, name, out type!))
                 return true;
 
             type = null!;
