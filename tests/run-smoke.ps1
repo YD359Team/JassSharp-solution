@@ -101,7 +101,7 @@ catch {
 }
 $bitwiseConstantsErrors = @($parsedBitwiseConstantsDiagnostics | Where-Object { $_.Severity -eq "error" })
 $bitwiseConstantsErrorLines = @($bitwiseConstantsErrors | ForEach-Object { [int]$_.Line } | Sort-Object) -join ","
-if ($bitwiseConstantsExitCode -eq 0 -or $bitwiseConstantsErrors.Count -ne 2 -or $bitwiseConstantsErrorLines -ne "3,6") {
+if ($bitwiseConstantsExitCode -eq 0 -or $bitwiseConstantsErrors.Count -ne 2 -or $bitwiseConstantsErrorLines -ne "3,7") {
     throw "Overflow validation did not cover const and enum expressions. Exit code: $bitwiseConstantsExitCode. Error lines: $bitwiseConstantsErrorLines. Output: $bitwiseConstantsText"
 }
 
