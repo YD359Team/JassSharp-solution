@@ -1124,7 +1124,8 @@ $inheritanceCheckOutput = dotnet run --configuration Release --no-build --projec
 if ($LASTEXITCODE -ne 0) {
     throw "Class/interface inheritance fixture produced semantic errors: $($inheritanceCheckOutput -join [Environment]::NewLine)"
 }
-$inheritanceDiagnostics = @($inheritanceCheckOutput | ConvertFrom-Json)
+$inheritanceCheckText = $inheritanceCheckOutput -join "`n"
+$inheritanceDiagnostics = @(ConvertFrom-Json -InputObject $inheritanceCheckText)
 $inheritanceWarnings = @($inheritanceDiagnostics | Where-Object { $_.severity -eq "warning" })
 if ($inheritanceWarnings.Count -gt 0) {
     throw "Valid class/interface inheritance produced warnings: $($inheritanceWarnings | ConvertTo-Json -Depth 5 -Compress)"
