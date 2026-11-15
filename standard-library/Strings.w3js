@@ -16,7 +16,8 @@ namespace Strings
             int total = utf8.len(value);
             if (startIndex >= total || length == 0) { return ""; }
             int remaining = total - startIndex;
-            int endIndex = length > remaining ? total : startIndex + length;
+            int endIndex = total;
+            if (length <= remaining) { endIndex = startIndex + length; }
             int firstByte = utf8.offset(value, startIndex + 1);
             int afterLastByte = utf8.offset(value, endIndex + 1);
             return string.sub(value, firstByte, afterLastByte - 1);
