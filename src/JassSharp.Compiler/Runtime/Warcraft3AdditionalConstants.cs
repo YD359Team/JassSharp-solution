@@ -1,0 +1,66 @@
+namespace JassSharp.Runtime;
+
+/// <summary>
+/// Standard Warcraft III object-data field constants that are present in common.j
+/// but are not yet included in the generated NativeCatalog snapshot.
+/// </summary>
+public static class Warcraft3AdditionalConstants
+{
+    public static readonly HashSet<string> Constants = new(StringComparer.Ordinal)
+    {
+        "ABILITY_IF_ALLOWED_TARGETS",
+        "ABILITY_RF_CAST_POINT",
+        "ABILITY_RF_CAST_BACK_SWING",
+        "ABILITY_RF_CASTING_TIME",
+        "ABILITY_ILF_BUFFID",
+        "ABILITY_ILF_EFFECTID",
+        "ABILITY_ILF_ALLOWED_TARGETS",
+        "ABILITY_ILF_SPAWN_UNIT_ID_NSY2",
+        "ABILITY_ILF_REQUIRED_UNIT_TYPE",
+        "ABILITY_ILF_CONVERTED_UNIT_TYPE",
+        "ABILITY_ILF_PARTNER_UNIT_TYPE",
+        "ABILITY_ILF_PARTNER_UNIT_TYPE_ONE",
+        "ABILITY_ILF_PARTNER_UNIT_TYPE_TWO",
+        "ABILITY_ILF_UNIT_TYPE_ONE",
+        "ABILITY_ILF_UNIT_TYPE_TWO",
+        "ABILITY_ILF_UNIT_TYPE_SOD2",
+        "ABILITY_ILF_SUMMON_1_UNIT_TYPE",
+        "ABILITY_ILF_SUMMON_2_UNIT_TYPE",
+        "ABILITY_ILF_RACE_TO_CONVERT",
+        "ABILITY_ILF_NORMAL_FORM_UNIT_EME1",
+        "ABILITY_ILF_NORMAL_FORM_UNIT_MIL1",
+        "ABILITY_ILF_ALTERNATE_FORM_UNIT_MIL2",
+        "ABILITY_ILAF_BUFFID",
+        "ITEM_IF_GOLD_COST",
+        "ITEM_IF_LUMBER_COST",
+        "ITEM_IF_OLD_LEVEL",
+        "ITEM_IF_STOCK_MAX",
+        "ITEM_IF_STOCK_REG",
+        "ITEM_IF_STOCK_DELAY",
+        "ITEM_BF_IGNORE_COOLDOWN",
+        "UNIT_IF_GOLD_COST",
+        "UNIT_IF_LUMBER_COST",
+        "UNIT_IF_GOLD_REPAIR_COST",
+        "UNIT_IF_LUMBER_REPAIR_COST",
+        "UNIT_IF_CARGO_SIZE",
+        "UNIT_IF_REPULSE_GROUP",
+        "UNIT_IF_REPULSE_PARAM",
+        "UNIT_IF_REPULSE_PRIO",
+        "UNIT_IF_BUILD_TIME",
+        "UNIT_IF_STOCK_MAX",
+        "UNIT_IF_POINT_VALUE",
+        "UNIT_IF_RACE",
+        "UNIT_IF_HIT_POINTS_BASE",
+        "UNIT_IF_MANA_BASE",
+        "UNIT_IF_MANA_START",
+        "UNIT_IF_REPAIR_TIME",
+        "UNIT_IF_DEFENSE_UPGRADE_BONUS",
+        "UNIT_RF_SPEED_MAX",
+        "UNIT_RF_SPEED_MIN",
+        "UNIT_RF_SPEED_BASE",
+        "UNIT_BF_REPULSE",
+        "UNIT_BF_CAN_FLEE",
+        "UNIT_BF_CAN_SLEEP",
+        "UNIT_WEAPON_RF_MOTION_BUFFER",
+    };
+}
