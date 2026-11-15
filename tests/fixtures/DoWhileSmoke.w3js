@@ -5,7 +5,7 @@ namespace DoWhileSmoke
         int value = 0;
         do
         {
-            value++;
+            value = value + 1;
         }
         while (value < 3);
     }
