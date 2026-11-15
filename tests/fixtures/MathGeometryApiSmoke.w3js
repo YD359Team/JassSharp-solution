@@ -1,0 +1,59 @@
+namespace MathGeometryApiSmoke
+{
+    using Math;
+    using Geometry;
+
+    public class MathGeometryApiSmoke
+    {
+        public static float Round(float value)
+        {
+            return Math.Round(value);
+        }
+
+        public static float Repeat(float value, float length)
+        {
+            return Math.Repeat(value, length);
+        }
+
+        public static float InverseLerp(float a, float b, float value)
+        {
+            return Math.InverseLerp(a, b, value);
+        }
+
+        public static float MoveTowards(float current, float target, float maxDelta)
+        {
+            return Math.MoveTowards(current, target, maxDelta);
+        }
+
+        public static float VectorLength(float x, float y)
+        {
+            return new Vector2(x, y).Length();
+        }
+
+        public static float Vector3CrossZ(float ax, float ay, float bx, float by)
+        {
+            return new Vector3(ax, ay, 0.0).Cross(new Vector3(bx, by, 0.0)).Z;
+        }
+
+        public static float RectArea(float x, float y, float width, float height)
+        {
+            return new Rect2(x, y, width, height).Area();
+        }
+
+        public static bool RectContains(float x, float y, float width, float height, float px, float py)
+        {
+            return new Rect2(x, y, width, height).Contains(new Vector2(px, py));
+        }
+
+        public static bool CircleIntersectsRect(float cx, float cy, float radius, float x, float y, float width, float height)
+        {
+            return new Rect2(x, y, width, height).IntersectsCircle(new Circle(new Vector2(cx, cy), radius));
+        }
+
+        public static float SegmentDistance(float ax, float ay, float bx, float by, float px, float py)
+        {
+            return new LineSegment2(new Vector2(ax, ay), new Vector2(bx, by))
+                .DistanceToPoint(new Vector2(px, py));
+        }
+    }
+}
