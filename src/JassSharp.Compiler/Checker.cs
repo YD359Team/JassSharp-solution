@@ -551,6 +551,7 @@ public static class Checker
                     var indexType = InferType(index.Index);
                     var indexedType = InferType(index.Object);
 
+                    bool invalidFromEndReceiver = false;
                     if (index.Index is FromEndExpr fromEndIndex)
                     {
                         var offsetType = InferType(fromEndIndex.Inner);
@@ -565,8 +566,11 @@ public static class Checker
                             supportsFromEnd = fromEndCollectionName == "List";
 
                         if (indexedType is not null && !supportsFromEnd)
+                        {
+                            invalidFromEndReceiver = true;
                             Add(index.Line, index.Col, "error",
                                 $"индексация с конца не поддерживается для типа {indexedType}");
+                        }
                     }
 
                     bool dictionaryIndexer = indexedType is not null &&
@@ -579,7 +583,7 @@ public static class Checker
                         indexedType is not null && indexedType.EndsWith("[]", StringComparison.Ordinal);
                     if (indexedType is not null && TryGetGenericArguments(indexedType, out var indexedName, out _))
                         supportsIndex = indexedName is "List" or "Dictionary";
-                    if (indexedType is not null && !supportsIndex)
+                    if (indexedType is not null && !supportsIndex && !invalidFromEndReceiver)
                         Add(index.Line, index.Col, "error", $"тип {indexedType} не поддерживает индексатор");
                     if (indexedType is not null && TryGetGenericArguments(indexedType, out var dictionaryName, out var dictionaryArgs) &&
                         dictionaryName == "Dictionary")
