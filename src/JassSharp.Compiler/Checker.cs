@@ -1057,6 +1057,18 @@ public static class Checker
                 foreach (var duplicate in contract.Methods.GroupBy(method => method.Name, StringComparer.Ordinal)
                              .Where(group => group.Count() > 1))
                     Add(1, 1, "error", $"interface {contract.Name} declares duplicate method {duplicate.Key}");
+
+                foreach (var inheritedGroup in GetInterfaceMethods(contract.Name)
+                             .GroupBy(method => method.Name, StringComparer.Ordinal))
+                {
+                    var signatures = inheritedGroup
+                        .Select(GetMethodSignature)
+                        .Distinct(StringComparer.Ordinal)
+                        .ToList();
+                    if (signatures.Count > 1)
+                        Add(1, 1, "error",
+                            $"interface {contract.Name} inherits conflicting signatures for method {inheritedGroup.Key}");
+                }
             }
 
             foreach (var cls in _classDeclarations.Values)
@@ -1086,6 +1098,23 @@ public static class Checker
 
             foreach (var cls in _classDeclarations.Values)
             {
+                foreach (var duplicate in cls.Fields.GroupBy(field => field.Name, StringComparer.Ordinal)
+                             .Where(group => group.Count() > 1))
+                    Add(1, 1, "error", $"class {cls.Name} declares duplicate field {duplicate.Key}");
+
+                foreach (var duplicate in cls.Methods.Where(method => method.Operator is null)
+                             .GroupBy(method => method.Name, StringComparer.Ordinal)
+                             .Where(group => group.Count() > 1))
+                    Add(1, 1, "error", $"class {cls.Name} declares duplicate method {duplicate.Key}");
+
+                foreach (var method in cls.Methods.Where(method => method.Operator is null))
+                {
+                    if (TryGetBaseClassMethod(cls.Name, method.Name, out var inheritedMethod) &&
+                        !string.Equals(GetMethodSignature(method), GetMethodSignature(inheritedMethod), StringComparison.Ordinal))
+                        Add(1, 1, "error",
+                            $"method {cls.Name}.{method.Name} hides an inherited method with an incompatible signature");
+                }
+
                 foreach (string interfaceName in GetImplementedInterfaces(cls.Name))
                 {
                     foreach (var required in GetInterfaceMethods(interfaceName))
@@ -1144,6 +1173,26 @@ public static class Checker
                 active.Remove(current);
                 return false;
             }
+        }
+
+        private static string GetMethodSignature(FnDecl method) =>
+            method.ReturnType + "(" + string.Join(",", method.Params.Select(parameter => parameter.Type)) + ")" +
+            (method.IsStatic ? " static" : " instance");
+
+        private bool TryGetBaseClassMethod(string className, string methodName, out FnDecl method)
+        {
+            string? current = _classBaseTypes.GetValueOrDefault(className);
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            while (current is not null && visited.Add(current))
+            {
+                if (_classMethods.TryGetValue(current, out var methods) &&
+                    methods.TryGetValue(methodName, out method!))
+                    return true;
+                current = _classBaseTypes.GetValueOrDefault(current);
+            }
+
+            method = null!;
+            return false;
         }
 
         private bool TryGetClassMethod(string className, string methodName, out FnDecl method)
