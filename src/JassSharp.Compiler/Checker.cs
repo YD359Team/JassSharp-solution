@@ -811,6 +811,9 @@ public static class Checker
                     if (receiverType is null)
                         return null;
 
+                    if (member.Name == "HandleId" && Warcraft3TypeHierarchy.IsHandleType(receiverType))
+                        return "int";
+
                     if (member.Name == "Length" &&
                         (receiverType == "string" || receiverType.EndsWith("[]", StringComparison.Ordinal)))
                         return "int";
@@ -942,6 +945,9 @@ public static class Checker
 
         private bool HasMember(string type, string memberName)
         {
+            if (memberName == "HandleId" && Warcraft3TypeHierarchy.IsHandleType(type))
+                return true;
+
             if (memberName == "Length" &&
                 (type == "string" || type.EndsWith("[]", StringComparison.Ordinal)))
                 return true;
