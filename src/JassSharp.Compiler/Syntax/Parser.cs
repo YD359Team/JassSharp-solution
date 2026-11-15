@@ -30,6 +30,8 @@ public sealed class Parser(List<Token> tokens)
             var attrs = ParseAttributes();
             SkipVis();
             bool isHook = AcceptId("hook");
+            if (isHook && (CheckId("const") || CheckId("class") || CheckId("interface") || CheckId("enum")))
+                throw new ParseException("модификатор hook применим только к глобальным функциям", Peek.Line, Peek.Col);
             if (CheckId("const"))
             {
                 Eat(TokKind.Id);
@@ -63,6 +65,8 @@ public sealed class Parser(List<Token> tokens)
                 }
                 else
                 {
+                    if (isHook)
+                        throw new ParseException("модификатор hook применим только к глобальным функциям", Peek.Line, Peek.Col);
                     Accept(";");
                     fields.Add(new FieldDecl(typeName, id, isArray));
                 }
