@@ -129,7 +129,8 @@ namespace MyWarcraftMap
 Сборка выполняется из корня проекта:
 
 ```powershell
-dotnet run --project <путь-к-JassSharp>/src/JassSharp.Compiler -- map --project .
+$compilerProject = "C:\path\to\JassSharp-solution\src\JassSharp.Compiler"
+dotnet run --project $compilerProject -- map --project .
 ```
 
 Результат — `bin/JassSharpMap.w3x`. Чтобы после сборки запустить карту в игре, укажи `game` в конфиге и добавь `--run`. Если `entry` не задан, компилятор собирает все файлы `.w3js` внутри `src/` и его подкаталогов.
@@ -181,7 +182,8 @@ namespace MyLuaProject
 Запуск сборки из корня проекта:
 
 ```powershell
-dotnet run --project <путь-к-JassSharp>/src/JassSharp.Compiler -- map --project .
+$compilerProject = "C:\path\to\JassSharp-solution\src\JassSharp.Compiler"
+dotnet run --project $compilerProject -- map --project .
 ```
 
 Результат — `bin/Main.lua`. Если `entry` не задан, компилятор обрабатывает все файлы `.w3js` внутри `src/` и его подкаталогов. Если `output` не задан, используется `bin/<имя-проекта>.lua`.
