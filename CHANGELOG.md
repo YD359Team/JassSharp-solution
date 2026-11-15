@@ -23,6 +23,9 @@ Versions follow Semantic Versioning.
 - Added a Windows compiler archive alongside the VS Code VSIX in GitHub Releases.
 
 ### Fixed
+- Timer and group wrappers now handle failed native-handle creation safely; timer starts and group iteration ignore null callbacks, and group membership operations reject null units.
+- Floating-text and lightning helpers now reject null unit/color arguments before forwarding to native APIs.
+- RPG ability cooldown access normalizes negative level indices and negative cooldown durations.
 - Frame wrappers now treat null native handles as disposed, avoiding native calls and invalid destruction after failed frame creation.
 - Corrected `Strings.LastIndexOf` for multibyte UTF-8 text and overlapping matches.
 - Headless smoke coverage now proves that a project builds without `main`, `config`, or `OnInit`.
