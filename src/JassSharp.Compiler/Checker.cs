@@ -30,6 +30,8 @@ public static class Checker
         private readonly Dictionary<string, string?> _classBaseTypes = new(StringComparer.Ordinal);
         private readonly Dictionary<string, List<string>> _classInterfaces = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FnDecl> _functions = new(StringComparer.Ordinal);
+        private readonly List<FnDecl> _hooks = [];
+        private NativeSig? _hookOriginalSignature;
         private readonly Dictionary<string, string> _globals = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
         private readonly Dictionary<string, Dictionary<string, FnDecl>> _classMethods = new(StringComparer.Ordinal);
@@ -92,7 +94,17 @@ public static class Checker
             }
 
             foreach (var fn in unit.Functions)
-                _functions[fn.Name] = fn;
+            {
+                if (fn.IsHook)
+                {
+                    if (ReferenceEquals(unit, _unit))
+                        _hooks.Add(fn);
+                }
+                else
+                {
+                    _functions[fn.Name] = fn;
+                }
+            }
 
             foreach (var field in unit.Fields)
                 _globals[field.Name] = field.Type;
@@ -159,8 +171,10 @@ public static class Checker
             }
 
             _currentClass = null;
-            foreach (var function in _unit.Functions)
+            foreach (var function in _unit.Functions.Where(function => !function.IsHook))
                 CheckFunction(function, null);
+
+            CheckHooks();
         }
 
         private void ValidateOperators(ClassDecl cls)
@@ -190,6 +204,48 @@ public static class Checker
                 Add(1, 1, "error", "операторы == и != должны объявляться парой");
         }
 
+        private void CheckHooks()
+        {
+            foreach (var hook in _hooks)
+            {
+                if (hook.Name == "OnInit")
+                {
+                    Add(1, 1, "error", "нельзя перехватывать OnInit: точка входа компилируется под отдельным именем");
+                    continue;
+                }
+
+                NativeSig? targetSignature = null;
+                if (_functions.TryGetValue(hook.Name, out var target))
+                {
+                    targetSignature = new NativeSig(target.Name, target.ReturnType,
+                        target.Params.Select(parameter => parameter.Type).ToArray(), "");
+                }
+                else if (_hasWarcraft3 && NativeSigs.Map.TryGetValue(hook.Name, out var native))
+                {
+                    targetSignature = native;
+                }
+
+                if (targetSignature is null)
+                {
+                    Add(1, 1, "error",
+                        $"нельзя объявить hook для неизвестной функции {hook.Name}; для нативных функций добавьте using Warcraft3");
+                }
+                else if (hook.ReturnType != targetSignature.ReturnType ||
+                         !hook.Params.Select(parameter => parameter.Type)
+                             .SequenceEqual(targetSignature.Params, StringComparer.Ordinal))
+                {
+                    string expected = $"{targetSignature.ReturnType} {hook.Name}({string.Join(", ", targetSignature.Params)})";
+                    string actual = $"{hook.ReturnType} {hook.Name}({string.Join(", ", hook.Params.Select(parameter => parameter.Type))})";
+                    Add(1, 1, "error", $"сигнатура hook не совпадает с целевой функцией: ожидалась {expected}, получена {actual}");
+                }
+
+                _hookOriginalSignature = targetSignature ?? new NativeSig(
+                    hook.Name, hook.ReturnType, hook.Params.Select(parameter => parameter.Type).ToArray(), "");
+                CheckFunction(hook, null);
+                _hookOriginalSignature = null;
+            }
+        }
+
         private void CheckFunction(FnDecl function, string? className)
         {
             ValidateDeclaredType(function.ReturnType, 1, 1, allowVoid: true);
@@ -204,8 +260,10 @@ public static class Checker
             _expectedReturnType = function.ReturnType;
 
             PushScope();
+            if (_hookOriginalSignature is not null)
+                Declare("original", "function", 1, 1);
             foreach (var parameter in function.Params)
-                Declare(parameter.Name, parameter.Type, 1, 1, reportDuplicate: false);
+                Declare(parameter.Name, parameter.Type, 1, 1, reportDuplicate: _hookOriginalSignature is not null);
 
             CheckStatements(function.Body);
             PopScope();
@@ -665,6 +723,11 @@ public static class Checker
 
             if (call.Callee is NameExpr name)
             {
+                if (name.Name == "original" && _hookOriginalSignature is { } originalSignature)
+                {
+                    CheckArguments(name, call.Args, originalSignature.Params);
+                    return;
+                }
                 if (_currentClass is not null &&
                     TryGetClassMethod(_currentClass, name.Name, out var currentClassMethod))
                 {
@@ -817,6 +880,9 @@ public static class Checker
                     return "null";
                 case NewExpr creation:
                     return creation.Type;
+
+                case CallExpr { Callee: NameExpr { Name: "original" } } when _hookOriginalSignature is { } originalSignature:
+                    return originalSignature.ReturnType;
 
                 case CallExpr { Callee: NameExpr name }:
                     if (_functions.TryGetValue(name.Name, out var function))
