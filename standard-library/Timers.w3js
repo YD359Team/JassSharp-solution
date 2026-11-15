@@ -12,7 +12,7 @@ namespace Timers
         public GameTimer()
         {
             _handle = CreateTimer();
-            _disposed = false;
+            _disposed = _handle == null;
         }
 
         public bool IsDisposed()
@@ -23,7 +23,7 @@ namespace Timers
         // Starting an already-running timer replaces its previous schedule.
         public void StartOnce(float timeout, code callback)
         {
-            if (_disposed) { return; }
+            if (_disposed || callback == null) { return; }
             TimerStart(_handle, Math.Max(timeout, 0.0), false, callback);
         }
 
