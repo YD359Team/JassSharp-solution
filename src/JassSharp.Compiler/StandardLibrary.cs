@@ -24,8 +24,28 @@ internal static class StandardLibrary
 
     public static IEnumerable<NsUnit> LoadUnits()
     {
-        foreach (var source in LoadSources())
-            yield return ParseUnit(source);
+        var parsedUnits = LoadSources()
+            .Select(ParseUnit)
+            .GroupBy(unit => unit.Name, StringComparer.Ordinal);
+
+        foreach (var group in parsedUnits)
+        {
+            var units = group.ToList();
+            if (units.Count == 1)
+            {
+                yield return units[0];
+                continue;
+            }
+
+            yield return new NsUnit(
+                group.Key,
+                units.SelectMany(unit => unit.Usings).Distinct(StringComparer.Ordinal).ToList(),
+                units.SelectMany(unit => unit.Classes).ToList(),
+                units.SelectMany(unit => unit.Functions).ToList(),
+                units.SelectMany(unit => unit.Fields).ToList(),
+                units.SelectMany(unit => unit.Consts).ToList(),
+                units.SelectMany(unit => unit.Enums).ToList());
+        }
     }
 
     private static NsUnit ParseUnit((string FileName, string Source) source)
