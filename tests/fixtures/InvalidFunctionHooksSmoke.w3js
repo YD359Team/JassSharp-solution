@@ -1,0 +1,22 @@
+namespace InvalidFunctionHooksSmoke
+{
+    int Compute(int value)
+    {
+        return value;
+    }
+
+    hook float Compute(float value)
+    {
+        return original(value);
+    }
+
+    hook int Compute(int value)
+    {
+        return original(1.0);
+    }
+
+    hook int Missing(int value)
+    {
+        return original(value);
+    }
+}
