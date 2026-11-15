@@ -131,6 +131,7 @@ if (cmd == "symbols")
                 kv => new
                 {
                     classes = kv.Value.Classes.Select(c => c.Name),
+                    interfaces = (kv.Value.Interfaces ?? []).Select(i => i.Name),
                     functions = kv.Value.Functions.Select(f => f.Name),
                     consts = kv.Value.Consts.Select(c => c.Name),
                     fields = kv.Value.Fields.Select(f => f.Name)
