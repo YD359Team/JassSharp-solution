@@ -25,4 +25,22 @@ namespace InvalidFunctionHooksSmoke
     {
         return original(value);
     }
+
+    void main()
+    {
+    }
+
+    hook void main()
+    {
+        original();
+    }
+
+    void config()
+    {
+    }
+
+    hook void config()
+    {
+        original();
+    }
 }
