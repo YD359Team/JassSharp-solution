@@ -75,24 +75,24 @@ public sealed class Codegen
 
         var hasInit = unit.Functions.Any(f => f.Name == "OnInit");
         Line($"-- {unit.Name}  (JASS# → Lua)");
-            if (unit.Usings.Count > 0)
-                Line("-- usings: " + string.Join(", ", unit.Usings));
-            if (!_headless)
-                Line("if not BJDebugMsg then function BJDebugMsg(s) print(s) end end");
-            Line("");
-            foreach (var f in unit.Fields)
-                Line(f.IsArray ? $"{f.Name} = {{}}" : $"{f.Name} = nil");
-            if (unit.Fields.Count > 0) Line("");
-            foreach (var c in unit.Consts)
-                Line($"local {c.Name} = {EmitExpr(c.Value)}");
-            foreach (var en in unit.Enums) EmitEnum(en);
-            if (unit.Consts.Count > 0) Line("");
-            foreach (var cls in unit.Classes) EmitClassLua(cls);
-            foreach (var fn in unit.Functions) EmitFnLua(fn);
-            if (!_headless)
-                EmitLuaEntry(hasInit);
+        if (unit.Usings.Count > 0)
+            Line("-- usings: " + string.Join(", ", unit.Usings));
+        if (!_headless)
+            Line("if not BJDebugMsg then function BJDebugMsg(s) print(s) end end");
+        Line("");
+        foreach (var f in unit.Fields)
+            Line(f.IsArray ? $"{f.Name} = {{}}" : $"{f.Name} = nil");
+        if (unit.Fields.Count > 0) Line("");
+        foreach (var c in unit.Consts)
+            Line($"local {c.Name} = {EmitExpr(c.Value)}");
+        foreach (var en in unit.Enums) EmitEnum(en);
+        if (unit.Consts.Count > 0) Line("");
+        foreach (var cls in unit.Classes) EmitClassLua(cls);
+        foreach (var fn in unit.Functions) EmitFnLua(fn);
+        if (!_headless)
+            EmitLuaEntry(hasInit);
 
-            Line(@"
+        Line(@"
 local __collection_null = {}
 local function __collection_store(value)
     if value == nil then return __collection_null end
@@ -107,8 +107,8 @@ function __list_remove(t, v)
     v = __collection_store(v)
     for i = 1, #t do
         if t[i] == v then
-            table.remove(t, i)
-            return true
+        table.remove(t, i)
+        return true
         end
     end
     return false
@@ -163,7 +163,7 @@ function __dictionary_new()
     local items = {}
     setmetatable(items, {
         __index = function(_, key)
-            error("The given key was not present in the dictionary: " .. tostring(key))
+        error("The given key was not present in the dictionary: " .. tostring(key))
         end
     })
     return { _items = items, _count = 0 }
