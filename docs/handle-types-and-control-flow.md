@@ -8,6 +8,7 @@ JASS# models the documented Warcraft III handle hierarchy for semantic type chec
 handle
 └── agent
     ├── event
+    ├── player
     ├── widget
     │   ├── unit
     │   ├── destructable
@@ -26,6 +27,19 @@ handle
     │   ├── conditionfunc
     │   └── filterfunc
     └── sound
+
+handle
+├── eventid
+│   ├── gameevent
+│   ├── playerevent
+│   ├── playerunitevent
+│   ├── unitevent
+│   ├── limitop
+│   ├── widgetevent
+│   └── dialogevent
+└── gamestate
+    ├── igamestate
+    └── fgamestate
 ```
 
 Additional handle descendants from the Warcraft III API catalog are also accepted as handle values. Specialized parent relationships are recorded explicitly; remaining native descriptor/enum handle types are treated as direct descendants of `handle`.
@@ -82,6 +96,7 @@ A value-returning method must return a compatible value; a bare return is a sema
 
 - [XGM: Передача и хранение данных в варкрафте](https://xgm.guru/p/wc3/w3datatypes) — handle semantics and `GetHandleId`.
 - [XGM: Утекают ли не обнулённые переменные типа handle](https://xgm.guru/p/wc3/do-unnulled-handle-locals-leak) — native handle hierarchy and Reforged handle types.
+- [W3CE common.j](https://github.com/Warcraft-III-Community-Edition/W3CE/blob/main/Scripts/common.j) — additional parent relationships such as `player : agent`, `gameevent : eventid` and `igamestate : gamestate`.
 - Warcraft III native declarations in `common.j` — engine signatures remain authoritative for native parameter types.
 
 The implementation is a compile-time model of Warcraft III's native types. It does not turn Warcraft handles into user-defined classes or add runtime casting.
