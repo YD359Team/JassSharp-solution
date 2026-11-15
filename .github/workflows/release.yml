@@ -99,13 +99,18 @@ jobs:
           }
           Compress-Archive -Path artifacts/compiler/* -DestinationPath artifacts/jasssharp-compiler-win-x64.zip -Force
 
+      - name: Stage release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/release | Out-Null
+          Copy-Item src/jasssharp-vscode/*.vsix artifacts/release/
+          Copy-Item artifacts/jasssharp-compiler-win-x64.zip artifacts/release/
+
       - name: Upload release assets
         uses: actions/upload-artifact@v4
         with:
           name: jasssharp-release-assets
-          path: |
-            src/jasssharp-vscode/*.vsix
-            artifacts/jasssharp-compiler-win-x64.zip
+          path: artifacts/release/*
           if-no-files-found: error
           retention-days: 30
 
