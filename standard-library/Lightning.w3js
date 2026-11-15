@@ -30,11 +30,6 @@ namespace Lightning
             return _handle;
         }
 
-        public bool Move(Vector3 start, Vector3 end)
-        {
-            return Move(start, end, _checkVisibility);
-        }
-
         public bool Move(Vector3 start, Vector3 end, bool checkVisibility)
         {
             if (_disposed) { return false; }
