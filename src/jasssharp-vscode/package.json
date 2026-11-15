@@ -103,7 +103,8 @@
       },
       {
         "command": "jasssharp.buildLua",
-        "title": "JASS#: Build Lua"
+        "title": "JASS#: Build Lua",
+        "icon": "$(tools)"
       },
       {
         "command": "jasssharp.buildMap",
@@ -189,7 +190,7 @@
     "compile": "tsc -p .",
     "watch": "tsc -p . -w",
     "prepackage": "npm run sync-version",
-    "package": "npm run compile && vsce package",
+    "package": "vsce package",
     "pretest": "npm run sync-version",
     "test": "npm run compile && node --test tests/*.test.cjs",
     "vscode:prepublish": "npm run compile"

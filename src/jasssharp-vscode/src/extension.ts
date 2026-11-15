@@ -58,8 +58,7 @@ export function activate(context: vscode.ExtensionContext) {
         vscode.workspace.onDidChangeConfiguration(event => {
             if (event.affectsConfiguration("jasssharp.projectFile")) updateButtons();
         }),
-        vscode.workspace.onDidSaveTextDocument(() => updateButtons()),
-        vscode.workspace.onDidChangeTextDocument(() => updateButtons())
+        vscode.workspace.onDidSaveTextDocument(() => updateButtons())
     );
 
     context.subscriptions.push(
