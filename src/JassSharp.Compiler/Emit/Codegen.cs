@@ -6,7 +6,6 @@ namespace JassSharp.Emit;
 public sealed class Codegen
 {
     private readonly bool _headless;
-    private readonly HashSet<string> _classes;
     private List<string> _lines = [];
     private int _indent;
     private int _foreachCounter;
