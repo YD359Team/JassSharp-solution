@@ -1307,10 +1307,28 @@ if ($invalidFunctionHooksExitCode -eq 0 -or
 
 Write-Host "[29/29] Verifying inline-hook rejection and cross-module hook ordering..."
 $inlineFixture = Join-Path $PSScriptRoot "fixtures/InvalidInlineFunctionHookSmoke.w3js"
-$inlineOutput = dotnet run --configuration Release --no-build --project $project -- check $inlineFixture 2>&1
-$inlineExitCode = $LASTEXITCODE
-$inlineText = $inlineOutput -join "`n"
-if ($inlineExitCode -eq 0 -or -not $inlineText.Contains("нельзя перехватывать inline-функцию Fast")) {
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $inlineOutput = dotnet run --configuration Release --no-build --project $project -- check $inlineFixture 2>&1
+    $inlineExitCode = $LASTEXITCODE
+    $inlineText = $inlineOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    # The CLI serializes diagnostics as JSON and escapes non-ASCII characters.
+    # Decode the JSON before checking the Russian diagnostic message.
+    $inlineDiagnostics = @(ConvertFrom-Json -InputObject $inlineText)
+}
+catch {
+    throw "Could not parse inline-hook diagnostics as JSON. Exit code: $inlineExitCode. Output: $inlineText"
+}
+$inlineErrors = @($inlineDiagnostics | Where-Object {
+    $_.Severity -eq "error" -and $_.Message -like "*inline*Fast*"
+})
+if ($inlineExitCode -eq 0 -or $inlineErrors.Count -ne 1) {
     throw "Hooks targeting [Inline] functions must be rejected. Exit code: $inlineExitCode. Output: $inlineText"
 }
 
