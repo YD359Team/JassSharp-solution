@@ -5,12 +5,20 @@ namespace InterfacesAndInheritanceSmoke
         int Id();
     }
 
+    interface IReadable : IEntity
+    {
+    }
+
+    interface ISerializable : IEntity
+    {
+    }
+
     interface ITraceable
     {
         string Trace();
     }
 
-    interface IActor : IEntity, ITraceable
+    interface IActor : IReadable, ISerializable, ITraceable
     {
         void Act(int amount);
     }
