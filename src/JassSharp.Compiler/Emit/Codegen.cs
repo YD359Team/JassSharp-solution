@@ -1117,7 +1117,9 @@ end
         // Print
         if (c.Callee is NameExpr id && id.Name == "Print")
         {
-            var parts = c.Args.Select(ToStringExpr).ToList();
+            var parts = c.Args
+                .Select(argument => argument is StrExpr ? EmitExpr(argument) : ToStringExpr(argument))
+                .ToList();
             var msg = parts.Count == 0 ? "\"\"" : string.Join(" .. ", parts);
             return $"{(_headless ? "print" : "BJDebugMsg")}({msg})";
         }
