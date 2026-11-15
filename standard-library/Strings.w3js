@@ -117,7 +117,7 @@ namespace Strings
                 int found = string.find(value, separator, cursor, true);
                 if (found == null) { break; }
                 parts[count] = string.sub(value, cursor, found - 1);
-                count++;
+                count = count + 1;
                 cursor = found + string.len(separator);
             }
             parts[count] = string.sub(value, cursor);
@@ -127,7 +127,7 @@ namespace Strings
         public static string Join(string separator, string[] values)
         {
             string result = "";
-            for (int i = 0; i < values.Length; i++)
+            for (int i = 0; i < values.Length; i = i + 1)
             {
                 if (i > 0) { result = result + separator; }
                 result = result + values[i];
