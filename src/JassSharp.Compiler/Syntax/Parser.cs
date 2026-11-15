@@ -380,6 +380,12 @@ public sealed class Parser(List<Token> tokens)
             Expect("{");
             return new ForStmt(init, cond, step, ParseBlock());
         }
+        if (CheckId("break"))
+        {
+            var breakToken = Eat(TokKind.Id);
+            Accept(";");
+            return new BreakStmt(breakToken.Line, breakToken.Col);
+        }
         if (CheckId("return"))
         {
             Eat(TokKind.Id);
