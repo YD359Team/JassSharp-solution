@@ -1345,12 +1345,15 @@ $multiModuleLua = Get-Content -LiteralPath $multiModuleLuaPath -Raw
 $baseHookRegistration = $multiModuleLua.IndexOf('__jasssharp_register_hook("Compute"')
 $rootHookRegistration = $multiModuleLua.IndexOf('__jasssharp_register_hook("Compute"', $baseHookRegistration + 1)
 $hookFinalizer = $multiModuleLua.IndexOf("if __jasssharp_apply_hooks then __jasssharp_apply_hooks() end")
-$baseHookBody = $multiModuleLua.IndexOf("return original(value) + 10")
-$rootHookBody = $multiModuleLua.IndexOf("return original(value) * 2")
+# Binary expressions are emitted with explicit parentheses by the Lua code generator.
+$baseHookBody = $multiModuleLua.IndexOf("return (original(value) + 10)")
+$rootHookBody = $multiModuleLua.IndexOf("return (original(value) * 2)")
+$registrationCount = ([regex]::Matches($multiModuleLua, [regex]::Escape('__jasssharp_register_hook("Compute"'))).Count
 if ($baseHookRegistration -lt 0 -or $rootHookRegistration -le $baseHookRegistration -or
     $baseHookBody -lt 0 -or $rootHookBody -le $baseHookBody -or
-    $hookFinalizer -le $rootHookBody) {
-    throw "Cross-module hooks must register in dependency/declaration order and apply only after all module chunks."
+    $hookFinalizer -le $rootHookRegistration -or $hookFinalizer -le $rootHookBody -or
+    $registrationCount -ne 2) {
+    throw "Cross-module hooks must register exactly twice in dependency/declaration order and apply only after all module chunks. Registration count: $registrationCount. Base registration: $baseHookRegistration. Root registration: $rootHookRegistration. Base body: $baseHookBody. Root body: $rootHookBody. Finalizer: $hookFinalizer. Generated Lua: $multiModuleLua"
 }
 
 $global:LASTEXITCODE = 0
