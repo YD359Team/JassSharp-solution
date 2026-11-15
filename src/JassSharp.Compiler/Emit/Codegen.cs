@@ -5,7 +5,6 @@ namespace JassSharp.Emit;
 
 public sealed class Codegen
 {
-    private readonly bool _lua = true;
     private readonly bool _headless;
     private readonly HashSet<string> _classes;
     private List<string> _lines = [];
@@ -75,9 +74,7 @@ public sealed class Codegen
                 _inlineMethods[kv.Key] = kv.Value;
 
         var hasInit = unit.Functions.Any(f => f.Name == "OnInit");
-        if (_lua)
-        {
-            Line($"-- {unit.Name}  (JASS# → Lua)");
+        Line($"-- {unit.Name}  (JASS# → Lua)");
             if (unit.Usings.Count > 0)
                 Line("-- usings: " + string.Join(", ", unit.Usings));
             if (!_headless)
@@ -202,7 +199,6 @@ function __dictionary_containskey(d, key)
     return rawget(d._items, key) ~= nil
 end
 ");
-        }
         return string.Join("\n", _lines) + "\n";
     }
 
@@ -350,7 +346,7 @@ end
             string value;
             if (m.Value is NumExpr n && TryParseInt32Literal(n.Text, out var v))
             {
-                value = _lua ? EmitNumber(n.Text) : n.Text;
+                value = EmitNumber(n.Text);
                 next = unchecked(v + 1);
             }
             else if (m.Value is not null)
@@ -364,33 +360,17 @@ end
                 next++;
             }
 
-            if (_lua)
-                Line($"{en.Name}_{m.Name} = {value}");
-            else
-                Line($"constant integer {en.Name}_{m.Name} = {value}");
+            Line($"{en.Name}_{m.Name} = {value}");
         }
 
         // ToString helper
-        if (_lua)
-        {
-            Line($"function {en.Name}_ToString(v)");
-            _indent++;
-            foreach (var m in en.Members)
-                Line($"if v == {en.Name}_{m.Name} then return \"{m.Name}\" end");
-            Line("return \"?\"");
-            _indent--;
-            Line("end");
-        }
-        else
-        {
-            Line($"function {en.Name}_ToString takes integer v returns string");
-            _indent++;
-            foreach (var m in en.Members)
-                Line($"if v == {en.Name}_{m.Name} then return \"{m.Name}\" endif");
-            Line("return \"?\"");
-            _indent--;
-            Line("endfunction");
-        }
+        Line($"function {en.Name}_ToString(v)");
+        _indent++;
+        foreach (var m in en.Members)
+            Line($"if v == {en.Name}_{m.Name} then return \"{m.Name}\" end");
+        Line("return \"?\"");
+        _indent--;
+        Line("end");
         Line("");
     }
 
@@ -438,9 +418,7 @@ end
                     _ => "?"
                 };
                 var msg = $"[trace] {loc}";
-                Line(_lua
-                    ? (_headless ? $"print(\"{Esc(msg)}\")" : $"BJDebugMsg(\"{Esc(msg)}\")")
-                    : $"call BJDebugMsg(\"{Esc(msg)}\")");
+                Line(_headless ? $"print(\"{Esc(msg)}\")" : $"BJDebugMsg(\"{Esc(msg)}\")");
             }
             switch (s)
             {
@@ -450,21 +428,12 @@ end
                         : v.Type;
                     _locals[v.Name] = inferredType;
                     var init = v.Init is null ? null : EmitExpr(v.Init);
-                    if (_lua)
-                    {
-                        if (init is not null)
-                            Line($"local {v.Name} = {init}");
-                        else if (inferredType.EndsWith("[]", StringComparison.Ordinal))
-                            Line($"local {v.Name} = {{}}");
-                        else
-                            Line($"local {v.Name}");
-                    }
+                    if (init is not null)
+                        Line($"local {v.Name} = {init}");
+                    else if (inferredType.EndsWith("[]", StringComparison.Ordinal))
+                        Line($"local {v.Name} = {{}}");
                     else
-                    {
-                        Line(init is null
-                            ? $"local {MapType(inferredType)} {v.Name}"
-                            : $"local {MapType(inferredType)} {v.Name} = {init}");
-                    }
+                        Line($"local {v.Name}");
                     break;
                 case AssignStmt a:
                     EmitAssign(a.Target, a.Value);
@@ -475,7 +444,7 @@ end
                     if (!EmitChain(e.Expr))
                     {
                         var ex = EmitExpr(e.Expr);
-                        Line(_lua ? ex : $"call {ex}");
+                        Line(ex);
                     }
                     break;
                 case ReturnStmt r:
@@ -493,7 +462,7 @@ end
                         EmitStmts(i.Else, trace);
                         _indent--;
                     }
-                    Line(_lua ? "end" : "endif");
+                    Line("end");
                     break;
                 case WhileStmt w:
                     Line($"while {EmitExpr(w.Cond)} do");
@@ -517,26 +486,13 @@ end
                     EmitForeach(foreachLoop, trace);
                     break;
                 case ForStmt f:
-                    if (_lua)
-                    {
-                        if (f.Init is not null) EmitStmts([f.Init], trace);
-                        Line($"while {EmitExpr(f.Cond ?? new BoolExpr(true))} do");
-                        _indent++;
-                        EmitStmts(f.Body, trace);
-                        if (f.Step is not null) EmitStmts([f.Step], trace);
-                        _indent--;
-                        Line("end");
-                    }
-                    else
-                    {
-                        Line("loop");
-                        _indent++;
-                        if (f.Cond is not null) Line($"exitwhen not ({EmitExpr(f.Cond)})");
-                        EmitStmts(f.Body, trace);
-                        if (f.Step is not null) EmitStmts([f.Step], trace);
-                        _indent--;
-                        Line("endloop");
-                    }
+                    if (f.Init is not null) EmitStmts([f.Init], trace);
+                    Line($"while {EmitExpr(f.Cond ?? new BoolExpr(true))} do");
+                    _indent++;
+                    EmitStmts(f.Body, trace);
+                    if (f.Step is not null) EmitStmts([f.Step], trace);
+                    _indent--;
+                    Line("end");
                     break;
             }
         }
@@ -544,10 +500,6 @@ end
 
     private void EmitForeach(ForeachStmt loop, bool trace)
     {
-        if (!_lua)
-            throw new NotSupportedException(
-                $"foreach пока поддерживается только Lua backend (строка {loop.Line})");
-
         string collectionType = InferType(loop.Collection) ?? throw new InvalidOperationException(
             $"Не удалось определить тип коллекции foreach в строке {loop.Line}");
         string collection = EmitExpr(loop.Collection);
@@ -649,14 +601,14 @@ end
             var p = meth.Params[i];
             var argExpr = EmitExpr(args[i]);
             // simple: introduce temp or just substitute by emitting as local
-            Line(_lua ? $"local {p.Name} = {argExpr}" : $"local {MapType(p.Type)} {p.Name} = {argExpr}");
+            Line($"local {p.Name} = {argExpr}");
             _locals[p.Name] = p.Type;
         }
 
         // if method, bind self/this
         if (recvName is not null && _className is not null)
         {
-            Line(_lua ? $"local self = {recvName}" : $"local {_className} this = {recvName}");
+            Line($"local self = {recvName}");
         }
 
         EmitStmts(meth.Body);
@@ -668,7 +620,7 @@ end
 
     private void EmitAssign(Expr target, Expr value)
     {
-        if (_lua && target is IndexExpr dictionaryIndex &&
+        if (target is IndexExpr dictionaryIndex &&
             RecvType(dictionaryIndex.Object) is { } dictionaryType &&
             IsGenericType(dictionaryType, "Dictionary"))
         {
@@ -683,13 +635,13 @@ end
             if (prop?.Kind == MemberKind.GetSet && prop.Write is not null)
             {
                 var call = Apply(prop.Write, EmitExpr(m.Object), [EmitExpr(value)]);
-                Line(_lua ? call : $"call {call}");
+                Line(call);
                 return;
             }
         }
         var left = EmitExpr(target);
         var v = EmitExpr(value);
-        Line(_lua ? $"{left} = {v}" : $"set {left} = {v}");
+        Line($"{left} = {v}");
     }
 
     private bool EmitChain(Expr e)
@@ -711,7 +663,7 @@ end
             if (prop?.Kind != MemberKind.Method) return false;
             var args = p.Args.Select((a, i) => CodeArg(p.Name, i, a)).ToList();
             var call = Apply(prop.Read, recv, args);
-            Line(_lua ? call : $"call {call}");
+            Line(call);
         }
         return true;
     }
@@ -755,14 +707,14 @@ end
         var emitted = EmitExpr(e);
         return t switch
         {
-            "int" => _lua ? $"tostring({emitted})" : $"I2S({emitted})",
-            "float" => _lua ? $"tostring({emitted})" : $"R2S({emitted})",
-            "bool" => _lua ? $"tostring({emitted})" : $"B2S({emitted})",
-            "string" => _lua ? $"({emitted} or \"\")" : emitted,
+            "int" => $"tostring({emitted})",
+            "float" => $"tostring({emitted})",
+            "bool" => $"tostring({emitted})",
+            "string" => $"({emitted} or \"\")",
             "unit" => $"GetUnitName({emitted})",
             "player" => $"GetPlayerName({emitted})",
             "item" => $"GetItemName({emitted})",
-            _ => _lua ? $"tostring({emitted})" : $"I2S(0)"
+            _ => $"tostring({emitted})"
         };
     }
 
@@ -797,7 +749,7 @@ end
     }
 
     private bool ShouldEmitCurrentField(string name) =>
-        _lua && CurrentFieldType(name) is not null;
+        CurrentFieldType(name) is not null;
 
     private static bool IsFloatingLiteral(string text) =>
         !text.StartsWith("0x", StringComparison.OrdinalIgnoreCase) &&
@@ -974,24 +926,21 @@ end
 
     private string EmitExpr(Expr e) => e switch
     {
-        NumExpr n => _lua ? EmitNumber(n.Text) : n.Text,
+        NumExpr n => EmitNumber(n.Text),
         StrExpr s => $"\"{Esc(s.Text)}\"",
         InterpolatedExpr interpolated => EmitInterpolated(interpolated),
-        RawExpr r => _lua ? Rawcode.Pack(r.Id).ToString() : $"'{r.Id}'",
+        RawExpr r => Rawcode.Pack(r.Id).ToString(),
         BoolExpr b => b.Value ? "true" : "false",
-        NullExpr => _lua ? "nil" : "null",
-        ThisExpr => _lua ? "self" : "this",
+        NullExpr => "nil",
+        ThisExpr => "self",
         NameExpr n when ShouldEmitCurrentField(n.Name) => $"self.{n.Name}",
         NameExpr n => n.Name,
 
         UnaryExpr u when FindOperator(InferType(u.Inner), null, u.Op, [u.Inner]) is { } overload =>
             $"{overload.Owner}.{OperatorFunctionName(overload.Method)}({EmitExpr(u.Inner)})",
 
-        UnaryExpr u when u.Op == "-" && u.Inner is NumExpr { Text: "2147483648" } && _lua =>
+        UnaryExpr u when u.Op == "-" && u.Inner is NumExpr { Text: "2147483648" } =>
             "(-2147483647 - 1)",
-
-        UnaryExpr u when u.Op == "!" && !_lua =>
-            $"not ({EmitExpr(u.Inner)})",
 
         UnaryExpr u =>
             $"{(u.Op == "!" ? "not " : "-")}{EmitExpr(u.Inner)}",
@@ -999,7 +948,7 @@ end
         BinaryExpr b when FindOperator(InferType(b.Left), InferType(b.Right), b.Op, [b.Left, b.Right]) is { } overload =>
             $"{overload.Owner}.{OperatorFunctionName(overload.Method)}({EmitExpr(b.Left)}, {EmitExpr(b.Right)})",
 
-        BinaryExpr b when b.Op == "+" && _lua && IsStringish(b) =>
+        BinaryExpr b when b.Op == "+" && IsStringish(b) =>
             Concat(b.Left, b.Right),
 
         BinaryExpr b =>
@@ -1007,26 +956,22 @@ end
 
         IndexExpr ix => EmitIndex(ix),
 
-        NewExpr n when n.Type.EndsWith("[]", StringComparison.Ordinal) && _lua => "{}",
+        NewExpr n when n.Type.EndsWith("[]", StringComparison.Ordinal) => "{}",
 
-        NewExpr n when _lua && IsGenericType(n.Type, "List") => "{}",
-        NewExpr n when _lua && IsGenericType(n.Type, "Queue") => "__queue_new()",
-        NewExpr n when _lua && IsGenericType(n.Type, "Stack") => "__stack_new()",
-        NewExpr n when _lua && IsGenericType(n.Type, "Dictionary") => "__dictionary_new()",
+        NewExpr n when IsGenericType(n.Type, "List") => "{}",
+        NewExpr n when IsGenericType(n.Type, "Queue") => "__queue_new()",
+        NewExpr n when IsGenericType(n.Type, "Stack") => "__stack_new()",
+        NewExpr n when IsGenericType(n.Type, "Dictionary") => "__dictionary_new()",
 
         NewExpr n when NativeTable.Constructors.TryGetValue(n.Type, out var ctor) =>
             $"{ctor}({string.Join(", ", n.Args.Select(EmitExpr))})",
 
-        NewExpr n when _lua =>
-            $"{n.Type}.new({string.Join(", ", n.Args.Select(EmitExpr))})",
-
         NewExpr n =>
-            $"{n.Type}.create({string.Join(", ", n.Args.Select(EmitExpr))})",
+            $"{n.Type}.new({string.Join(", ", n.Args.Select(EmitExpr))})",
 
         MemberExpr m => EmitMember(m),
         CallExpr c => EmitCall(c),
-        LambdaExpr l when _lua => EmitLambda(l),
-        LambdaExpr l => throw new NotSupportedException($"лямбды поддерживаются только в Lua (строка {l.Line})"),
+        LambdaExpr l => EmitLambda(l),
 
         _ => throw new NotSupportedException(
             $"Unsupported expression node: {e.GetType().Name}")
@@ -1089,7 +1034,7 @@ end
             else if (mid.Name == "Skills" && StandardRawcodes.Skills.TryGetValue(m.Name, out var acode))
                 code = acode;
             if (code is not null)
-                return _lua ? Rawcode.Pack(code).ToString() : $"'{code}'";
+                return Rawcode.Pack(code).ToString();
         }
 
         // Enum.Member → Enum_Member
@@ -1200,9 +1145,7 @@ end
                  CurrentFieldType(staticOwner.Name) is null))
                 return $"{recv}.{mem.Name}({string.Join(", ", args)})";
 
-            if (_lua)
-                return $"{recv}:{mem.Name}({string.Join(", ", args)})";
-            return $"{recv}.{mem.Name}({string.Join(", ", args)})";
+            return $"{recv}:{mem.Name}({string.Join(", ", args)})";
         }
         if (c.Callee is NameExpr id)
             return $"{id.Name}({string.Join(", ", c.Args.Select((a, i) => CodeArg(id.Name, i, a)))})";
@@ -1270,8 +1213,6 @@ end
 
     private string CodeArg(string method, int index, Expr arg)
     {
-        var codeSlot = method is "AddAction" or "AddCondition" || (method == "Start" && index == 2);
-        if (codeSlot && arg is NameExpr n && !_lua) return $"function {n.Name}";
         return EmitExpr(arg);
     }
 
@@ -1290,7 +1231,7 @@ end
                     b.Append(
                         i < args.Count
                             ? args[i++]
-                            : (_lua ? "nil" : "null"));
+                            : "nil");
                 }
                 else
                 {
@@ -1363,27 +1304,9 @@ end
     {
         "&&" => "and",
         "||" => "or",
-        "^" => _lua ? "~" : "^",
+        "^" => "~",
         _ => op,
     };
-
-    private static string MapType(string t)
-    {
-        while (t.EndsWith("[]", StringComparison.Ordinal))
-            t = t[..^2];
-
-        return t switch
-        {
-            "int" => "integer",
-            "float" => "real",
-            "bool" => "boolean",
-            "void" => "nothing",
-            _ => t,
-        };
-    }
-
-    private static string Params(FnDecl fn) =>
-        fn.Params.Count == 0 ? "nothing" : string.Join(", ", fn.Params.Select(p => $"{MapType(p.Type)} {p.Name}"));
 
     private static string Esc(string s) =>
         s.Replace("\\", "\\\\")
