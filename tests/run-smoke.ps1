@@ -1120,6 +1120,16 @@ if ($invalidLoopErrors.Count -lt 3) {
 
 Write-Host "[25/25] Verifying class inheritance and interface contracts..."
 $inheritanceFixture = Join-Path $PSScriptRoot "fixtures/InterfacesAndInheritanceSmoke.w3js"
+$inheritanceCheckOutput = dotnet run --configuration Release --no-build --project $project -- check $inheritanceFixture
+if ($LASTEXITCODE -ne 0) {
+    throw "Class/interface inheritance fixture produced semantic errors: $($inheritanceCheckOutput -join [Environment]::NewLine)"
+}
+$inheritanceDiagnostics = @($inheritanceCheckOutput | ConvertFrom-Json)
+$inheritanceWarnings = @($inheritanceDiagnostics | Where-Object { $_.severity -eq "warning" })
+if ($inheritanceWarnings.Count -gt 0) {
+    throw "Valid class/interface inheritance produced warnings: $($inheritanceWarnings | ConvertTo-Json -Depth 5 -Compress)"
+}
+
 $inheritanceBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $inheritanceFixture --target lua
 if ($LASTEXITCODE -ne 0) {
     throw "Class/interface inheritance fixture failed to compile: $($inheritanceBuildOutput -join [Environment]::NewLine)"
@@ -1135,7 +1145,8 @@ foreach ($fragment in @(
     "function UnitActor.__init(self)",
     "EntityBase.__init(self)",
     "UnitActor.new()",
-    "actorContract:Act(3)"
+    "actorContract:Act(3)",
+    "actorContract:Trace()"
 )) {
     if (-not $inheritanceLua.Contains($fragment)) {
         throw "Generated inheritance Lua is missing expected fragment: $fragment"
@@ -1149,8 +1160,11 @@ if ($LASTEXITCODE -eq 0) {
 }
 $invalidInterfaceDiagnostics = $invalidInterfaceOutput | ConvertFrom-Json
 $invalidInterfaceErrors = @($invalidInterfaceDiagnostics | Where-Object { $_.severity -eq "error" })
-if ($invalidInterfaceErrors.Count -lt 1) {
-    throw "Expected a diagnostic for the missing interface implementation."
+$invalidInterfaceText = $invalidInterfaceErrors | ForEach-Object { $_.message }
+if ($invalidInterfaceErrors.Count -lt 2 -or
+    -not (($invalidInterfaceText -join "`n").Contains("does not implement IRequired.Execute")) -or
+    -not (($invalidInterfaceText -join "`n").Contains("conflicting signatures for method Value"))) {
+    throw "Expected diagnostics for a missing interface implementation and conflicting inherited interface signatures."
 }
 
 $global:LASTEXITCODE = 0
