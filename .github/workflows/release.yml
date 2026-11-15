@@ -40,6 +40,10 @@ jobs:
           cache: npm
           cache-dependency-path: src/jasssharp-vscode/package-lock.json
 
+      - name: Verify changelog extraction
+        shell: pwsh
+        run: node --test .github/scripts/extract-release-notes.test.cjs
+
       - name: Synchronize extension version from Version.props
         working-directory: src/jasssharp-vscode
         shell: pwsh
@@ -68,7 +72,6 @@ jobs:
               throw "Release tag '$($env:RELEASE_TAG)' does not match Version.props ($version)."
           }
 
-
       - name: Test VS Code extension and brace formatter
         working-directory: src/jasssharp-vscode
         shell: pwsh
@@ -96,7 +99,7 @@ jobs:
           retention-days: 30
 
   publish-release:
-    name: Attach VSIX to GitHub Release
+    name: Attach VSIX and publish changelog notes
     if: github.event_name == 'release'
     needs: build-and-package
     runs-on: ubuntu-latest
@@ -104,15 +107,32 @@ jobs:
       contents: write
 
     steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Extract release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          node .github/scripts/extract-release-notes.cjs "$VERSION" CHANGELOG.md "$RUNNER_TEMP/release-notes.md"
+
       - name: Download packaged VSIX
         uses: actions/download-artifact@v4
         with:
           name: jasssharp-vsix
           path: dist
 
-      - name: Attach VSIX to GitHub Release
+      - name: Attach VSIX and update GitHub Release notes
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.event.release.tag_name }}
+          body_path: ${{ runner.temp }}/release-notes.md
           files: dist/*.vsix
           fail_on_unmatched_files: true
