@@ -910,6 +910,38 @@ if ($abilityLua.Contains("function UnitAbility:Dispose()") -or $abilityLua.Conta
 }
 
 Write-Host "All JASS# compiler smoke checks passed."
+Write-Host "[21/21] Verifying Warcraft III Reforged 3.0.0 native signatures..."
+$wc300Fixture = Join-Path $PSScriptRoot "fixtures/Warcraft300ApiSmoke.w3js"
+$wc300BuildOutput = dotnet run --configuration Release --no-build --project $project -- build $wc300Fixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Warcraft III 3.0.0 API fixture failed to compile: $($wc300BuildOutput -join [Environment]::NewLine)"
+}
+$wc300LuaPath = Join-Path $PSScriptRoot "fixtures/bin/Warcraft300ApiSmoke.lua"
+if (-not (Test-Path $wc300LuaPath)) {
+    throw "Expected generated Warcraft III 3.0.0 API Lua file was not created: $wc300LuaPath"
+}
+$wc300Lua = Get-Content -LiteralPath $wc300LuaPath -Raw
+foreach ($native in @(
+    "BlzResetUnitAttack(",
+    "BlzSetSpecialEffectAnimationBlendTime(",
+    "BlzQueueSpecialEffectAnimation(",
+    "BlzSetSpecialEffectAnimation(",
+    "BlzUnitEnableAuras(",
+    "BlzGetUnitAbilityCooldownPercent(",
+    "BlzGetUnitAbilityCooldownRemaining(",
+    "BlzGetUnitAbilityCooldown(",
+    "BlzSetUnitAbilityCooldownRemaining(",
+    "BlzSetUnitAbilityCooldownPercent(",
+    "BlzAdjustUnitAbilityCooldownRemaining(",
+    "BlzAdjustUnitAbilityCooldownPercent(",
+    "BlzStartUnitAbilityCooldown(",
+    "BlzEndUnitAbilityCooldown("
+)) {
+    if (-not $wc300Lua.Contains($native)) {
+        throw "Generated Warcraft III 3.0.0 API Lua is missing native call: $native"
+    }
+}
+
 
 Write-Host "[20/20] Verifying Warcraft III Frame API wrappers, ownership, events, and coordinates..."
 $frameFixture = Join-Path $PSScriptRoot "fixtures/FrameSmoke.w3js"
