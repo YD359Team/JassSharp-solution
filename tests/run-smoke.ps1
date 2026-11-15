@@ -1254,14 +1254,14 @@ if (-not (Test-Path $functionHooksLuaPath)) {
     throw "Expected generated function hooks Lua file was not created: $functionHooksLuaPath"
 }
 $functionHooksLua = Get-Content -LiteralPath $functionHooksLuaPath -Raw
-$firstComputeWrapper = $functionHooksLua.IndexOf("local __jasssharp_original_0 = Compute")
-$secondComputeWrapper = $functionHooksLua.IndexOf("local __jasssharp_original_1 = Compute")
-$nativeWrapper = $functionHooksLua.IndexOf("local __jasssharp_original_2 = GetUnitAbilityLevel")
+$firstComputeWrapper = $functionHooksLua.IndexOf('__jasssharp_register_hook("Compute"')
+$secondComputeWrapper = $functionHooksLua.IndexOf('__jasssharp_register_hook("Compute"', $firstComputeWrapper + 1)
+$nativeWrapper = $functionHooksLua.IndexOf('__jasssharp_register_hook("GetUnitAbilityLevel"')
 $secondHookBody = $functionHooksLua.IndexOf("return (original(value) * 2)")
 $firstHookBody = $functionHooksLua.IndexOf("if (value < 0)")
 foreach ($fragment in @(
-    "__jasssharp_register_hook(\"Compute\", function(__jasssharp_original)",
-    "__jasssharp_register_hook(\"GetUnitAbilityLevel\", function(__jasssharp_original)",
+    '__jasssharp_register_hook("Compute", function(__jasssharp_original)',
+    '__jasssharp_register_hook("GetUnitAbilityLevel", function(__jasssharp_original)',
     "local original = __jasssharp_original",
     "return original(whichUnit, abilityId)",
     "function __jasssharp_apply_hooks()",
