@@ -1177,6 +1177,57 @@ if ($invalidInterfaceErrors.Count -lt 2 -or
     throw "Expected diagnostics for a missing interface implementation and conflicting inherited interface signatures."
 }
 
+Write-Host "[27/27] Verifying from-end index semantics and type safety..."
+$fromEndFixture = Join-Path $PSScriptRoot "fixtures/FromEndIndexSmoke.w3js"
+$fromEndCheckOutput = dotnet run --configuration Release --no-build --project $project -- check $fromEndFixture
+if ($LASTEXITCODE -ne 0) {
+    throw "Valid from-end indexing fixture failed semantic analysis: $($fromEndCheckOutput -join [Environment]::NewLine)"
+}
+$fromEndBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $fromEndFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Valid from-end indexing fixture failed to compile: $($fromEndBuildOutput -join [Environment]::NewLine)"
+}
+$fromEndLuaPath = Join-Path $PSScriptRoot "fixtures/bin/FromEndIndexSmoke.lua"
+if (-not (Test-Path $fromEndLuaPath)) {
+    throw "Expected generated from-end indexing Lua file was not created: $fromEndLuaPath"
+}
+$fromEndLua = Get-Content -LiteralPath $fromEndLuaPath -Raw
+foreach ($fragment in @(
+    "values[#values - 1 + 1]",
+    "__collection_load(items[#items - 1 + 1])",
+    "string.sub(text, -1, -1)"
+)) {
+    if (-not $fromEndLua.Contains($fragment)) {
+        throw "Generated from-end Lua is missing expected fragment: $fragment"
+    }
+}
+
+$invalidFromEndFixture = Join-Path $PSScriptRoot "fixtures/InvalidFromEndIndexSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $invalidFromEndOutput = dotnet run --configuration Release --no-build --project $project -- check $invalidFromEndFixture 2>&1
+    $invalidFromEndExitCode = $LASTEXITCODE
+    $invalidFromEndText = $invalidFromEndOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $invalidFromEndDiagnostics = ConvertFrom-Json -InputObject $invalidFromEndText
+}
+catch {
+    throw "Could not parse from-end indexing diagnostics as JSON. Exit code: $invalidFromEndExitCode. Output: $invalidFromEndText"
+}
+$invalidFromEndErrors = @($invalidFromEndDiagnostics | Where-Object { $_.severity -eq "error" })
+$invalidFromEndMessages = @($invalidFromEndErrors | ForEach-Object { $_.message }) -join "`n"
+if ($invalidFromEndExitCode -eq 0 -or
+    -not $invalidFromEndMessages.Contains("индексация с конца не поддерживается для типа Dictionary<string, int>") -or
+    -not $invalidFromEndMessages.Contains("индексация с конца не поддерживается для типа Queue<int>") -or
+    -not $invalidFromEndMessages.Contains("индекс с конца требует смещение типа int")) {
+    throw "From-end indexing must reject Dictionary/Queue receivers and non-int offsets. Output: $invalidFromEndText"
+}
+
 Write-Host "[26/26] Verifying parameterized base constructors are rejected..."
 $baseConstructorFixture = Join-Path $PSScriptRoot "fixtures/InvalidBaseConstructorSmoke.w3js"
 $baseConstructorOutput = dotnet run --configuration Release --no-build --project $project -- check $baseConstructorFixture
