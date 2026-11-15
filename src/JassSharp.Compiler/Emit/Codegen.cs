@@ -129,7 +129,7 @@ function __queue_enqueue(q, value)
     q._items[q._last] = __collection_store(value)
 end
 function __queue_dequeue(q)
-    if __queue_count(q) <= 0 then error("Queue is empty") end
+    if __queue_count(q) <= 0 then error(""Queue is empty"") end
     local value = __collection_load(q._items[q._first])
     q._items[q._first] = nil
     q._first = q._first + 1
@@ -137,7 +137,7 @@ function __queue_dequeue(q)
     return value
 end
 function __queue_peek(q)
-    if __queue_count(q) <= 0 then error("Queue is empty") end
+    if __queue_count(q) <= 0 then error(""Queue is empty"") end
     return __collection_load(q._items[q._first])
 end
 
@@ -148,11 +148,11 @@ function __stack_push(s, value)
     table.insert(s._items, __collection_store(value))
 end
 function __stack_pop(s)
-    if #s._items == 0 then error("Stack is empty") end
+    if #s._items == 0 then error(""Stack is empty"") end
     return __collection_load(table.remove(s._items))
 end
 function __stack_peek(s)
-    if #s._items == 0 then error("Stack is empty") end
+    if #s._items == 0 then error(""Stack is empty"") end
     return __collection_load(s._items[#s._items])
 end
 
@@ -160,15 +160,15 @@ function __dictionary_new()
     local items = {}
     setmetatable(items, {
         __index = function(_, key)
-            error("The given key was not present in the dictionary: " .. tostring(key))
+            error(""The given key was not present in the dictionary: "" .. tostring(key))
         end
     })
     return { _items = items, _count = 0 }
 end
 function __dictionary_add(d, key, value)
-    if key == nil then error("Dictionary key cannot be nil") end
-    if value == nil then error("Dictionary value cannot be nil") end
-    if rawget(d._items, key) ~= nil then error("An item with the same key already exists") end
+    if key == nil then error(""Dictionary key cannot be nil"") end
+    if value == nil then error(""Dictionary value cannot be nil"") end
+    if rawget(d._items, key) ~= nil then error(""An item with the same key already exists"") end
     d._items[key] = __collection_store(value)
     d._count = d._count + 1
 end
@@ -188,7 +188,7 @@ function __dictionary_tryremove(d, key)
     return __dictionary_remove(d, key)
 end
 function __dictionary_set(d, key, value)
-    if key == nil then error("Dictionary key cannot be nil") end
+    if key == nil then error(""Dictionary key cannot be nil"") end
     if rawget(d._items, key) == nil then d._count = d._count + 1 end
     d._items[key] = __collection_store(value)
 end
