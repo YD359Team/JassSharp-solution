@@ -911,6 +911,10 @@ public static class Checker
 
         private bool HasMember(string type, string memberName)
         {
+            if (memberName == "Length" &&
+                (type == "string" || type.EndsWith("[]", StringComparison.Ordinal)))
+                return true;
+
             if (IsCollectionType(type))
                 return memberName == "Count";
             if (TryGetGenericArguments(type, out var pairName, out _) && pairName == "KeyValuePair")
