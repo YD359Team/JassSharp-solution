@@ -1,0 +1,14 @@
+namespace HookRoot
+{
+    using HookBase;
+
+    hook int Compute(int value)
+    {
+        return original(value) * 2;
+    }
+
+    public void Verify()
+    {
+        int result = Compute(1);
+    }
+}
