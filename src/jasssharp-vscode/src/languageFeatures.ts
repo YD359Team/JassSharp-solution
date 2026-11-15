@@ -67,7 +67,7 @@ const BITWISE_OPERATORS = [
 const KEYWORDS = new Set([
     "namespace", "using", "class", "enum", "const", "public", "private", "static",
     "void", "int", "integer", "float", "real", "bool", "boolean", "string", "code",
-    "new", "this", "if", "else", "do", "while", "for", "foreach", "return", "break", "continue",
+    "new", "this", "if", "else", "do", "while", "for", "foreach", "return", "break",
     "true", "false", "null", "var", "in", "is", "as", "get", "set"
 ]);
 
