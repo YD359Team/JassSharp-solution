@@ -26,4 +26,7 @@ assert(MathGeometryApiSmoke.CircleIntersectsRect(3, 0, 1, 0, 0, 2, 2),
 near(MathGeometryApiSmoke.SegmentDistance(0, 0, 2, 0, 3, 0), 1, 0.00001,
     "segment closest point must clamp beyond endpoint")
 
-print("Math, vectors, and geometry runtime checks passed.")
+assert(MathGeometryApiSmoke.VerifyNullFrameWrappers(),
+    "all frame wrappers must treat null native handles as disposed")
+
+print("Math, vectors, geometry, and frame runtime checks passed.")
