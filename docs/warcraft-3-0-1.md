@@ -60,4 +60,4 @@ Do not infer signatures from function names. In particular, `BlzUnitHeal` return
 - [XGM: Warcraft III Reforged 3.0.1 — список изменений](https://xgm.guru/p/wc3/Warcraft-3-Reforged-301-spisok-izmeneniy-RQE)
 
 
-The regression fixture `tests/fixtures/Warcraft301ApiSmoke.w3js` and stage `[22]` in `tests/run-smoke.ps1` compile representative 3.0.1 calls, including talent reset, random item filtering, healing, effect removal, camera target-lock settings, equipment queries and the exact `BlzUnitHasAnyItemEquiped` spelling.
+The regression fixture `tests/fixtures/Warcraft301ApiSmoke.w3js` and stage `[22/23]` in `tests/run-smoke.ps1` compile representative 3.0.1 calls, including talent reset, random item filtering, healing, effect removal, camera target-lock settings, equipment queries and the exact `BlzUnitHasAnyItemEquiped` spelling.
