@@ -1297,6 +1297,7 @@ $invalidFunctionHooksMessages = @($invalidFunctionHooksDiagnostics | Where-Objec
 if ($invalidFunctionHooksExitCode -eq 0 -or
     -not $invalidFunctionHooksMessages.Contains("сигнатура hook не совпадает") -or
     -not $invalidFunctionHooksMessages.Contains("аргумент 1: ожидался тип int, получен float") -or
+    -not $invalidFunctionHooksMessages.Contains("переменная invalidReturnType: ожидался тип bool, получен int") -or
     -not $invalidFunctionHooksMessages.Contains("нельзя объявить hook для неизвестной функции Missing")) {
     throw "Function hooks must reject mismatched signatures, invalid original arguments, and unknown targets. Output: $invalidFunctionHooksText"
 }
