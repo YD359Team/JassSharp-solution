@@ -9,8 +9,6 @@ namespace Lightning
     {
         private lightning _handle;
         private bool _disposed;
-        private bool _checkVisibility;
-
         public LightningEffect(string codeName, bool checkVisibility, Vector3 start, Vector3 end)
         {
             _checkVisibility = checkVisibility;
