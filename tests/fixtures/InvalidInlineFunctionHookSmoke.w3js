@@ -1,0 +1,13 @@
+namespace InvalidInlineFunctionHookSmoke
+{
+    [Inline]
+    int Fast(int value)
+    {
+        return value + 1;
+    }
+
+    hook int Fast(int value)
+    {
+        return original(value) + 1;
+    }
+}
