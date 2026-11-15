@@ -217,6 +217,13 @@ public static class Checker
                     continue;
                 }
 
+                if (_hasWarcraft3 && hook.Name is "main" or "config")
+                {
+                    Add(1, 1, "error",
+                        $"нельзя перехватывать {hook.Name}: точка входа карты управляется сборщиком JASS#");
+                    continue;
+                }
+
                 NativeSig? targetSignature = null;
                 if (_functions.TryGetValue(hook.Name, out var target))
                 {
