@@ -12,5 +12,5 @@ public sealed class LuaEmitter
         new Codegen(headless: headless).Emit(unit, imports, finalizeHooks);
 
     public static string EmitHookFinalizer() =>
-        "if __jasssharp_apply_hooks then __jasssharp_apply_hooks() end\\n";
+        "if __jasssharp_apply_hooks then __jasssharp_apply_hooks() end\n";
 }
