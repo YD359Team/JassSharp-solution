@@ -1322,7 +1322,9 @@ if ($invalidFunctionHooksExitCode -eq 0 -or
     -not $invalidFunctionHooksMessages.Contains("аргумент 1: ожидался тип int, получен float") -or
     -not $invalidFunctionHooksMessages.Contains("переменная invalidReturnType: ожидался тип bool, получен int") -or
     -not $invalidFunctionHooksMessages.Contains("original доступен только внутри hook") -or
-    -not $invalidFunctionHooksMessages.Contains("нельзя объявить hook для неизвестной функции Missing")) {
+    -not $invalidFunctionHooksMessages.Contains("нельзя объявить hook для неизвестной функции Missing") -or
+    -not $invalidFunctionHooksMessages.Contains("нельзя перехватывать main") -or
+    -not $invalidFunctionHooksMessages.Contains("нельзя перехватывать config")) {
     throw "Function hooks must reject mismatched signatures, invalid original arguments, and unknown targets. Output: $invalidFunctionHooksText"
 }
 
