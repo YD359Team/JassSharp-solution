@@ -14,7 +14,7 @@ hook int GetUnitAbilityLevel(unit whichUnit, int abilityId)
 }
 ```
 
-A hook uses the target function's name and must match its complete signature: return type, parameter count, and parameter types. Native hooks require `using Warcraft3`. Hooks are global declarations; class methods and constructors cannot be hooked.
+A hook uses the target function's name and must match its complete signature: return type, parameter count, and parameter types. Native hooks require `using Warcraft3`. Hooks are global declarations; class methods and constructors cannot be hooked. In Warcraft III projects, the generated `main` and `config` entry points are controlled by the map build pipeline and cannot be hooked. Use `OnInit` for map initialization; it is also not a hook target.
 
 ## Calling the original implementation
 
