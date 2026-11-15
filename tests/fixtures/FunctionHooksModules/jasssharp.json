@@ -1,0 +1,5 @@
+{
+  "mode": "headless",
+  "entry": "src/HookRoot.w3js",
+  "output": "bin/FunctionHooksModules.lua"
+}
