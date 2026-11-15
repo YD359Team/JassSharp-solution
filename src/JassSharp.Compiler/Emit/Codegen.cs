@@ -238,6 +238,7 @@ end
         Line("__jasssharp_hook_registry = {}");
         Line("function __jasssharp_register_hook(name, factory)");
         _indent++;
+        Line("if __jasssharp_hooks_applied then error(\"JASS# hook registered after finalization: \" .. name) end");
         Line("local chain = __jasssharp_hook_registry[name]");
         Line("if not chain then chain = {}; __jasssharp_hook_registry[name] = chain end");
         Line("chain[#chain + 1] = factory");
@@ -246,15 +247,17 @@ end
         Line("function __jasssharp_apply_hooks()");
         _indent++;
         Line("if __jasssharp_hooks_applied then return end");
-        Line("__jasssharp_hooks_applied = true");
+        Line("local replacements = {}");
         Line("for name, chain in pairs(__jasssharp_hook_registry) do");
         _indent++;
         Line("local current = _G[name]");
         Line("if type(current) ~= \"function\" then error(\"JASS# hook target is not a function: \" .. name) end");
         Line("for i = #chain, 1, -1 do current = chain[i](current) end");
-        Line("_G[name] = current");
+        Line("replacements[name] = current");
         _indent--;
         Line("end");
+        Line("for name, replacement in pairs(replacements) do _G[name] = replacement end");
+        Line("__jasssharp_hooks_applied = true");
         _indent--;
         Line("end");
         _indent--;
