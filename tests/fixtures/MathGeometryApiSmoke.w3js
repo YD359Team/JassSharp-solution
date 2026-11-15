@@ -3,6 +3,9 @@ namespace MathGeometryApiSmoke
     using Math;
     using Geometry;
     using Frames;
+    using Abilities;
+    using Inventory;
+    using RpgStats;
 
     public class MathGeometryApiSmoke
     {
@@ -55,6 +58,38 @@ namespace MathGeometryApiSmoke
         {
             return new LineSegment2(new Vector2(ax, ay), new Vector2(bx, by))
                 .DistanceToPoint(new Vector2(px, py));
+        }
+
+
+        public static bool VerifyNullGameplayWrappers()
+        {
+            UnitAbility ability = new UnitAbility(null, 'A000');
+            UnitInventory inventory = new UnitInventory(null);
+            UnitCombatStats stats = new UnitCombatStats(null);
+
+            return !ability.IsPresent()
+                && !ability.Add()
+                && !ability.Remove()
+                && ability.Level() == 0
+                && ability.SetLevel(1) == 0
+                && ability.IncreaseLevel() == 0
+                && ability.DecreaseLevel() == 0
+                && !ability.SetPermanent(true)
+                && ability.Handle() == null
+                && inventory.Owner() == null
+                && inventory.BagSize() == 0
+                && inventory.BagItem(0) == null
+                && inventory.IsInBag(null) == false
+                && inventory.IsEquipped(null) == false
+                && !inventory.HasAnyEquippedItem()
+                && !inventory.Equip(null)
+                && stats.Owner() == null
+                && stats.Strength(false) == 0
+                && stats.Armor() == 0.0
+                && stats.BaseDamage(0) == 0
+                && stats.MaxLife() == 0
+                && stats.Life() == 0.0
+                && stats.AbilityCooldown('A000', 0) == 0.0;
         }
 
         public static bool VerifyNullFrameWrappers()
