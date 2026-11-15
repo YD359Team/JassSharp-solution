@@ -1149,7 +1149,18 @@ end
             return $"{recv}:{mem.Name}({string.Join(", ", args)})";
         }
         if (c.Callee is NameExpr id)
-            return $"{id.Name}({string.Join(", ", c.Args.Select(EmitExpr))})";
+        {
+            var arguments = string.Join(", ", c.Args.Select(EmitExpr));
+            if (_className is not null &&
+                _methods.TryGetValue(_className + "." + id.Name, out var classMethod))
+            {
+                return classMethod.IsStatic
+                    ? $"{_className}.{id.Name}({arguments})"
+                    : $"self:{id.Name}({arguments})";
+            }
+
+            return $"{id.Name}({arguments})";
+        }
         return $"{EmitExpr(c.Callee)}({string.Join(", ", c.Args.Select(EmitExpr))})";
     }
 
