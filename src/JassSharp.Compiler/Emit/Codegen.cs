@@ -9,6 +9,8 @@ public sealed class Codegen
     private List<string> _lines = [];
     private int _indent;
     private int _foreachCounter;
+    private int _loopCounter;
+    private readonly Stack<(string ContinueLabel, string? BreakFlag)> _loopTargets = new();
     private Dictionary<string, string> _locals = new(StringComparer.Ordinal);
     private string? _className;
     private bool _currentMethodIsStatic;
@@ -451,6 +453,23 @@ end
                 case ReturnStmt r:
                     Line(r.Expr is null ? "return" : $"return {EmitExpr(r.Expr)}");
                     break;
+                case BreakStmt:
+                    if (_loopTargets.Count == 0)
+                        throw new InvalidOperationException("break outside loop reached Lua code generation");
+                    var breakTarget = _loopTargets.Peek();
+                    if (breakTarget.BreakFlag is null)
+                        Line("break");
+                    else
+                    {
+                        Line($"{breakTarget.BreakFlag} = true");
+                        Line($"goto {breakTarget.ContinueLabel}");
+                    }
+                    break;
+                case ContinueStmt:
+                    if (_loopTargets.Count == 0)
+                        throw new InvalidOperationException("continue outside loop reached Lua code generation");
+                    Line($"goto {_loopTargets.Peek().ContinueLabel}");
+                    break;
                 case IfStmt i:
                     Line($"if {EmitExpr(i.Cond)} then");
                     _indent++;
@@ -466,19 +485,39 @@ end
                     Line("end");
                     break;
                 case WhileStmt w:
+                {
+                    string label = $"__continue{++_loopCounter}";
                     Line($"while {EmitExpr(w.Cond)} do");
                     _indent++;
+                    Line("do");
+                    _indent++;
+                    _loopTargets.Push((label, null));
                     EmitStmts(w.Body, trace);
+                    _loopTargets.Pop();
+                    _indent--;
+                    Line("end");
+                    Line($"::{label}::");
                     _indent--;
                     Line("end");
                     break;
+                }
                 case DoWhileStmt loop:
+                {
+                    string label = $"__continue{++_loopCounter}";
                     Line("repeat");
                     _indent++;
+                    Line("do");
+                    _indent++;
+                    _loopTargets.Push((label, null));
                     EmitStmts(loop.Body, trace);
+                    _loopTargets.Pop();
+                    _indent--;
+                    Line("end");
+                    Line($"::{label}::");
                     _indent--;
                     Line($"until not ({EmitExpr(loop.Cond)})");
                     break;
+                }
                 case RawLuaStmt raw:
                     foreach (var rawLine in raw.Code.Replace("\r\n", "\n").Replace('\r', '\n').Split('\n'))
                         Line(rawLine);
@@ -487,14 +526,24 @@ end
                     EmitForeach(foreachLoop, trace);
                     break;
                 case ForStmt f:
+                {
                     if (f.Init is not null) EmitStmts([f.Init], trace);
+                    string label = $"__continue{++_loopCounter}";
                     Line($"while {EmitExpr(f.Cond ?? new BoolExpr(true))} do");
                     _indent++;
+                    Line("do");
+                    _indent++;
+                    _loopTargets.Push((label, null));
                     EmitStmts(f.Body, trace);
+                    _loopTargets.Pop();
+                    _indent--;
+                    Line("end");
+                    Line($"::{label}::");
                     if (f.Step is not null) EmitStmts([f.Step], trace);
                     _indent--;
                     Line("end");
                     break;
+                }
             }
         }
     }
