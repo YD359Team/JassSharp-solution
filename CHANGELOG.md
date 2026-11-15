@@ -17,6 +17,8 @@ Versions follow Semantic Versioning.
 - Added C#-style Allman brace formatting on type and document formatting.
 - Added an always-available Lua build status-bar command, including in headless projects.
 - Added explicit command activation and editor toolbar/context-menu entries.
+- Added Lua runtime integration tests for hook execution, early returns, native delegation, cross-module ordering, and one-time finalization.
+- Added automatic GitHub Release notes extraction from the matching version section in `CHANGELOG.md`.
 
 ### Fixed
 - Headless smoke coverage now proves that a project builds without `main`, `config`, or `OnInit`.
