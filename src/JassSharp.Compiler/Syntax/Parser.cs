@@ -29,6 +29,7 @@ public sealed class Parser(List<Token> tokens)
             }
             var attrs = ParseAttributes();
             SkipVis();
+            bool isHook = AcceptId("hook");
             if (CheckId("const"))
             {
                 Eat(TokKind.Id);
@@ -58,7 +59,7 @@ public sealed class Parser(List<Token> tokens)
                 {
                     var ps = ParseParams();
                     Expect(")");
-                    ns.Functions.Add(new FnDecl(typeName, id, ps, ParseMethodBody(typeName), attrs));
+                    ns.Functions.Add(new FnDecl(typeName, id, ps, ParseMethodBody(typeName), attrs, IsHook: isHook));
                 }
                 else
                 {
@@ -68,6 +69,13 @@ public sealed class Parser(List<Token> tokens)
             }
         }
         return ns;
+    }
+
+    private bool AcceptId(string id)
+    {
+        if (!CheckId(id)) return false;
+        Eat(TokKind.Id);
+        return true;
     }
 
     private HashSet<string> ParseAttributes()
