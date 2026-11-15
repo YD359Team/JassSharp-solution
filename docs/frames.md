@@ -142,3 +142,8 @@ Destroying a parent frame may invalidate child handles. Dispose event subscripti
 Frame UI is client-local. Create and mutate frames only in the appropriate local-player context (normally guarded by `GetLocalPlayer() == GetTriggerPlayer()` or the corresponding local UI condition). Do not put gameplay state changes inside a local-only UI branch: that can desynchronize the game simulation.
 
 This module requires Warcraft III's Frame API at runtime. Headless mode can check and translate it when `using Warcraft3;` is present, but the generated Lua still requires the game runtime.
+
+
+## Lua instance-field lowering
+
+Instance fields referenced from an instance method are emitted as `self.<field>` in Lua. This follows Lua's colon-method calling convention and prevents accidental reads of unrelated globals. The Frame API smoke test checks this explicitly for frame handles and event-subscription trigger/action fields.
