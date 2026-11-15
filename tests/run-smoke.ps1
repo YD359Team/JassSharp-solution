@@ -727,10 +727,10 @@ $foreachLua = Get-Content -LiteralPath $foreachLuaPath -Raw
 $foreachFragments = @(
     "local __foreachCollection1 = matrix",
     "for __foreachIndex1 = 1, #__foreachCollection1 do",
-    "local row = __foreachCollection1[__foreachIndex1]",
+    "local row = __collection_load(__foreachCollection1[__foreachIndex1])",
     "local __foreachCollection2 = row",
     "for __foreachIndex2 = 1, #__foreachCollection2 do",
-    "local value = __foreachCollection2[__foreachIndex2]",
+    "local value = __collection_load(__foreachCollection2[__foreachIndex2])",
     "ForGroup(units, function()",
     "local unit = GetEnumUnit()"
 )
