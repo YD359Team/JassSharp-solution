@@ -1519,6 +1519,7 @@ public static class NativeCatalog
         "SetTextTagVelocity",
         "SetTextTagVisibility",
         "SetThematicMusicPlayPosition",
+        "SetThematicMusicAbsoluteVolume",
         "SetThematicMusicVolume",
         "SetTimeOfDayScale",
         "SetTutorialCleared",
