@@ -5,6 +5,6 @@ namespace InvalidHandleHierarchySmoke
     public void Verify(widget value)
     {
         unit invalid = value;
-        int invalidId = 42.HandleId;
+        int invalidId = (42).HandleId;
     }
 }
