@@ -200,6 +200,9 @@ public static class Checker
         {
             switch (statement)
             {
+                case BreakStmt:
+                    break;
+
                 case VarStmt variable:
                 {
                     string declaredType = variable.Type;
