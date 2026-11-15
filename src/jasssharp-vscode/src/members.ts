@@ -3,7 +3,7 @@ export const HANDLE_TYPES = new Set([
   "ability", "buff", "force", "group", "trigger", "triggercondition", "triggeraction",
   "timer", "location", "region", "rect", "boolexpr", "sound", "conditionfunc", "filterfunc",
   "unitpool", "itempool", "race", "alliancetype", "racepreference", "gamestate", "igamestate",
-  "fgamestate", "playerstate", "playerscore", "playergameresult", "unitstate", "aidifficulty",
+  "fgamestate", "fogstyle", "metakeytype", "playerstate", "playerscore", "playergameresult", "unitstate", "aidifficulty",
   "eventid", "gameevent", "playerevent", "playerunitevent", "unitevent", "limitop",
   "widgetevent", "dialogevent", "unittype", "gamespeed", "gamedifficulty", "gametype",
   "mapflag", "mapvisibility", "mapsetting", "mapdensity", "mapcontrol", "minimapicon",
