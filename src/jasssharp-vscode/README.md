@@ -24,7 +24,7 @@ Workflow `.github/workflows/release.yml` запускается при push, с�
 3. Берёт версию VSIX из тега релиза (например, `v0.2.0` → `jasssharp-0.2.0.vsix`).
 4. Прикладывает готовый VSIX к опубликованному GitHub Release.
 
-Тот же workflow можно запустить вручную через **Actions → Release → Run workflow**. В этом случае версия берётся из `package.json`, а VSIX публикуется как workflow artifact, без изменения GitHub Release.
+Тот же workflow можно запустить вручную через **Actions → CI and Release → Run workflow**. В этом случае версия берётся из `package.json`, а VSIX публикуется как workflow artifact, без изменения GitHub Release.
 
 Для автоматической публикации требуется тег с SemVer-версией: `vMAJOR.MINOR.PATCH` (например, `v0.2.0`). Workflow не публикует расширение в Visual Studio Marketplace — он прикладывает VSIX к GitHub Release.
 
