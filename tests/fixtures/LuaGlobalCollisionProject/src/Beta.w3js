@@ -1,0 +1,6 @@
+namespace Beta
+{
+    class SharedName
+    {
+    }
+}
