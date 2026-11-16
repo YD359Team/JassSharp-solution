@@ -126,6 +126,14 @@ static class MapBuild
                 return Fail("source catalog loading failed: " + ex.Message);
             }
 
+            List<string> globalSymbolCollisions = FindLuaGlobalSymbolCollisions(ordered, allUnits);
+            if (globalSymbolCollisions.Count > 0)
+            {
+                foreach (string collision in globalSymbolCollisions)
+                    Console.Error.WriteLine("error: " + collision);
+                return Fail("Lua global symbol collision validation failed");
+            }
+
             List<string> chunks = new();
             List<string> onInits = new();
             HashSet<string> seenInitializers = new(StringComparer.Ordinal);
@@ -311,6 +319,14 @@ static class MapBuild
         catch (Exception ex)
         {
             return Fail("headless source catalog loading failed: " + ex.Message);
+        }
+
+        List<string> globalSymbolCollisions = FindLuaGlobalSymbolCollisions(ordered, allUnits);
+        if (globalSymbolCollisions.Count > 0)
+        {
+            foreach (string collision in globalSymbolCollisions)
+                Console.Error.WriteLine("error: " + collision);
+            return Fail("Lua global symbol collision validation failed");
         }
 
         List<string> chunks = new();
@@ -1827,6 +1843,73 @@ static class MapBuild
             foreach (string file in EnumerateProjectSources(childDirectory))
                 yield return file;
         }
+    }
+
+
+    private static List<string> FindLuaGlobalSymbolCollisions(
+        IReadOnlyCollection<string> orderedFiles,
+        IReadOnlyDictionary<string, NsUnit> allUnits)
+    {
+        StringComparer pathComparer = OperatingSystem.IsWindows()
+            ? StringComparer.OrdinalIgnoreCase
+            : StringComparer.Ordinal;
+        HashSet<string> emittedNamespaces = new(StringComparer.Ordinal);
+
+        foreach (string file in orderedFiles)
+        {
+            string namespaceName = new Parser(new Lexer(File.ReadAllText(file)).Lex())
+                .ParseNamespace().Name;
+            emittedNamespaces.Add(namespaceName);
+        }
+
+        Dictionary<string, (string Namespace, string Kind)> owners =
+            new(StringComparer.Ordinal);
+        List<string> collisions = new();
+
+        void Register(string namespaceName, string symbolName, string kind)
+        {
+            if (!owners.TryGetValue(symbolName, out var owner))
+            {
+                owners.Add(symbolName, (namespaceName, kind));
+                return;
+            }
+
+            if (owner.Namespace == namespaceName)
+                return;
+
+            collisions.Add(
+                $"Lua global '{symbolName}' is declared by namespace '{owner.Namespace}' ({owner.Kind}) " +
+                $"and namespace '{namespaceName}' ({kind}); the later chunk would overwrite the earlier declaration.");
+        }
+
+        foreach (string namespaceName in emittedNamespaces.OrderBy(name => name, StringComparer.Ordinal))
+        {
+            if (!allUnits.TryGetValue(namespaceName, out NsUnit? unit))
+                continue;
+
+            foreach (ClassDecl cls in unit.Classes)
+                Register(namespaceName, cls.Name, "class");
+
+            foreach (FnDecl function in unit.Functions.Where(function => !function.IsHook))
+            {
+                string emittedName = function.Name == "OnInit"
+                    ? namespaceName + "_OnInit"
+                    : function.Name;
+                Register(namespaceName, emittedName, "function");
+            }
+
+            foreach (FieldDecl field in unit.Fields)
+                Register(namespaceName, field.Name, "global field");
+
+            foreach (EnumDecl enumeration in unit.Enums)
+            {
+                Register(namespaceName, enumeration.Name + "_ToString", "enum helper");
+                foreach (EnumMember member in enumeration.Members)
+                    Register(namespaceName, enumeration.Name + "_" + member.Name, "enum member");
+            }
+        }
+
+        return collisions;
     }
 
     public static List<NsUnit> ResolveImports(NsUnit unit, Dictionary<string, NsUnit> all)
