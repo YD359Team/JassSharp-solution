@@ -1,7 +1,12 @@
 namespace UnknownCallSmoke
 {
-    void Run()
+    class LocalService
+    {
+    }
+
+    void Run(LocalService service)
     {
         ExternalLuaFunction(123);
+        service.MissingMethod();
     }
 }
