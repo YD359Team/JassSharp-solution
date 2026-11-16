@@ -41,6 +41,7 @@ static class MapBuild
             JsonElement root = doc.RootElement;
 
             string mode = GetString(root, "mode")?.Trim().ToLowerInvariant() ?? "wc3";
+            bool strictUnknownCalls = GetBoolean(root, "strictUnknownCalls");
             if (mode is not ("wc3" or "headless"))
                 return Fail($"unsupported mode '{mode}'. Supported modes are 'wc3' and 'headless'.");
 
@@ -135,7 +136,11 @@ static class MapBuild
                 {
                     var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
                     var imports = ResolveImports(unit, allUnits);
-                    var diagnostics = Checker.Check(unit, file, imports);
+                    var diagnostics = Checker.Check(
+                        unit,
+                        file,
+                        imports,
+                        strictUnknownCalls: strictUnknownCalls);
                     foreach (var diagnostic in diagnostics)
                     {
                         Console.Error.WriteLine(
@@ -258,6 +263,7 @@ static class MapBuild
             return Fail("headless mode only generates Lua and cannot run a Warcraft III map");
 
         string target = GetString(root, "target")?.Trim().ToLowerInvariant() ?? "lua";
+        bool strictUnknownCalls = GetBoolean(root, "strictUnknownCalls");
         if (target != "lua")
             return Fail($"unsupported target '{target}'. Headless mode supports only Lua.");
 
@@ -314,7 +320,12 @@ static class MapBuild
             {
                 var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
                 var imports = ResolveImports(unit, allUnits);
-                var diagnostics = Checker.Check(unit, file, imports, implicitWarcraft3: false);
+                var diagnostics = Checker.Check(
+                    unit,
+                    file,
+                    imports,
+                    implicitWarcraft3: false,
+                    strictUnknownCalls: strictUnknownCalls);
                 foreach (var diagnostic in diagnostics)
                     Console.Error.WriteLine(
                         $"{file}:{diagnostic.Line}:{diagnostic.Col}: {diagnostic.Severity}: {diagnostic.Message}");
@@ -1510,6 +1521,16 @@ static class MapBuild
     private static string ResolveConfiguredPath(string project, string path)
     {
         return Path.GetFullPath(Path.IsPathRooted(path) ? path : Path.Combine(project, path));
+    }
+
+
+    private static bool GetBoolean(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out JsonElement element))
+            return false;
+        if (element.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            throw new InvalidDataException($"project configuration property '{propertyName}' must be a boolean");
+        return element.GetBoolean();
     }
 
     private static string? GetString(JsonElement root, string propertyName)
