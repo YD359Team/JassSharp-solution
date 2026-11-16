@@ -1855,11 +1855,15 @@ static class MapBuild
 
         foreach (string file in orderedFiles)
         {
-            string namespaceName = new Parser(new Lexer(File.ReadAllText(file)).Lex())
-                .ParseNamespace().Name;
-            if (seenNamespaces.Add(namespaceName) &&
-                allUnits.TryGetValue(namespaceName, out NsUnit? unit))
+            NsUnit parsedUnit = new Parser(new Lexer(File.ReadAllText(file)).Lex())
+                .ParseNamespace();
+            if (!seenNamespaces.Add(parsedUnit.Name))
+                continue;
+
+            if (allUnits.TryGetValue(parsedUnit.Name, out NsUnit? unit))
                 emittedUnits.Add(unit);
+            else
+                emittedUnits.Add(parsedUnit);
         }
 
         return FindLuaGlobalSymbolCollisions(emittedUnits);
