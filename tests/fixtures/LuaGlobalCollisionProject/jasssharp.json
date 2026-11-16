@@ -1,0 +1,5 @@
+{
+  "mode": "headless",
+  "target": "lua",
+  "output": "bin/LuaGlobalCollisionProject.lua"
+}
