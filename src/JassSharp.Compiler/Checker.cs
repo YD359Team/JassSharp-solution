@@ -54,9 +54,12 @@ public static class Checker
                 unit.Usings.Contains("Warcraft3", StringComparer.Ordinal) ||
                 importedUnits.Any(imported => imported.Name == "Warcraft3");
 
-            AddUnit(unit);
+            // Match LuaEmitter: imported declarations are registered first, then the
+            // current namespace. The current unit is emitted after its imports and
+            // therefore owns name resolution when a symbol name is shared.
             foreach (var imported in importedUnits)
                 AddUnit(imported);
+            AddUnit(unit);
         }
 
         private void AddUnit(NsUnit unit)
