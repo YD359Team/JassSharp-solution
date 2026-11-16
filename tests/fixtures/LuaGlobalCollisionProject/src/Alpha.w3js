@@ -1,0 +1,6 @@
+namespace Alpha
+{
+    void SharedName()
+    {
+    }
+}
