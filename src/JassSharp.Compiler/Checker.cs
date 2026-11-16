@@ -851,7 +851,7 @@ public static class Checker
                 }
                 else if (nativeMember is null)
                 {
-                    Add(member.Line, member.Col, "warning",
+                    Add(member.Line, member.Col, _strictUnknownCalls ? "error" : "warning",
                         $"тип {receiverType} не содержит метода {member.Name}");
                 }
             }
