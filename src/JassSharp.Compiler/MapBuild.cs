@@ -1850,13 +1850,15 @@ static class MapBuild
         IReadOnlyCollection<string> orderedFiles,
         IReadOnlyDictionary<string, NsUnit> allUnits)
     {
-        HashSet<string> emittedNamespaces = new(StringComparer.Ordinal);
+        List<string> emittedNamespaces = new();
+        HashSet<string> seenNamespaces = new(StringComparer.Ordinal);
 
         foreach (string file in orderedFiles)
         {
             string namespaceName = new Parser(new Lexer(File.ReadAllText(file)).Lex())
                 .ParseNamespace().Name;
-            emittedNamespaces.Add(namespaceName);
+            if (seenNamespaces.Add(namespaceName))
+                emittedNamespaces.Add(namespaceName);
         }
 
         Dictionary<string, (string Namespace, string Kind)> owners =
@@ -1879,7 +1881,7 @@ static class MapBuild
                 $"and namespace '{namespaceName}' ({kind}); the later chunk would overwrite the earlier declaration.");
         }
 
-        foreach (string namespaceName in emittedNamespaces.OrderBy(name => name, StringComparer.Ordinal))
+        foreach (string namespaceName in emittedNamespaces)
         {
             if (!allUnits.TryGetValue(namespaceName, out NsUnit? unit))
                 continue;
