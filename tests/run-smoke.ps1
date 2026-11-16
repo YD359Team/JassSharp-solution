@@ -142,12 +142,16 @@ catch {
     throw "Could not parse unknown-call diagnostics. Default exit: $defaultUnknownCallExitCode. Strict exit: $strictUnknownCallExitCode. Default output: $defaultUnknownCallText. Strict output: $strictUnknownCallText"
 }
 $defaultUnknownCall = @($defaultUnknownCallDiagnostics | Where-Object { $_.Message -like "*ExternalLuaFunction*" })
+$defaultUnknownMethod = @($defaultUnknownCallDiagnostics | Where-Object { $_.Message -like "*MissingMethod*" })
 $strictUnknownCall = @($strictUnknownCallDiagnostics | Where-Object { $_.Message -like "*ExternalLuaFunction*" })
-if ($defaultUnknownCallExitCode -ne 0 -or $defaultUnknownCall.Count -ne 1 -or $defaultUnknownCall[0].Severity -ne "warning") {
-    throw "Unknown external calls must remain warnings by default. Exit code: $defaultUnknownCallExitCode. Output: $defaultUnknownCallText"
+$strictUnknownMethod = @($strictUnknownCallDiagnostics | Where-Object { $_.Message -like "*MissingMethod*" })
+if ($defaultUnknownCallExitCode -ne 0 -or $defaultUnknownCall.Count -ne 1 -or $defaultUnknownCall[0].Severity -ne "warning" -or
+    $defaultUnknownMethod.Count -ne 1 -or $defaultUnknownMethod[0].Severity -ne "warning") {
+    throw "Unknown external calls and unresolved typed methods must remain warnings by default. Exit code: $defaultUnknownCallExitCode. Output: $defaultUnknownCallText"
 }
-if ($strictUnknownCallExitCode -eq 0 -or $strictUnknownCall.Count -ne 1 -or $strictUnknownCall[0].Severity -ne "error") {
-    throw "strictUnknownCalls did not promote an unknown call to an error. Exit code: $strictUnknownCallExitCode. Output: $strictUnknownCallText"
+if ($strictUnknownCallExitCode -eq 0 -or $strictUnknownCall.Count -ne 1 -or $strictUnknownCall[0].Severity -ne "error" -or
+    $strictUnknownMethod.Count -ne 1 -or $strictUnknownMethod[0].Severity -ne "error") {
+    throw "strictUnknownCalls did not promote unknown calls and unresolved typed methods to errors. Exit code: $strictUnknownCallExitCode. Output: $strictUnknownCallText"
 }
 
 Write-Host "[3/25] Verifying build rejects semantic errors..."
