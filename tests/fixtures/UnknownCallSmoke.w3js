@@ -1,12 +1,15 @@
 namespace UnknownCallSmoke
 {
+    using Warcraft3;
+
     class LocalService
     {
     }
 
-    void Run(LocalService service)
+    void Run(LocalService service, unit target)
     {
         ExternalLuaFunction(123);
         service.MissingMethod();
+        target.MissingNativeMethod();
     }
 }
