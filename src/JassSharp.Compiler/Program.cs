@@ -54,6 +54,9 @@ if (cmd == "check")
         var allUnits = MapBuild.LoadProject(projectDirectory);
         var imports = MapBuild.ResolveImports(unit, allUnits);
 
+        diagnostics.AddRange(MapBuild.FindLuaGlobalSymbolCollisions(imports.Append(unit))
+            .Select(message => new JassSharp.Diagnostic(1, 1, "error", message, path)));
+
         diagnostics.AddRange(JassSharp.Checker.Check(
             unit,
             path,
@@ -191,6 +194,14 @@ try
         throw new InvalidDataException($"unsupported project mode '{mode}'. Supported modes are 'wc3' and 'headless'.");
     var allUnits = MapBuild.LoadProject(projectDirectory);
     var imports = MapBuild.ResolveImports(unit, allUnits);
+    var globalSymbolCollisions = MapBuild.FindLuaGlobalSymbolCollisions(imports.Append(unit));
+    if (globalSymbolCollisions.Count > 0)
+    {
+        foreach (string collision in globalSymbolCollisions)
+            Console.Error.WriteLine("error: " + collision);
+        return 1;
+    }
+
     foreach (var sourceUnit in imports.Append(unit))
     {
         var sourceImports = imports.Where(dependency => dependency.Name != sourceUnit.Name);
