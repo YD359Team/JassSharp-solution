@@ -1850,20 +1850,29 @@ static class MapBuild
         IReadOnlyCollection<string> orderedFiles,
         IReadOnlyDictionary<string, NsUnit> allUnits)
     {
-        List<string> emittedNamespaces = new();
+        List<NsUnit> emittedUnits = new();
         HashSet<string> seenNamespaces = new(StringComparer.Ordinal);
 
         foreach (string file in orderedFiles)
         {
             string namespaceName = new Parser(new Lexer(File.ReadAllText(file)).Lex())
                 .ParseNamespace().Name;
-            if (seenNamespaces.Add(namespaceName))
-                emittedNamespaces.Add(namespaceName);
+            if (seenNamespaces.Add(namespaceName) &&
+                allUnits.TryGetValue(namespaceName, out NsUnit? unit))
+                emittedUnits.Add(unit);
         }
+
+        return FindLuaGlobalSymbolCollisions(emittedUnits);
+    }
+
+    public static List<string> FindLuaGlobalSymbolCollisions(IEnumerable<NsUnit> sourceUnits)
+    {
+        ArgumentNullException.ThrowIfNull(sourceUnits);
 
         Dictionary<string, (string Namespace, string Kind)> owners =
             new(StringComparer.Ordinal);
         List<string> collisions = new();
+        HashSet<string> seenNamespaces = new(StringComparer.Ordinal);
 
         void Register(string namespaceName, string symbolName, string kind)
         {
@@ -1878,33 +1887,33 @@ static class MapBuild
 
             collisions.Add(
                 $"Lua global '{symbolName}' is declared by namespace '{owner.Namespace}' ({owner.Kind}) " +
-                $"and namespace '{namespaceName}' ({kind}); the later chunk would overwrite the earlier declaration.");
+                $"and namespace '{namespaceName}' ({kind}); the later declaration or chunk can overwrite the earlier one.");
         }
 
-        foreach (string namespaceName in emittedNamespaces)
+        foreach (NsUnit unit in sourceUnits)
         {
-            if (!allUnits.TryGetValue(namespaceName, out NsUnit? unit))
+            if (!seenNamespaces.Add(unit.Name))
                 continue;
 
             foreach (ClassDecl cls in unit.Classes)
-                Register(namespaceName, cls.Name, "class");
+                Register(unit.Name, cls.Name, "class");
 
             foreach (FnDecl function in unit.Functions.Where(function => !function.IsHook))
             {
                 string emittedName = function.Name == "OnInit"
-                    ? namespaceName + "_OnInit"
+                    ? unit.Name + "_OnInit"
                     : function.Name;
-                Register(namespaceName, emittedName, "function");
+                Register(unit.Name, emittedName, "function");
             }
 
             foreach (FieldDecl field in unit.Fields)
-                Register(namespaceName, field.Name, "global field");
+                Register(unit.Name, field.Name, "global field");
 
             foreach (EnumDecl enumeration in unit.Enums)
             {
-                Register(namespaceName, enumeration.Name + "_ToString", "enum helper");
+                Register(unit.Name, enumeration.Name + "_ToString", "enum helper");
                 foreach (EnumMember member in enumeration.Members)
-                    Register(namespaceName, enumeration.Name + "_" + member.Name, "enum member");
+                    Register(unit.Name, enumeration.Name + "_" + member.Name, "enum member");
             }
         }
 
