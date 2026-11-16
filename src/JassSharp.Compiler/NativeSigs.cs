@@ -1047,7 +1047,6 @@ public static class NativeSigs
         ["EnableDragSelect"] = new("EnableDragSelect", "void", ["bool", "bool"], ""),
         ["EnablePreSelect"] = new("EnablePreSelect", "void", ["bool", "bool"], ""),
         ["EnableSelect"] = new("EnableSelect", "void", ["bool", "bool"], ""),
-        ["BlzGetHUDScale"] = new("BlzGetHUDScale", "float", [], ""),
         ["BlzSetHUDScale"] = new("BlzSetHUDScale", "void", ["int"], ""),
         ["BlzLockHUDScale"] = new("BlzLockHUDScale", "void", [], ""),
         ["BlzUnlockHUDScale"] = new("BlzUnlockHUDScale", "void", [], ""),
