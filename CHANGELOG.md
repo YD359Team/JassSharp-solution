@@ -7,7 +7,7 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
-- Added opt-in `strictUnknownCalls` project configuration to promote unknown function-call diagnostics from warnings to errors in check, build, Warcraft III map builds, and headless builds. The default remains permissive for external Lua functions.
+- Added opt-in `strictUnknownCalls` project configuration to promote unknown function-call and unresolved statically typed method-call diagnostics from warnings to errors in check, build, Warcraft III map builds, and headless builds. The default remains permissive for external Lua functions.
 
 - Removed `BlzGetHUDScale` from the native registry: it appeared in a transient Warcraft III patch build but is absent from the later 3.0.1 PTR native set.
 
