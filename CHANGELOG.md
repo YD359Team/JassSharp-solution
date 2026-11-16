@@ -7,6 +7,8 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
+- Removed `BlzGetHUDScale` from the native registry: it appeared in a transient Warcraft III patch build but is absent from the later 3.0.1 PTR native set.
+
 ### Documentation
 - Added project scaffolding instructions and directory layouts for Warcraft III and headless projects.
 - Documented the current restriction on parameterized base constructors and added a regression check.
