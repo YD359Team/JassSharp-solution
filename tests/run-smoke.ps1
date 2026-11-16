@@ -1436,15 +1436,15 @@ finally {
     $ErrorActionPreference = $previousErrorActionPreference
 }
 if ($globalCollisionCheckExitCode -eq 0 -or
-    -not $globalCollisionCheckText.Contains("Lua global 'SharedName'") -or
-    -not $globalCollisionCheckText.Contains("Lua global 'ShadowedName'") -or
-    -not $globalCollisionCheckText.Contains("Lua global 'Color_ToString'")) {
+    -not $globalCollisionCheckText.Contains("Lua identifier 'SharedName'") -or
+    -not $globalCollisionCheckText.Contains("Lua identifier 'ShadowedName'") -or
+    -not $globalCollisionCheckText.Contains("Lua identifier 'Color_ToString'")) {
     throw "The check command must report imported Lua global collisions. Exit code: $globalCollisionCheckExitCode. Output: $globalCollisionCheckText"
 }
 if ($globalCollisionExitCode -eq 0 -or
-    -not $globalCollisionText.Contains("Lua global 'SharedName'") -or
-    -not $globalCollisionText.Contains("Lua global 'ShadowedName'") -or
-    -not $globalCollisionText.Contains("Lua global 'Color_ToString'") -or
+    -not $globalCollisionText.Contains("Lua identifier 'SharedName'") -or
+    -not $globalCollisionText.Contains("Lua identifier 'ShadowedName'") -or
+    -not $globalCollisionText.Contains("Lua identifier 'Color_ToString'") -or
     -not $globalCollisionText.Contains("Lua global symbol collision validation failed")) {
     throw "Map build must reject cross-namespace collisions in generated Lua globals, including enum helpers. Exit code: $globalCollisionExitCode. Output: $globalCollisionText"
 }
