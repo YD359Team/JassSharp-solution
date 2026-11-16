@@ -1,0 +1,8 @@
+namespace Gamma
+{
+    enum Color
+    {
+        Red,
+        Blue
+    }
+}
