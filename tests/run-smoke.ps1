@@ -1419,5 +1419,24 @@ if ($baseHookRegistration -lt 0 -or $rootHookRegistration -le $baseHookRegistrat
     throw "Cross-module hooks must register exactly twice in dependency/declaration order and apply only after all module chunks. Registration count: $registrationCount. Base registration: $baseHookRegistration. Root registration: $rootHookRegistration. Base body: $baseHookBody. Root body: $rootHookBody. Finalizer: $hookFinalizer. Generated Lua: $multiModuleLua"
 }
 
+Write-Host "[30/30] Verifying project-wide Lua global collision rejection..."
+$globalCollisionProject = Join-Path $PSScriptRoot "fixtures/LuaGlobalCollisionProject"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $globalCollisionOutput = dotnet run --configuration Release --no-build --project $project -- map --project $globalCollisionProject 2>&1
+    $globalCollisionExitCode = $LASTEXITCODE
+    $globalCollisionText = $globalCollisionOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+if ($globalCollisionExitCode -eq 0 -or
+    -not $globalCollisionText.Contains("Lua global 'SharedName'") -or
+    -not $globalCollisionText.Contains("Lua global 'Color_ToString'") -or
+    -not $globalCollisionText.Contains("Lua global symbol collision validation failed")) {
+    throw "Map build must reject cross-namespace collisions in generated Lua globals, including enum helpers. Exit code: $globalCollisionExitCode. Output: $globalCollisionText"
+}
+
 $global:LASTEXITCODE = 0
 Write-Host "All JASS# compiler smoke checks passed."
