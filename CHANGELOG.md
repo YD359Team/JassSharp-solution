@@ -7,7 +7,7 @@ Versions follow Semantic Versioning.
 
 ## [Unreleased]
 
-- CLI check/build commands and map builds now reject collisions among emitted Lua globals (functions, classes, global fields, top-level constants, enum members, and generated enum helpers) instead of silently allowing later chunks to overwrite earlier declarations. Namespace runtime isolation remains a separate future change.
+- CLI check/build commands and map builds now reject collisions among emitted Lua identifiers (functions, classes, global fields, top-level constants, enum members, and generated enum helpers) instead of silently allowing later chunks to overwrite earlier declarations. Namespace runtime isolation remains a separate future change.
 
 - Added opt-in `strictUnknownCalls` project configuration to promote unknown function-call and unresolved statically typed method-call diagnostics from warnings to errors in check, build, Warcraft III map builds, and headless builds. The default remains permissive for external Lua functions.
 
