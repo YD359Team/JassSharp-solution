@@ -1909,6 +1909,9 @@ static class MapBuild
             foreach (FieldDecl field in unit.Fields)
                 Register(unit.Name, field.Name, "global field");
 
+            foreach (ConstDecl constant in unit.Consts)
+                Register(unit.Name, constant.Name, "top-level local constant");
+
             foreach (EnumDecl enumeration in unit.Enums)
             {
                 Register(unit.Name, enumeration.Name + "_ToString", "enum helper");
