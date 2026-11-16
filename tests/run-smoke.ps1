@@ -118,6 +118,38 @@ if ($misuseExitCode -eq 0 -or -not $hasErrorSeverity -or -not $hasStaticCallErro
     throw "Static/instance misuse was not rejected with all expected diagnostics. Exit code: $misuseExitCode. Output: $misuseText"
 }
 
+Write-Host "[2a] Verifying opt-in strict unknown-call diagnostics..."
+$unknownCallFixture = Join-Path $PSScriptRoot "fixtures/UnknownCallSmoke.w3js"
+$strictUnknownCallsConfig = Join-Path $PSScriptRoot "fixtures/strict-unknown-calls.json"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $defaultUnknownCallOutput = dotnet run --configuration Release --no-build --project $project -- check $unknownCallFixture 2>&1
+    $defaultUnknownCallExitCode = $LASTEXITCODE
+    $strictUnknownCallOutput = dotnet run --configuration Release --no-build --project $project -- check $unknownCallFixture --config $strictUnknownCallsConfig 2>&1
+    $strictUnknownCallExitCode = $LASTEXITCODE
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+$defaultUnknownCallText = $defaultUnknownCallOutput -join "`n"
+$strictUnknownCallText = $strictUnknownCallOutput -join "`n"
+try {
+    $defaultUnknownCallDiagnostics = ConvertFrom-Json -InputObject $defaultUnknownCallText
+    $strictUnknownCallDiagnostics = ConvertFrom-Json -InputObject $strictUnknownCallText
+}
+catch {
+    throw "Could not parse unknown-call diagnostics. Default exit: $defaultUnknownCallExitCode. Strict exit: $strictUnknownCallExitCode. Default output: $defaultUnknownCallText. Strict output: $strictUnknownCallText"
+}
+$defaultUnknownCall = @($defaultUnknownCallDiagnostics | Where-Object { $_.Message -like "*ExternalLuaFunction*" })
+$strictUnknownCall = @($strictUnknownCallDiagnostics | Where-Object { $_.Message -like "*ExternalLuaFunction*" })
+if ($defaultUnknownCallExitCode -ne 0 -or $defaultUnknownCall.Count -ne 1 -or $defaultUnknownCall[0].Severity -ne "warning") {
+    throw "Unknown external calls must remain warnings by default. Exit code: $defaultUnknownCallExitCode. Output: $defaultUnknownCallText"
+}
+if ($strictUnknownCallExitCode -eq 0 -or $strictUnknownCall.Count -ne 1 -or $strictUnknownCall[0].Severity -ne "error") {
+    throw "strictUnknownCalls did not promote an unknown call to an error. Exit code: $strictUnknownCallExitCode. Output: $strictUnknownCallText"
+}
+
 Write-Host "[3/25] Verifying build rejects semantic errors..."
 $previousErrorActionPreference = $ErrorActionPreference
 try {
