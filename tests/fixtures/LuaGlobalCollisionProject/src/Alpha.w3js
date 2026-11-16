@@ -1,5 +1,9 @@
 namespace Alpha
 {
+    using Beta;
+    using Gamma;
+    using Delta;
+
     void SharedName()
     {
     }
