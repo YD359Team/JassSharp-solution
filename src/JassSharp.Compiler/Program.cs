@@ -54,7 +54,12 @@ if (cmd == "check")
         var allUnits = MapBuild.LoadProject(projectDirectory);
         var imports = MapBuild.ResolveImports(unit, allUnits);
 
-        diagnostics.AddRange(JassSharp.Checker.Check(unit, path, imports, implicitWarcraft3: mode == "wc3"));
+        diagnostics.AddRange(JassSharp.Checker.Check(
+            unit,
+            path,
+            imports,
+            implicitWarcraft3: mode == "wc3",
+            strictUnknownCalls: ReadStrictUnknownCalls(projectDirectory, checkConfig)));
     }
     catch (ParseException ex)
     {
@@ -193,7 +198,8 @@ try
             sourceUnit,
             sourceUnit.Name == unit.Name ? file : null,
             sourceImports,
-            implicitWarcraft3: mode == "wc3");
+            implicitWarcraft3: mode == "wc3",
+            strictUnknownCalls: ReadStrictUnknownCalls(projectDirectory, buildConfig));
         foreach (var diagnostic in diagnostics)
             Console.Error.WriteLine($"{sourceUnit.Name}:{diagnostic.Line}:{diagnostic.Col}: {diagnostic.Severity}: {diagnostic.Message}");
         if (diagnostics.Any(diagnostic => diagnostic.Severity == "error"))
@@ -251,6 +257,27 @@ static string ReadProjectMode(string projectDirectory, string? configName = null
         throw new InvalidDataException("project configuration property 'mode' must be a string");
 
     return modeElement.GetString()?.Trim().ToLowerInvariant() ?? "wc3";
+}
+
+
+static bool ReadStrictUnknownCalls(string projectDirectory, string? configName = null)
+{
+    string configPath = string.IsNullOrWhiteSpace(configName)
+        ? Path.Combine(projectDirectory, "jasssharp.json")
+        : Path.GetFullPath(Path.IsPathRooted(configName)
+            ? configName
+            : Path.Combine(projectDirectory, configName));
+    if (!File.Exists(configPath))
+        return false;
+
+    using var document = JsonDocument.Parse(File.ReadAllText(configPath));
+    var root = document.RootElement;
+    if (!root.TryGetProperty("strictUnknownCalls", out var strictElement))
+        return false;
+    if (strictElement.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+        throw new InvalidDataException("project configuration property 'strictUnknownCalls' must be a boolean");
+
+    return strictElement.GetBoolean();
 }
 
 static string FindProjectDirectory(string sourceFile)
