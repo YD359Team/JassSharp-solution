@@ -1850,9 +1850,6 @@ static class MapBuild
         IReadOnlyCollection<string> orderedFiles,
         IReadOnlyDictionary<string, NsUnit> allUnits)
     {
-        StringComparer pathComparer = OperatingSystem.IsWindows()
-            ? StringComparer.OrdinalIgnoreCase
-            : StringComparer.Ordinal;
         HashSet<string> emittedNamespaces = new(StringComparer.Ordinal);
 
         foreach (string file in orderedFiles)
