@@ -1419,17 +1419,26 @@ if ($baseHookRegistration -lt 0 -or $rootHookRegistration -le $baseHookRegistrat
     throw "Cross-module hooks must register exactly twice in dependency/declaration order and apply only after all module chunks. Registration count: $registrationCount. Base registration: $baseHookRegistration. Root registration: $rootHookRegistration. Base body: $baseHookBody. Root body: $rootHookBody. Finalizer: $hookFinalizer. Generated Lua: $multiModuleLua"
 }
 
-Write-Host "[30/30] Verifying project-wide Lua global collision rejection..."
+Write-Host "[30/30] Verifying Lua global collision diagnostics..."
 $globalCollisionProject = Join-Path $PSScriptRoot "fixtures/LuaGlobalCollisionProject"
+$globalCollisionSource = Join-Path $globalCollisionProject "src/Alpha.w3js"
 $previousErrorActionPreference = $ErrorActionPreference
 try {
     $ErrorActionPreference = "Continue"
+    $globalCollisionCheckOutput = dotnet run --configuration Release --no-build --project $project -- check $globalCollisionSource 2>&1
+    $globalCollisionCheckExitCode = $LASTEXITCODE
+    $globalCollisionCheckText = $globalCollisionCheckOutput -join "`n"
     $globalCollisionOutput = dotnet run --configuration Release --no-build --project $project -- map --project $globalCollisionProject 2>&1
     $globalCollisionExitCode = $LASTEXITCODE
     $globalCollisionText = $globalCollisionOutput -join "`n"
 }
 finally {
     $ErrorActionPreference = $previousErrorActionPreference
+}
+if ($globalCollisionCheckExitCode -eq 0 -or
+    -not $globalCollisionCheckText.Contains("Lua global 'SharedName'") -or
+    -not $globalCollisionCheckText.Contains("Lua global 'Color_ToString'")) {
+    throw "The check command must report imported Lua global collisions. Exit code: $globalCollisionCheckExitCode. Output: $globalCollisionCheckText"
 }
 if ($globalCollisionExitCode -eq 0 -or
     -not $globalCollisionText.Contains("Lua global 'SharedName'") -or
