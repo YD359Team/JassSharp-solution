@@ -11,9 +11,10 @@ public static class Checker
         NsUnit unit,
         string? file = null,
         IEnumerable<NsUnit>? imports = null,
-        bool implicitWarcraft3 = true)
+        bool implicitWarcraft3 = true,
+        bool strictUnknownCalls = false)
     {
-        var analyzer = new Analyzer(unit, file, imports, implicitWarcraft3);
+        var analyzer = new Analyzer(unit, file, imports, implicitWarcraft3, strictUnknownCalls);
         analyzer.Run();
         return analyzer.Diagnostics;
     }
@@ -23,6 +24,7 @@ public static class Checker
         private readonly NsUnit _unit;
         private readonly string? _file;
         private readonly bool _hasWarcraft3;
+        private readonly bool _strictUnknownCalls;
         private readonly HashSet<string> _classes = new(StringComparer.Ordinal);
         private readonly HashSet<string> _interfaces = new(StringComparer.Ordinal);
         private readonly Dictionary<string, ClassDecl> _classDeclarations = new(StringComparer.Ordinal);
@@ -45,10 +47,16 @@ public static class Checker
 
         public List<Diagnostic> Diagnostics { get; } = [];
 
-        public Analyzer(NsUnit unit, string? file, IEnumerable<NsUnit>? imports, bool implicitWarcraft3)
+        public Analyzer(
+            NsUnit unit,
+            string? file,
+            IEnumerable<NsUnit>? imports,
+            bool implicitWarcraft3,
+            bool strictUnknownCalls)
         {
             _unit = unit;
             _file = file;
+            _strictUnknownCalls = strictUnknownCalls;
             var importedUnits = imports?.ToList() ?? [];
             _hasWarcraft3 = implicitWarcraft3 ||
                 unit.Usings.Contains("Warcraft3", StringComparer.Ordinal) ||
@@ -776,7 +784,8 @@ public static class Checker
                     if (IsWarcraftSymbol(name.Name) && !_hasWarcraft3)
                         Add(name.Line, name.Col, "error", $"{name.Name} доступна только после using Warcraft3");
                     else if (!IsKnownSymbol(name.Name))
-                        Add(name.Line, name.Col, "warning", $"неизвестный вызов {name.Name}");
+                        Add(name.Line, name.Col, _strictUnknownCalls ? "error" : "warning",
+                            $"неизвестный вызов {name.Name}");
 
                     foreach (var argument in call.Args)
                         CheckExpression(argument);
