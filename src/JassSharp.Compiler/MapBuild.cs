@@ -1890,8 +1890,8 @@ static class MapBuild
                 return;
 
             collisions.Add(
-                $"Lua global '{symbolName}' is declared by namespace '{owner.Namespace}' ({owner.Kind}) " +
-                $"and namespace '{namespaceName}' ({kind}); the later declaration or chunk can overwrite the earlier one.");
+                $"Lua identifier '{symbolName}' is declared by namespace '{owner.Namespace}' ({owner.Kind}) " +
+                $"and namespace '{namespaceName}' ({kind}); this creates a name collision in the generated script.");
         }
 
         foreach (NsUnit unit in sourceUnits)
