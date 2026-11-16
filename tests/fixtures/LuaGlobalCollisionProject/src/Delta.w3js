@@ -1,0 +1,6 @@
+namespace Delta
+{
+    void Color_ToString(int value)
+    {
+    }
+}
