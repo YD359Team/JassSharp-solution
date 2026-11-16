@@ -3,4 +3,6 @@ namespace Beta
     class SharedName
     {
     }
+
+    const int ShadowedName = 1;
 }
