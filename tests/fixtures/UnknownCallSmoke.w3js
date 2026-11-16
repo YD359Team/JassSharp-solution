@@ -1,0 +1,7 @@
+namespace UnknownCallSmoke
+{
+    void Run()
+    {
+        ExternalLuaFunction(123);
+    }
+}
