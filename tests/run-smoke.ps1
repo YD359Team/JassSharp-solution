@@ -143,15 +143,19 @@ catch {
 }
 $defaultUnknownCall = @($defaultUnknownCallDiagnostics | Where-Object { $_.Message -like "*ExternalLuaFunction*" })
 $defaultUnknownMethod = @($defaultUnknownCallDiagnostics | Where-Object { $_.Message -like "*MissingMethod*" })
+$defaultUnknownNativeMethod = @($defaultUnknownCallDiagnostics | Where-Object { $_.Message -like "*MissingNativeMethod*" })
 $strictUnknownCall = @($strictUnknownCallDiagnostics | Where-Object { $_.Message -like "*ExternalLuaFunction*" })
 $strictUnknownMethod = @($strictUnknownCallDiagnostics | Where-Object { $_.Message -like "*MissingMethod*" })
+$strictUnknownNativeMethod = @($strictUnknownCallDiagnostics | Where-Object { $_.Message -like "*MissingNativeMethod*" })
 if ($defaultUnknownCallExitCode -ne 0 -or $defaultUnknownCall.Count -ne 1 -or $defaultUnknownCall[0].Severity -ne "warning" -or
-    $defaultUnknownMethod.Count -ne 1 -or $defaultUnknownMethod[0].Severity -ne "warning") {
-    throw "Unknown external calls and unresolved typed methods must remain warnings by default. Exit code: $defaultUnknownCallExitCode. Output: $defaultUnknownCallText"
+    $defaultUnknownMethod.Count -ne 1 -or $defaultUnknownMethod[0].Severity -ne "warning" -or
+    $defaultUnknownNativeMethod.Count -ne 1 -or $defaultUnknownNativeMethod[0].Severity -ne "warning") {
+    throw "Unknown external calls and unresolved typed/native methods must remain warnings by default. Exit code: $defaultUnknownCallExitCode. Output: $defaultUnknownCallText"
 }
 if ($strictUnknownCallExitCode -eq 0 -or $strictUnknownCall.Count -ne 1 -or $strictUnknownCall[0].Severity -ne "error" -or
-    $strictUnknownMethod.Count -ne 1 -or $strictUnknownMethod[0].Severity -ne "error") {
-    throw "strictUnknownCalls did not promote unknown calls and unresolved typed methods to errors. Exit code: $strictUnknownCallExitCode. Output: $strictUnknownCallText"
+    $strictUnknownMethod.Count -ne 1 -or $strictUnknownMethod[0].Severity -ne "error" -or
+    $strictUnknownNativeMethod.Count -ne 1 -or $strictUnknownNativeMethod[0].Severity -ne "error") {
+    throw "strictUnknownCalls did not promote unknown calls and unresolved typed/native methods to errors. Exit code: $strictUnknownCallExitCode. Output: $strictUnknownCallText"
 }
 
 Write-Host "[3/25] Verifying build rejects semantic errors..."
