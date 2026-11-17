@@ -20,6 +20,45 @@ if ($LASTEXITCODE -ne 0) {
     throw "Compiler build failed with exit code $LASTEXITCODE"
 }
 
+Write-Host "[1d] Verifying namespace-qualified function resolution and ambiguous imports..."
+$qualifiedProject = Join-Path $PSScriptRoot "fixtures/NamespaceQualifiedFunctions"
+$qualifiedBuildOutput = dotnet run --configuration Release --no-build --project $project -- map --project $qualifiedProject
+if ($LASTEXITCODE -ne 0) {
+    throw "Namespace-qualified function project failed to build: $($qualifiedBuildOutput -join [Environment]::NewLine)"
+}
+$qualifiedLuaPath = Join-Path $qualifiedProject "bin/NamespaceQualifiedFunctions.lua"
+if (-not (Test-Path $qualifiedLuaPath)) {
+    throw "Expected namespace-qualified Lua output was not created: $qualifiedLuaPath"
+}
+$qualifiedLua = Get-Content -LiteralPath $qualifiedLuaPath -Raw
+if (-not $qualifiedLua.Contains("return Add(2, 3)")) {
+    throw "Namespace-qualified calls must resolve to the imported Lua function without changing its ABI. Generated Lua: $qualifiedLua"
+}
+
+$ambiguousSource = Join-Path $PSScriptRoot "fixtures/NamespaceAmbiguityProject/src/AmbiguousRoot.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $ambiguousOutput = dotnet run --configuration Release --no-build --project $project -- check $ambiguousSource 2>&1
+    $ambiguousExitCode = $LASTEXITCODE
+    $ambiguousText = $ambiguousOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $ambiguousDiagnostics = @(ConvertFrom-Json -InputObject $ambiguousText)
+}
+catch {
+    throw "Could not parse namespace ambiguity diagnostics as JSON. Exit code: $ambiguousExitCode. Output: $ambiguousText"
+}
+$ambiguousErrors = @($ambiguousDiagnostics | Where-Object {
+    $_.Severity -eq "error" -and $_.Message -like "*неоднозначный вызов Shared*"
+})
+if ($ambiguousExitCode -eq 0 -or $ambiguousErrors.Count -ne 1) {
+    throw "Unqualified calls matching multiple imported namespaces must report one ambiguity error. Exit code: $ambiguousExitCode. Output: $ambiguousText"
+}
+
 Write-Host "[1a] Verifying hexadecimal literals and bitwise operators..."
 $bitwiseFixture = Join-Path $PSScriptRoot "fixtures/BitwiseSmoke.w3js"
 $bitwiseBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $bitwiseFixture --target lua
@@ -1447,45 +1486,6 @@ if ($globalCollisionExitCode -eq 0 -or
     -not $globalCollisionText.Contains("Lua identifier 'Color_ToString'") -or
     -not $globalCollisionText.Contains("Lua global symbol collision validation failed")) {
     throw "Map build must reject cross-namespace collisions in generated Lua globals, including enum helpers. Exit code: $globalCollisionExitCode. Output: $globalCollisionText"
-}
-
-Write-Host "[31/31] Verifying namespace-qualified function resolution and ambiguous imports..."
-$qualifiedProject = Join-Path $PSScriptRoot "fixtures/NamespaceQualifiedFunctions"
-$qualifiedBuildOutput = dotnet run --configuration Release --no-build --project $project -- map --project $qualifiedProject
-if ($LASTEXITCODE -ne 0) {
-    throw "Namespace-qualified function project failed to build: $($qualifiedBuildOutput -join [Environment]::NewLine)"
-}
-$qualifiedLuaPath = Join-Path $qualifiedProject "bin/NamespaceQualifiedFunctions.lua"
-if (-not (Test-Path $qualifiedLuaPath)) {
-    throw "Expected namespace-qualified Lua output was not created: $qualifiedLuaPath"
-}
-$qualifiedLua = Get-Content -LiteralPath $qualifiedLuaPath -Raw
-if (-not $qualifiedLua.Contains("return Add(2, 3)")) {
-    throw "Namespace-qualified calls must resolve to the imported Lua function without changing its ABI. Generated Lua: $qualifiedLua"
-}
-
-$ambiguousSource = Join-Path $PSScriptRoot "fixtures/NamespaceAmbiguityProject/src/AmbiguousRoot.w3js"
-$previousErrorActionPreference = $ErrorActionPreference
-try {
-    $ErrorActionPreference = "Continue"
-    $ambiguousOutput = dotnet run --configuration Release --no-build --project $project -- check $ambiguousSource 2>&1
-    $ambiguousExitCode = $LASTEXITCODE
-    $ambiguousText = $ambiguousOutput -join "`n"
-}
-finally {
-    $ErrorActionPreference = $previousErrorActionPreference
-}
-try {
-    $ambiguousDiagnostics = @(ConvertFrom-Json -InputObject $ambiguousText)
-}
-catch {
-    throw "Could not parse namespace ambiguity diagnostics as JSON. Exit code: $ambiguousExitCode. Output: $ambiguousText"
-}
-$ambiguousErrors = @($ambiguousDiagnostics | Where-Object {
-    $_.Severity -eq "error" -and $_.Message -like "*неоднозначный вызов Shared*"
-})
-if ($ambiguousExitCode -eq 0 -or $ambiguousErrors.Count -ne 1) {
-    throw "Unqualified calls matching multiple imported namespaces must report one ambiguity error. Exit code: $ambiguousExitCode. Output: $ambiguousText"
 }
 
 $global:LASTEXITCODE = 0
