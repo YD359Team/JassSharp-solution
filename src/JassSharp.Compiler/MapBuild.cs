@@ -1889,6 +1889,12 @@ static class MapBuild
             if (owner.Namespace == namespaceName)
                 return;
 
+            // Classes receive deterministic namespace-qualified Lua aliases in Codegen.
+            // Their legacy short identifiers may therefore coexist without making
+            // references between the classes ambiguous at runtime.
+            if (owner.Kind == "class" && kind == "class")
+                return;
+
             collisions.Add(
                 $"Lua identifier '{symbolName}' is declared by namespace '{owner.Namespace}' ({owner.Kind}) " +
                 $"and namespace '{namespaceName}' ({kind}); this creates a name collision in the generated script.");
