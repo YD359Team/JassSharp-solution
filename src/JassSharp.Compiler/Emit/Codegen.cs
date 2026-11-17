@@ -21,6 +21,7 @@ public sealed class Codegen
     private readonly Dictionary<string, EnumDecl> _qualifiedEnums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _qualifiedGlobals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _qualifiedClasses = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _qualifiedClassNamespaces = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<FnDecl>> _operatorMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EnumDecl> _enums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
@@ -53,6 +54,7 @@ public sealed class Codegen
                 foreach (var cls in imported.Classes)
                 {
                     _qualifiedClasses[imported.Name + "." + cls.Name] = cls.Name;
+                    _qualifiedClassNamespaces[imported.Name + "." + cls.Name] = imported.Name;
                     _classFields[cls.Name] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
                     _classBaseCandidates[cls.Name] = cls.BaseTypes ?? [];
                     foreach (var method in cls.Methods)
@@ -89,6 +91,7 @@ public sealed class Codegen
         foreach (var cls in unit.Classes)
         {
             _qualifiedClasses[unit.Name + "." + cls.Name] = cls.Name;
+            _qualifiedClassNamespaces[unit.Name + "." + cls.Name] = unit.Name;
             _classFields[cls.Name] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
             _classBaseCandidates[cls.Name] = cls.BaseTypes ?? [];
             foreach (var m in cls.Methods)
@@ -104,8 +107,7 @@ public sealed class Codegen
             var baseClass = candidate.Value
                 .Select(typeName =>
                 {
-                    int separator = typeName.LastIndexOf('.');
-                    string namespaceName = separator > 0 ? typeName[..separator] : _namespaceName ?? string.Empty;
+                    string namespaceName = ResolveQualifiedClassNamespace(typeName);
                     string identity = ResolveQualifiedClassIdentity(typeName);
                     return (Identity: identity, LuaName: ResolveQualifiedClassName(typeName),
                         StableLuaName: GetQualifiedClassSymbol(namespaceName, identity));
@@ -1321,9 +1323,32 @@ end
         return _qualifiedClasses.TryGetValue(normalized, out var className) ? className : typeName;
     }
 
+    private string ResolveQualifiedClassNamespace(string typeName)
+    {
+        int separator = typeName.LastIndexOf('.');
+        if (separator > 0)
+            return typeName[..separator].Replace('.', '_');
+
+        string currentNamespace = _namespaceName ?? string.Empty;
+        string currentKey = NormalizeQualifiedTypeName(currentNamespace + "." + typeName);
+        if (_qualifiedClassNamespaces.TryGetValue(currentKey, out var currentMatch))
+            return currentMatch;
+
+        return _qualifiedClassNamespaces
+            .Where(candidate => candidate.Key.EndsWith("." + typeName, StringComparison.Ordinal))
+            .Select(candidate => candidate.Value)
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(candidate => candidate, StringComparer.Ordinal)
+            .FirstOrDefault() ?? currentNamespace;
+    }
+
     private static string GetQualifiedClassSymbol(string namespaceName, string className)
     {
-        string[] segments = namespaceName.Split('.').Append(className).ToArray();
+        // Namespace names are normalized to underscore-separated identifiers by the parser.
+        string normalizedNamespace = namespaceName.Replace('.', '_');
+        string[] segments = string.IsNullOrEmpty(normalizedNamespace)
+            ? [className]
+            : [normalizedNamespace, className];
         return "__jasssharp_type_" + string.Join("_", segments.Select(segment =>
             segment.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + "_" + segment));
     }
