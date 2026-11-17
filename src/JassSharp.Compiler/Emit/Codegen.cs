@@ -25,6 +25,7 @@ public sealed class Codegen
     private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<string>> _classBaseCandidates = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _classBases = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _classBaseIdentities = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, FnDecl>> _interfaceMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<string>> _interfaceBases = new(StringComparer.Ordinal);
 
@@ -98,13 +99,14 @@ public sealed class Codegen
         }
         foreach (var candidate in _classBaseCandidates)
         {
-            string? baseClass = candidate.Value
+            var baseClass = candidate.Value
                 .Select(typeName => (Identity: ResolveQualifiedClassIdentity(typeName), LuaName: ResolveQualifiedClassName(typeName)))
-                .Where(candidateType => candidateType.Identity is not null && _classFields.ContainsKey(candidateType.Identity))
-                .Select(candidateType => candidateType.LuaName)
-                .FirstOrDefault();
-            if (baseClass is not null)
-                _classBases[candidate.Key] = baseClass;
+                .FirstOrDefault(candidateType => _classFields.ContainsKey(candidateType.Identity));
+            if (baseClass.Identity is not null)
+            {
+                _classBaseIdentities[candidate.Key] = baseClass.Identity;
+                _classBases[candidate.Key] = baseClass.LuaName;
+            }
         }
 
         foreach (var en in unit.Enums)
@@ -996,7 +998,7 @@ end
         {
             if (_methods.TryGetValue(current + "." + methodName, out var method))
                 return method;
-            current = _classBases.GetValueOrDefault(current);
+            current = _classBaseIdentities.GetValueOrDefault(current);
         }
         return null;
     }
