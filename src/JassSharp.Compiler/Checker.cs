@@ -1132,8 +1132,8 @@ public static class Checker
                     {
                         if (TryResolveQualifiedEnumMember(qualifiedMember, out var enumName))
                             return enumName;
-                        if (TryResolveQualifiedGlobal(qualifiedMember, out var globalType))
-                            return globalType;
+                        if (TryResolveQualifiedGlobal(qualifiedMember, out var qualifiedGlobalType))
+                            return qualifiedGlobalType;
                     }
                     var receiverType = InferType(member.Object);
                     if (receiverType is null)
