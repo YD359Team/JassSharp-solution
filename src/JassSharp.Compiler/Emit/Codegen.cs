@@ -13,6 +13,7 @@ public sealed class Codegen
     private readonly Stack<(string ContinueLabel, string? BreakFlag)> _loopTargets = new();
     private Dictionary<string, string> _locals = new(StringComparer.Ordinal);
     private string? _className;
+    private string? _classIdentity;
     private string? _classLuaSymbol;
     private bool _currentMethodIsStatic;
     private readonly Dictionary<string, FnDecl> _inlineMethods = new(StringComparer.Ordinal);
@@ -22,6 +23,11 @@ public sealed class Codegen
     private readonly Dictionary<string, string> _qualifiedGlobals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _qualifiedClasses = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _qualifiedClassNamespaces = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _qualifiedInterfaces = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _interfaceNamespaces = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _classNamespaces = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string[]> _namespaceUsings = new(StringComparer.Ordinal);
+    private readonly Dictionary<FnDecl, string> _methodNamespaces = new(ReferenceEqualityComparer.Instance);
     private readonly Dictionary<string, List<FnDecl>> _operatorMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EnumDecl> _enums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
@@ -45,24 +51,32 @@ public sealed class Codegen
         {
             foreach (var imported in imports)
             {
+                _namespaceUsings[imported.Name] = imported.Usings.ToArray();
                 foreach (var contract in imported.Interfaces ?? [])
                 {
-                    _interfaceMethods[contract.Name] = contract.Methods.ToDictionary(method => method.Name, StringComparer.Ordinal);
-                    _interfaceBases[contract.Name] = contract.BaseInterfaces;
+                    string identity = GetTypeIdentity(imported.Name, contract.Name);
+                    _qualifiedInterfaces[NormalizeQualifiedTypeName(identity)] = identity;
+                    _interfaceNamespaces[identity] = imported.Name;
+                    _interfaceMethods[identity] = contract.Methods.ToDictionary(method => method.Name, StringComparer.Ordinal);
+                    _interfaceBases[identity] = contract.BaseInterfaces;
+                    foreach (var method in contract.Methods) _methodNamespaces[method] = imported.Name;
                 }
 
                 foreach (var cls in imported.Classes)
                 {
-                    _qualifiedClasses[imported.Name + "." + cls.Name] = cls.Name;
-                    _qualifiedClassNamespaces[imported.Name + "." + cls.Name] = imported.Name;
-                    _classFields[cls.Name] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
-                    _classBaseCandidates[cls.Name] = cls.BaseTypes ?? [];
+                    string identity = GetTypeIdentity(imported.Name, cls.Name);
+                    _qualifiedClasses[NormalizeQualifiedTypeName(identity)] = identity;
+                    _qualifiedClassNamespaces[NormalizeQualifiedTypeName(identity)] = imported.Name;
+                    _classNamespaces[identity] = imported.Name;
+                    _classFields[identity] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
+                    _classBaseCandidates[identity] = cls.BaseTypes ?? [];
                     foreach (var method in cls.Methods)
                     {
                         if (method.Operator is { } op)
-                            RegisterOperator(cls.Name, op, method);
+                            RegisterOperator(identity, op, method);
                         else
-                            _methods[cls.Name + "." + method.Name] = method;
+                            _methods[identity + "." + method.Name] = method;
+                        _methodNamespaces[method] = imported.Name;
                     }
                 }
                 foreach (var en in imported.Enums)
@@ -82,24 +96,32 @@ public sealed class Codegen
             }
         }
 
+        _namespaceUsings[unit.Name] = unit.Usings.ToArray();
         foreach (var contract in unit.Interfaces ?? [])
         {
-            _interfaceMethods[contract.Name] = contract.Methods.ToDictionary(method => method.Name, StringComparer.Ordinal);
-            _interfaceBases[contract.Name] = contract.BaseInterfaces;
+            string identity = GetTypeIdentity(unit.Name, contract.Name);
+            _qualifiedInterfaces[NormalizeQualifiedTypeName(identity)] = identity;
+            _interfaceNamespaces[identity] = unit.Name;
+            _interfaceMethods[identity] = contract.Methods.ToDictionary(method => method.Name, StringComparer.Ordinal);
+            _interfaceBases[identity] = contract.BaseInterfaces;
+            foreach (var method in contract.Methods) _methodNamespaces[method] = unit.Name;
         }
 
         foreach (var cls in unit.Classes)
         {
-            _qualifiedClasses[unit.Name + "." + cls.Name] = cls.Name;
-            _qualifiedClassNamespaces[unit.Name + "." + cls.Name] = unit.Name;
-            _classFields[cls.Name] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
-            _classBaseCandidates[cls.Name] = cls.BaseTypes ?? [];
+            string identity = GetTypeIdentity(unit.Name, cls.Name);
+            _qualifiedClasses[NormalizeQualifiedTypeName(identity)] = identity;
+            _qualifiedClassNamespaces[NormalizeQualifiedTypeName(identity)] = unit.Name;
+            _classNamespaces[identity] = unit.Name;
+            _classFields[identity] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
+            _classBaseCandidates[identity] = cls.BaseTypes ?? [];
             foreach (var m in cls.Methods)
             {
                 if (m.Operator is { } op)
-                    RegisterOperator(cls.Name, op, m);
+                    RegisterOperator(identity, op, m);
                 else
-                    _methods[cls.Name + "." + m.Name] = m;
+                    _methods[identity + "." + m.Name] = m;
+                _methodNamespaces[m] = unit.Name;
             }
         }
         foreach (var candidate in _classBaseCandidates)
@@ -107,10 +129,10 @@ public sealed class Codegen
             var baseClass = candidate.Value
                 .Select(typeName =>
                 {
-                    string namespaceName = ResolveQualifiedClassNamespace(typeName);
-                    string identity = ResolveQualifiedClassIdentity(typeName);
-                    return (Identity: identity, LuaName: ResolveQualifiedClassName(typeName),
-                        StableLuaName: GetQualifiedClassSymbol(namespaceName, identity));
+                    string ownerNamespace = _classNamespaces.GetValueOrDefault(candidate.Key, _namespaceName ?? string.Empty);
+                    string identity = ResolveQualifiedClassIdentity(typeName, ownerNamespace);
+                    return (Identity: identity, LuaName: ResolveQualifiedClassLuaName(identity),
+                        StableLuaName: GetQualifiedClassSymbol(_classNamespaces.GetValueOrDefault(identity, ownerNamespace), GetShortTypeName(identity)));
                 })
                 .FirstOrDefault(candidateType => _classFields.ContainsKey(candidateType.Identity));
             if (baseClass.Identity is not null)
@@ -334,16 +356,17 @@ end
 
     private IEnumerable<ClassDecl> GetClassEmissionOrder(IEnumerable<ClassDecl> classes)
     {
-        var byName = classes.ToDictionary(cls => cls.Name, StringComparer.Ordinal);
+        var byName = classes.ToDictionary(cls => GetTypeIdentity(_namespaceName ?? string.Empty, cls.Name), StringComparer.Ordinal);
         var visited = new HashSet<string>(StringComparer.Ordinal);
         var ordered = new List<ClassDecl>();
 
         void Visit(ClassDecl cls)
         {
-            if (!visited.Add(cls.Name))
+            string identity = GetTypeIdentity(_namespaceName ?? string.Empty, cls.Name);
+            if (!visited.Add(identity))
                 return;
-            if (_classBases.TryGetValue(cls.Name, out var baseName) &&
-                byName.TryGetValue(baseName, out var baseClass))
+            if (_classBaseIdentities.TryGetValue(identity, out var baseIdentity) &&
+                byName.TryGetValue(baseIdentity, out var baseClass)
                 Visit(baseClass);
             ordered.Add(cls);
         }
@@ -356,11 +379,12 @@ end
     private void EmitClassLua(ClassDecl cls)
     {
         _className = cls.Name;
+        _classIdentity = GetTypeIdentity(_namespaceName ?? string.Empty, cls.Name);
         _classLuaSymbol = GetQualifiedClassSymbol(_namespaceName ?? string.Empty, cls.Name);
         Line($"{cls.Name} = {{}}");
         Line($"{GetQualifiedClassSymbol(_namespaceName ?? string.Empty, cls.Name)} = {cls.Name}");
         Line($"{cls.Name}.__index = {cls.Name}");
-        if (_classBases.TryGetValue(cls.Name, out var baseClassName))
+        if (_classBaseStableSymbols.TryGetValue(_classIdentity, out var baseClassName))
             Line($"setmetatable({cls.Name}, {{ __index = {baseClassName} }})");
 
         var constructor = cls.Ctor;
@@ -369,11 +393,8 @@ end
         _locals = constructorParameters.ToDictionary(parameter => parameter.Name, parameter => ResolveQualifiedClassName(parameter.Type), StringComparer.Ordinal);
         Line($"function {cls.Name}.__init(self{(constructorParameters.Count == 0 ? "" : ", " + string.Join(", ", constructorParameters.Select(parameter => parameter.Name)))})");
         _indent++;
-        if (_classBases.TryGetValue(cls.Name, out baseClassName))
-        {
-            string stableBaseSymbol = _classBaseStableSymbols.GetValueOrDefault(cls.Name, baseClassName);
-            Line($"{stableBaseSymbol}.__init(self)");
-        }
+        if (_classBaseStableSymbols.TryGetValue(_classIdentity, out baseClassName))
+            Line($"{baseClassName}.__init(self)");
         foreach (var field in cls.Fields.Where(field => field.IsArray))
             Line($"self.{field.Name} = {{}}");
         if (constructor is not null)
@@ -414,6 +435,7 @@ end
         Line("");
         _currentMethodIsStatic = false;
         _className = null;
+        _classIdentity = null;
         _classLuaSymbol = null;
     }
 
