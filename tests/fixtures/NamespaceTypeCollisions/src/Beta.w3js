@@ -1,10 +1,20 @@
 namespace Beta
 {
-    class Player
+    class BaseEntity
+    {
+        public int BaseValue;
+
+        BaseEntity()
+        {
+            BaseValue = 200;
+        }
+    }
+
+    class Player : BaseEntity
     {
         int GetId()
         {
-            return 2;
+            return BaseValue + 2;
         }
     }
 }
