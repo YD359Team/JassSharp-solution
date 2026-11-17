@@ -1260,10 +1260,12 @@ public static class Checker
 
                     int score = 0;
                     bool compatible = true;
+                    int ownerSeparator = owner.LastIndexOf('.');
+                    string ownerNamespace = ownerSeparator > 0 ? owner[..ownerSeparator] : _unit.Name;
                     for (int i = 0; i < arguments.Count; i++)
                     {
                         var actual = InferType(arguments[i]);
-                        var expected = overload.Params[i].Type;
+                        var expected = ResolveQualifiedUserType(overload.Params[i].Type, ownerNamespace);
                         if (actual is null || actual == "null" || actual == expected)
                             continue;
                         if (actual == "int" && expected == "float")
