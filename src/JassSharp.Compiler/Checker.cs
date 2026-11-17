@@ -1214,7 +1214,7 @@ public static class Checker
                 {
                     var overload = FindOperator(InferType(unary.Inner), null, unary.Op, [unary.Inner]);
                     if (overload is not null)
-                        return overload.ReturnType;
+                        return ResolveQualifiedUserType(overload.ReturnType, _declarationNamespaces.GetValueOrDefault(overload, _unit.Name));
                     return unary.Op switch
                     {
                         "!" or "not" => "bool",
