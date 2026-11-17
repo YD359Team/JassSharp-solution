@@ -1886,13 +1886,10 @@ static class MapBuild
                 return;
             }
 
-            if (owner.Namespace == namespaceName)
-                return;
-
             // Classes receive deterministic namespace-qualified Lua aliases in Codegen.
-            // Their legacy short identifiers may therefore coexist without making
-            // references between the classes ambiguous at runtime.
-            if (owner.Kind == "class" && kind == "class")
+            // Their legacy short identifiers may therefore coexist across namespaces.
+            if (owner.Namespace != namespaceName &&
+                owner.Kind == "class" && kind == "class")
                 return;
 
             collisions.Add(
