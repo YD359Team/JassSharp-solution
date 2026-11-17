@@ -1,5 +1,10 @@
 namespace Alpha
 {
+    interface IIdentity
+    {
+        int GetId();
+    }
+
     class BaseEntity
     {
         public int BaseValue;
@@ -10,7 +15,7 @@ namespace Alpha
         }
     }
 
-    class Player : BaseEntity
+    class Player : BaseEntity, IIdentity
     {
         static int GetStaticId()
         {
