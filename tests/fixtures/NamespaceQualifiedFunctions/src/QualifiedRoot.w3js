@@ -11,4 +11,10 @@ namespace QualifiedRoot
     {
         return MathTools.Colors.Red == MathTools.Colors.Blue;
     }
+
+    int VerifyGlobals()
+    {
+        MathTools.Offset = 7;
+        return MathTools.BaseValue + MathTools.Offset;
+    }
 }

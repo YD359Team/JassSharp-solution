@@ -34,6 +34,7 @@ public static class Checker
         private readonly Dictionary<string, FnDecl> _functions = new(StringComparer.Ordinal);
         private readonly List<(string Namespace, FnDecl Function, bool IsCurrent)> _functionSymbols = [];
         private readonly List<(string Namespace, EnumDecl Enumeration, bool IsCurrent)> _enumSymbols = [];
+        private readonly List<(string Namespace, string Name, string Type, bool IsCurrent)> _globalSymbols = [];
         private readonly HashSet<string> _inlineFunctions = new(StringComparer.Ordinal);
         private readonly List<FnDecl> _hooks = [];
         private NativeSig? _hookOriginalSignature;
@@ -127,9 +128,15 @@ public static class Checker
             }
 
             foreach (var field in unit.Fields)
+            {
                 _globals[field.Name] = field.Type;
+                _globalSymbols.Add((unit.Name, field.Name, field.Type, ReferenceEquals(unit, _unit)));
+            }
             foreach (var constant in unit.Consts)
+            {
                 _globals[constant.Name] = constant.Type;
+                _globalSymbols.Add((unit.Name, constant.Name, constant.Type, ReferenceEquals(unit, _unit)));
+            }
             foreach (var enumeration in unit.Enums)
             {
                 foreach (var member in enumeration.Members)
@@ -298,6 +305,25 @@ public static class Checker
             }
 
             return matches.Count > 0;
+        }
+
+        private bool TryResolveQualifiedGlobal(string name, out string type)
+        {
+            type = string.Empty;
+            int separator = name.LastIndexOf('.');
+            if (separator <= 0)
+                return false;
+
+            string namespaceName = name[..separator].Replace('.', '_');
+            string symbolName = name[(separator + 1)..];
+            var matches = _globalSymbols
+                .Where(symbol => symbol.Namespace == namespaceName && symbol.Name == symbolName)
+                .ToList();
+            if (matches.Count != 1)
+                return false;
+
+            type = matches[0].Type;
+            return true;
         }
 
         private bool TryResolveQualifiedEnumMember(string name, out string enumName)
@@ -725,8 +751,9 @@ public static class Checker
                     break;
 
                 case MemberExpr member:
-                    if (TryGetQualifiedName(member, out var qualifiedEnumMember) &&
-                        TryResolveQualifiedEnumMember(qualifiedEnumMember, out _))
+                    if (TryGetQualifiedName(member, out var qualifiedMember) &&
+                        (TryResolveQualifiedEnumMember(qualifiedMember, out _) ||
+                         TryResolveQualifiedGlobal(qualifiedMember, out _)))
                         break;
                     CheckExpression(member.Object);
                     if (InferType(member.Object) is { } receiverType &&
@@ -1097,9 +1124,13 @@ public static class Checker
 
                 case MemberExpr member:
                 {
-                    if (TryGetQualifiedName(member, out var qualifiedEnumMember) &&
-                        TryResolveQualifiedEnumMember(qualifiedEnumMember, out var enumName))
-                        return enumName;
+                    if (TryGetQualifiedName(member, out var qualifiedMember))
+                    {
+                        if (TryResolveQualifiedEnumMember(qualifiedMember, out var enumName))
+                            return enumName;
+                        if (TryResolveQualifiedGlobal(qualifiedMember, out var globalType))
+                            return globalType;
+                    }
                     var receiverType = InferType(member.Object);
                     if (receiverType is null)
                         return null;

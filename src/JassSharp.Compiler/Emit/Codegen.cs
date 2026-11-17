@@ -18,6 +18,7 @@ public sealed class Codegen
     private readonly Dictionary<string, FnDecl> _methods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _qualifiedFunctions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EnumDecl> _qualifiedEnums = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _qualifiedGlobals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<FnDecl>> _operatorMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EnumDecl> _enums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
@@ -62,6 +63,10 @@ public sealed class Codegen
                     _enums[en.Name] = en;
                     _qualifiedEnums[imported.Name + "." + en.Name] = en;
                 }
+                foreach (var field in imported.Fields)
+                    _qualifiedGlobals[imported.Name + "." + field.Name] = field.Name;
+                foreach (var constant in imported.Consts)
+                    _qualifiedGlobals[imported.Name + "." + constant.Name] = constant.Name;
                 foreach (var fn in imported.Functions.Where(function => !function.IsHook))
                 {
                     _methods[fn.Name] = fn;
@@ -100,6 +105,10 @@ public sealed class Codegen
             _enums[en.Name] = en;
             _qualifiedEnums[unit.Name + "." + en.Name] = en;
         }
+        foreach (var field in unit.Fields)
+            _qualifiedGlobals[unit.Name + "." + field.Name] = field.Name;
+        foreach (var constant in unit.Consts)
+            _qualifiedGlobals[unit.Name + "." + constant.Name] = constant.Name;
         foreach (var fn in unit.Functions.Where(function => !function.IsHook))
         {
             _methods[fn.Name] = fn;
@@ -1258,6 +1267,10 @@ end
 
     private string EmitMember(MemberExpr m)
     {
+        if (TryGetQualifiedName(m, out var qualifiedGlobal) &&
+            _qualifiedGlobals.TryGetValue(qualifiedGlobal, out var resolvedGlobal))
+            return resolvedGlobal;
+
         if (TryGetQualifiedName(m, out var qualifiedEnumMember))
         {
             int memberSeparator = qualifiedEnumMember.LastIndexOf('.');

@@ -4,6 +4,9 @@ namespace MathTools
     {
         return left + right;
     }
+    const int BaseValue = 5;
+    int Offset;
+
     enum Colors
     {
         Red = 1,

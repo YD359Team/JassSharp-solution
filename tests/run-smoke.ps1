@@ -37,6 +37,9 @@ if (-not $qualifiedLua.Contains("return Add(2, 3)")) {
 if (-not $qualifiedLua.Contains("(Colors_Red == Colors_Blue)")) {
     throw "Namespace-qualified enum members must resolve to the imported enum without changing its Lua ABI. Generated Lua: $qualifiedLua"
 }
+if (-not $qualifiedLua.Contains("return (BaseValue + Offset)")) {
+    throw "Namespace-qualified globals and constants must resolve to their existing Lua names. Generated Lua: $qualifiedLua"
+}
 
 $ambiguousSource = Join-Path $PSScriptRoot "fixtures/NamespaceAmbiguityProject/src/AmbiguousRoot.w3js"
 $previousErrorActionPreference = $ErrorActionPreference
