@@ -1,0 +1,12 @@
+namespace InterfaceTypeMismatchRoot
+{
+    using Alpha;
+    using Beta;
+
+    void Verify()
+    {
+        Alpha.IIdentity first = new Alpha.Player();
+        Beta.IIdentity second = new Beta.Player();
+        first = second;
+    }
+}
