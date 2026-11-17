@@ -6,4 +6,9 @@ namespace QualifiedRoot
     {
         return MathTools.Add(2, 3);
     }
+
+    bool VerifyEnum()
+    {
+        return MathTools.Colors.Red == MathTools.Colors.Blue;
+    }
 }

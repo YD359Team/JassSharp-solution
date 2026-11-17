@@ -4,4 +4,9 @@ namespace MathTools
     {
         return left + right;
     }
+    enum Colors
+    {
+        Red = 1,
+        Blue = 2
+    }
 }

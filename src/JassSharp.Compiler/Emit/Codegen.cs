@@ -17,6 +17,7 @@ public sealed class Codegen
     private readonly Dictionary<string, FnDecl> _inlineMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FnDecl> _methods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _qualifiedFunctions = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, EnumDecl> _qualifiedEnums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<FnDecl>> _operatorMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EnumDecl> _enums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
@@ -57,7 +58,10 @@ public sealed class Codegen
                     }
                 }
                 foreach (var en in imported.Enums)
+                {
                     _enums[en.Name] = en;
+                    _qualifiedEnums[imported.Name + "." + en.Name] = en;
+                }
                 foreach (var fn in imported.Functions.Where(function => !function.IsHook))
                 {
                     _methods[fn.Name] = fn;
@@ -92,7 +96,10 @@ public sealed class Codegen
         }
 
         foreach (var en in unit.Enums)
+        {
             _enums[en.Name] = en;
+            _qualifiedEnums[unit.Name + "." + en.Name] = en;
+        }
         foreach (var fn in unit.Functions.Where(function => !function.IsHook))
         {
             _methods[fn.Name] = fn;
@@ -1251,6 +1258,20 @@ end
 
     private string EmitMember(MemberExpr m)
     {
+        if (TryGetQualifiedName(m, out var qualifiedEnumMember))
+        {
+            int memberSeparator = qualifiedEnumMember.LastIndexOf('.');
+            int enumSeparator = qualifiedEnumMember.LastIndexOf('.', memberSeparator - 1);
+            if (memberSeparator > 0 && enumSeparator > 0)
+            {
+                string namespaceName = qualifiedEnumMember[..enumSeparator].Replace('.', '_');
+                string enumName = qualifiedEnumMember[(enumSeparator + 1)..memberSeparator];
+                string memberName = qualifiedEnumMember[(memberSeparator + 1)..];
+                if (_qualifiedEnums.TryGetValue(namespaceName + "." + enumName, out var qualifiedEnum) &&
+                    qualifiedEnum.Members.Any(member => member.Name == memberName))
+                    return $"{qualifiedEnum.Name}_{memberName}";
+            }
+        }
         var receiverType = RecvType(m.Object);
         var receiver = EmitExpr(m.Object);
         if (m.Name == "HandleId" && receiverType is not null &&

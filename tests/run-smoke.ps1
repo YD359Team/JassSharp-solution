@@ -20,7 +20,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Compiler build failed with exit code $LASTEXITCODE"
 }
 
-Write-Host "[1d] Verifying namespace-qualified function resolution and ambiguous imports..."
+Write-Host "[1d] Verifying namespace-qualified functions, enums and ambiguous imports..."
 $qualifiedProject = Join-Path $PSScriptRoot "fixtures/NamespaceQualifiedFunctions"
 $qualifiedBuildOutput = dotnet run --configuration Release --no-build --project $project -- map --project $qualifiedProject
 if ($LASTEXITCODE -ne 0) {
@@ -33,6 +33,9 @@ if (-not (Test-Path $qualifiedLuaPath)) {
 $qualifiedLua = Get-Content -LiteralPath $qualifiedLuaPath -Raw
 if (-not $qualifiedLua.Contains("return Add(2, 3)")) {
     throw "Namespace-qualified calls must resolve to the imported Lua function without changing its ABI. Generated Lua: $qualifiedLua"
+}
+if (-not $qualifiedLua.Contains("(Colors_Red == Colors_Blue)")) {
+    throw "Namespace-qualified enum members must resolve to the imported enum without changing its Lua ABI. Generated Lua: $qualifiedLua"
 }
 
 $ambiguousSource = Join-Path $PSScriptRoot "fixtures/NamespaceAmbiguityProject/src/AmbiguousRoot.w3js"

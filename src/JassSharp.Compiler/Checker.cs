@@ -33,6 +33,7 @@ public static class Checker
         private readonly Dictionary<string, List<string>> _classInterfaces = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FnDecl> _functions = new(StringComparer.Ordinal);
         private readonly List<(string Namespace, FnDecl Function, bool IsCurrent)> _functionSymbols = [];
+        private readonly List<(string Namespace, EnumDecl Enumeration, bool IsCurrent)> _enumSymbols = [];
         private readonly HashSet<string> _inlineFunctions = new(StringComparer.Ordinal);
         private readonly List<FnDecl> _hooks = [];
         private NativeSig? _hookOriginalSignature;
@@ -105,6 +106,9 @@ public static class Checker
                     }
                 }
             }
+
+            foreach (var enumeration in unit.Enums)
+                _enumSymbols.Add((unit.Name, enumeration, ReferenceEquals(unit, _unit)));
 
             foreach (var fn in unit.Functions)
             {
@@ -294,6 +298,30 @@ public static class Checker
             }
 
             return matches.Count > 0;
+        }
+
+        private bool TryResolveQualifiedEnumMember(string name, out string enumName)
+        {
+            enumName = string.Empty;
+            int memberSeparator = name.LastIndexOf('.');
+            if (memberSeparator <= 0)
+                return false;
+            int enumSeparator = name.LastIndexOf('.', memberSeparator - 1);
+            if (enumSeparator <= 0)
+                return false;
+
+            string namespaceName = name[..enumSeparator].Replace('.', '_');
+            string declaredEnumName = name[(enumSeparator + 1)..memberSeparator];
+            string memberName = name[(memberSeparator + 1)..];
+            var matches = _enumSymbols
+                .Where(symbol => symbol.Namespace == namespaceName &&
+                                 symbol.Enumeration.Name == declaredEnumName &&
+                                 symbol.Enumeration.Members.Any(member => member.Name == memberName))
+                .ToList();
+            if (matches.Count != 1)
+                return false;
+            enumName = matches[0].Enumeration.Name;
+            return true;
         }
 
         private void CheckHooks()
@@ -697,6 +725,9 @@ public static class Checker
                     break;
 
                 case MemberExpr member:
+                    if (TryGetQualifiedName(member, out var qualifiedEnumMember) &&
+                        TryResolveQualifiedEnumMember(qualifiedEnumMember, out _))
+                        break;
                     CheckExpression(member.Object);
                     if (InferType(member.Object) is { } receiverType &&
                         !HasMember(receiverType, member.Name))
@@ -1066,6 +1097,9 @@ public static class Checker
 
                 case MemberExpr member:
                 {
+                    if (TryGetQualifiedName(member, out var qualifiedEnumMember) &&
+                        TryResolveQualifiedEnumMember(qualifiedEnumMember, out var enumName))
+                        return enumName;
                     var receiverType = InferType(member.Object);
                     if (receiverType is null)
                         return null;
