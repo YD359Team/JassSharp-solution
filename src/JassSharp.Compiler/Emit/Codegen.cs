@@ -366,7 +366,7 @@ end
             if (!visited.Add(identity))
                 return;
             if (_classBaseIdentities.TryGetValue(identity, out var baseIdentity) &&
-                byName.TryGetValue(baseIdentity, out var baseClass)
+                byName.TryGetValue(baseIdentity, out var baseClass))
                 Visit(baseClass);
             ordered.Add(cls);
         }
@@ -390,7 +390,7 @@ end
         var constructor = cls.Ctor;
         var constructorParameters = constructor?.Params ?? [];
         _currentMethodIsStatic = false;
-        _locals = constructorParameters.ToDictionary(parameter => parameter.Name, parameter => ResolveQualifiedClassName(parameter.Type), StringComparer.Ordinal);
+        _locals = constructorParameters.ToDictionary(parameter => parameter.Name, parameter => ResolveQualifiedTypeIdentity(parameter.Type, _namespaceName), StringComparer.Ordinal);
         Line($"function {cls.Name}.__init(self{(constructorParameters.Count == 0 ? "" : ", " + string.Join(", ", constructorParameters.Select(parameter => parameter.Name)))})");
         _indent++;
         if (_classBaseStableSymbols.TryGetValue(_classIdentity, out baseClassName))
@@ -413,7 +413,7 @@ end
         foreach (var m in cls.Methods)
         {
             _currentMethodIsStatic = m.IsStatic;
-            _locals = m.Params.ToDictionary(p => p.Name, p => ResolveQualifiedClassName(p.Type), StringComparer.Ordinal);
+            _locals = m.Params.ToDictionary(p => p.Name, p => ResolveQualifiedTypeIdentity(p.Type, _namespaceName), StringComparer.Ordinal);
             if (m.Operator is { } op)
             {
                 Line($"function {cls.Name}.{OperatorFunctionName(m)}({string.Join(", ", m.Params.Select(p => p.Name))})");
@@ -559,7 +559,7 @@ end
             _currentMethodIsStatic = false;
             _locals = hook.Params.ToDictionary(
                 parameter => parameter.Name,
-                parameter => ResolveQualifiedClassName(parameter.Type),
+                parameter => ResolveQualifiedTypeIdentity(parameter.Type, _namespaceName),
                 StringComparer.Ordinal);
             _locals["original"] = "function";
 
@@ -576,7 +576,7 @@ end
     {
         _locals = fn.Params.ToDictionary(
             p => p.Name,
-            p => ResolveQualifiedClassName(p.Type),
+            p => ResolveQualifiedTypeIdentity(p.Type, _namespaceName),
             StringComparer.Ordinal);
 
         string functionName = fn.Name == "OnInit"
@@ -622,7 +622,7 @@ end
                     var inferredType = v.Type == "var" && v.Init is not null
                         ? InferType(v.Init) ?? throw new InvalidOperationException($"Не удалось вывести тип переменной {v.Name}")
                         : v.Type;
-                    _locals[v.Name] = ResolveQualifiedClassName(inferredType);
+                    _locals[v.Name] = ResolveQualifiedTypeIdentity(inferredType, _namespaceName);
                     var init = v.Init is null ? null : EmitExpr(v.Init);
                     if (init is not null)
                         Line($"local {v.Name} = {init}");
@@ -986,8 +986,8 @@ end
     {
         NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
         NameExpr n when CurrentFieldType(n.Name) is { } fieldType => fieldType,
-        ThisExpr => _className,
-        NewExpr n => ResolveQualifiedClassName(n.Type),
+        ThisExpr => _classIdentity,
+        NewExpr n => ResolveQualifiedTypeIdentity(n.Type, _namespaceName),
         NumExpr n => IsFloatingLiteral(n.Text) ? "float" : "int",
         StrExpr => "string",
         InterpolatedExpr => "string",
@@ -1006,7 +1006,7 @@ end
         if (_currentMethodIsStatic || _className is null || _locals.ContainsKey(name))
             return null;
 
-        return TryGetClassField(_className, name, out var type) ? type : null;
+        return TryGetClassField(_classIdentity ?? _className, name, out var type) ? type : null;
     }
 
     private FnDecl? FindInterfaceMethod(string interfaceName, string methodName)
@@ -1068,7 +1068,7 @@ end
     {
         var overload = FindOperator(InferType(expression.Left), InferType(expression.Right), expression.Op, [expression.Left, expression.Right]);
         if (overload is { } resolved)
-            return resolved.Method.ReturnType;
+            return ResolveQualifiedTypeIdentity(resolved.Method.ReturnType, _methodNamespaces.GetValueOrDefault(resolved.Method));
 
         if (expression.Op is "==" or "!=" or "<" or ">" or "<=" or ">=" or "&&" or "||")
             return "bool";
@@ -1154,7 +1154,7 @@ end
                 for (int index = 0; index < arguments.Count; index++)
                 {
                     string? actual = InferType(arguments[index]);
-                    string expected = method.Params[index].Type;
+                    string expected = ResolveQualifiedTypeIdentity(method.Params[index].Type, _methodNamespaces.GetValueOrDefault(method));
                     if (actual is null || actual == expected)
                         continue;
                     if (actual == "int" && expected == "float")
@@ -1183,7 +1183,7 @@ end
         if (expression.Callee is NameExpr name)
         {
             if (_methods.TryGetValue(name.Name, out var function))
-                return function.ReturnType;
+                return ResolveQualifiedTypeIdentity(function.ReturnType, _methodNamespaces.GetValueOrDefault(function));
 
             if (NativeSigs.Map.TryGetValue(name.Name, out var native))
                 return native.ReturnType;
@@ -1194,8 +1194,8 @@ end
         if (expression.Callee is MemberExpr member)
         {
             if (member.Object is NameExpr className &&
-                FindClassMethod(className.Name, member.Name) is { IsStatic: true } staticMethod)
-                return staticMethod.ReturnType;
+                FindClassMethod(ResolveQualifiedClassIdentity(className.Name), member.Name) is { IsStatic: true } staticMethod)
+                return ResolveQualifiedTypeIdentity(staticMethod.ReturnType, _methodNamespaces.GetValueOrDefault(staticMethod));
 
             var receiverType = RecvType(member.Object);
             if (receiverType is null)
@@ -1215,10 +1215,10 @@ end
             }
 
             if (FindClassMethod(receiverType, member.Name) is { } method)
-                return method.ReturnType;
+                return ResolveQualifiedTypeIdentity(method.ReturnType, _methodNamespaces.GetValueOrDefault(method));
 
             if (FindInterfaceMethod(receiverType, member.Name) is { } interfaceMethod)
-                return interfaceMethod.ReturnType;
+                return ResolveQualifiedTypeIdentity(interfaceMethod.ReturnType, _methodNamespaces.GetValueOrDefault(interfaceMethod));
 
             var nativeMember = NativeTable.Find(receiverType, member.Name);
             if (nativeMember?.Kind == MemberKind.Method)
@@ -1254,7 +1254,7 @@ end
         NameExpr n => n.Name,
 
         UnaryExpr u when FindOperator(InferType(u.Inner), null, u.Op, [u.Inner]) is { } overload =>
-            $"{overload.Owner}.{OperatorFunctionName(overload.Method)}({EmitExpr(u.Inner)})",
+            $"{GetQualifiedClassSymbol(_classNamespaces.GetValueOrDefault(overload.Owner, _namespaceName ?? string.Empty), GetShortTypeName(overload.Owner))}.{OperatorFunctionName(overload.Method)}({EmitExpr(u.Inner)})",
 
         UnaryExpr u when u.Op == "-" && u.Inner is NumExpr { Text: "2147483648" } =>
             "(-2147483647 - 1)",
@@ -1263,7 +1263,7 @@ end
             $"{(u.Op == "!" ? "not " : "-")}{EmitExpr(u.Inner)}",
 
         BinaryExpr b when FindOperator(InferType(b.Left), InferType(b.Right), b.Op, [b.Left, b.Right]) is { } overload =>
-            $"{overload.Owner}.{OperatorFunctionName(overload.Method)}({EmitExpr(b.Left)}, {EmitExpr(b.Right)})",
+            $"{GetQualifiedClassSymbol(_classNamespaces.GetValueOrDefault(overload.Owner, _namespaceName ?? string.Empty), GetShortTypeName(overload.Owner))}.{OperatorFunctionName(overload.Method)}({EmitExpr(b.Left)}, {EmitExpr(b.Right)})",
 
         BinaryExpr b when b.Op == "+" && IsStringish(b) =>
             Concat(b.Left, b.Right),
@@ -1284,7 +1284,7 @@ end
             $"{ctor}({string.Join(", ", n.Args.Select(EmitExpr))})",
 
         NewExpr n =>
-            $"{ResolveQualifiedClassName(n.Type)}.new({string.Join(", ", n.Args.Select(EmitExpr))})",
+            $"{ResolveQualifiedClassLuaName(n.Type)}.new({string.Join(", ", n.Args.Select(EmitExpr))})",
 
         MemberExpr m => EmitMember(m),
         CallExpr c => EmitCall(c),
@@ -1382,7 +1382,7 @@ end
             int separator = qualifiedTypeMember.LastIndexOf('.');
             if (separator > 0 &&
                 _qualifiedClasses.ContainsKey(NormalizeQualifiedTypeName(qualifiedTypeMember[..separator])))
-                return ResolveQualifiedClassName(qualifiedTypeMember[..separator]) + "." + qualifiedTypeMember[(separator + 1)..];
+                return ResolveQualifiedClassLuaName(qualifiedTypeMember[..separator]) + "." + qualifiedTypeMember[(separator + 1)..];
         }
 
         if (TryGetQualifiedName(m, out var qualifiedGlobal) &&
@@ -1566,7 +1566,7 @@ end
         {
             var arguments = string.Join(", ", c.Args.Select(EmitExpr));
             if (_className is not null &&
-                FindClassMethod(_className, id.Name) is { } classMethod)
+                FindClassMethod(_classIdentity ?? _className, id.Name) is { } classMethod)
             {
                 return classMethod.IsStatic
                     ? $"{_classLuaSymbol ?? _className}.{id.Name}({arguments})"
@@ -1596,10 +1596,10 @@ end
 
     private string? RecvType(Expr obj) => obj switch
     {
-        ThisExpr => _className,
+        ThisExpr => _classIdentity,
         NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
         NameExpr n when CurrentFieldType(n.Name) is { } fieldType => fieldType,
-        NewExpr n => ResolveQualifiedClassName(n.Type),
+        NewExpr n => ResolveQualifiedTypeIdentity(n.Type, _namespaceName),
         BinaryExpr b => InferBinaryType(b),
         UnaryExpr u => FindOperator(InferType(u.Inner), null, u.Op, [u.Inner])?.Method.ReturnType ?? InferType(u.Inner),
         MemberExpr m => InferMemberType(m),
