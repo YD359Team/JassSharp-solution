@@ -12,6 +12,11 @@ namespace Beta
 
     class Player : BaseEntity
     {
+        static int GetStaticId()
+        {
+            return 20;
+        }
+
         int GetId()
         {
             return BaseValue + 2;
