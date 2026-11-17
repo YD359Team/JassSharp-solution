@@ -1,6 +1,7 @@
 namespace QualifiedRoot
 {
     using MathTools;
+    using MathTools.Nested;
 
     int Verify()
     {
