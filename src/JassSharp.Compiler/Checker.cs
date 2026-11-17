@@ -29,6 +29,9 @@ public static class Checker
         private readonly HashSet<string> _interfaces = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _qualifiedClasses = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _qualifiedInterfaces = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _classNamespaces = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _interfaceNamespaces = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string[]> _namespaceUsings = new(StringComparer.Ordinal);
         private readonly Dictionary<string, ClassDecl> _classDeclarations = new(StringComparer.Ordinal);
         private readonly Dictionary<string, InterfaceDecl> _interfaceDeclarations = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string?> _classBaseTypes = new(StringComparer.Ordinal);
@@ -77,38 +80,30 @@ public static class Checker
 
         private void AddUnit(NsUnit unit)
         {
+            _namespaceUsings[unit.Name] = unit.Usings.Select(name => name.Replace('.', '_')).ToArray();
             foreach (var contract in unit.Interfaces ?? [])
             {
-                _interfaces.Add(contract.Name);
-                _qualifiedInterfaces[unit.Name + "." + contract.Name] = contract.Name;
-                _interfaceDeclarations[contract.Name] = contract;
+                string identity = GetTypeIdentity(unit.Name, contract.Name);
+                _interfaces.Add(identity); _qualifiedInterfaces[identity] = identity;
+                _interfaceNamespaces[identity] = unit.Name; _interfaceDeclarations[identity] = contract;
             }
-
             foreach (var cls in unit.Classes)
             {
-                _classes.Add(cls.Name);
-                _qualifiedClasses[unit.Name + "." + cls.Name] = cls.Name;
-                _classDeclarations[cls.Name] = cls;
-                if (!_classFields.ContainsKey(cls.Name))
-                    _classFields[cls.Name] = new Dictionary<string, string>(StringComparer.Ordinal);
-                if (!_classMethods.ContainsKey(cls.Name))
-                    _classMethods[cls.Name] = new Dictionary<string, FnDecl>(StringComparer.Ordinal);
-
-                foreach (var field in cls.Fields)
-                    _classFields[cls.Name][field.Name] = field.Type;
+                string identity = GetTypeIdentity(unit.Name, cls.Name);
+                _classes.Add(identity); _qualifiedClasses[identity] = identity;
+                _classNamespaces[identity] = unit.Name; _classDeclarations[identity] = cls;
+                _classFields[identity] = new Dictionary<string, string>(StringComparer.Ordinal);
+                _classMethods[identity] = new Dictionary<string, FnDecl>(StringComparer.Ordinal);
+                foreach (var field in cls.Fields) _classFields[identity][field.Name] = field.Type;
                 foreach (var method in cls.Methods)
                 {
                     if (method.Operator is { } op)
                     {
-                        string key = cls.Name + "|" + op;
-                        if (!_operators.TryGetValue(key, out var overloads))
-                            _operators[key] = overloads = [];
+                        string key = identity + "|" + op;
+                        if (!_operators.TryGetValue(key, out var overloads)) _operators[key] = overloads = [];
                         overloads.Add(method);
                     }
-                    else
-                    {
-                        _classMethods[cls.Name][method.Name] = method;
-                    }
+                    else _classMethods[identity][method.Name] = method;
                 }
             }
 
@@ -193,12 +188,9 @@ public static class Checker
                 ValidateOperators(cls);
                 foreach (var field in cls.Fields)
                     ValidateDeclaredType(field.Type, 1, 1, allowVoid: false);
-                _currentClass = cls.Name;
-
-                if (cls.Ctor is not null)
-                    CheckFunction(cls.Ctor, cls.Name);
-                foreach (var method in cls.Methods)
-                    CheckFunction(method, cls.Name);
+                _currentClass = GetTypeIdentity(_unit.Name, cls.Name);
+                if (cls.Ctor is not null) CheckFunction(cls.Ctor, _currentClass);
+                foreach (var method in cls.Methods) CheckFunction(method, _currentClass);
             }
 
             _currentClass = null;
@@ -219,7 +211,7 @@ public static class Checker
                     Add(1, 1, "error", $"перегруженный оператор {op} должен быть static");
                 if (method.Params.Count != expectedArity)
                     Add(1, 1, "error", $"оператор {op} должен принимать {expectedArity} параметр(а)");
-                if (!method.Params.Any(parameter => parameter.Type == cls.Name))
+                if (!method.Params.Any(parameter => ResolveQualifiedUserType(parameter.Type, _unit.Name) == GetTypeIdentity(_unit.Name, cls.Name)))
                     Add(1, 1, "error", $"оператор {op} должен принимать параметр типа {cls.Name}");
                 if ((op is "==" or "!=" or "<" or ">" or "<=" or ">=") && method.ReturnType != "bool")
                     Add(1, 1, "error", $"оператор сравнения {op} должен возвращать bool");
@@ -995,7 +987,7 @@ public static class Checker
 
             if (member.Object is NameExpr className &&
                 !_scopes.Any(scope => scope.ContainsKey(className.Name)) &&
-                TryGetClassMethod(className.Name, member.Name, out var classMethod))
+                TryGetClassMethod(ResolveQualifiedUserType(className.Name), member.Name, out var classMethod))
             {
                 CheckArguments(member, call.Args, classMethod.Params.Select(p => p.Type).ToArray());
                 if (!classMethod.IsStatic)
@@ -1109,7 +1101,7 @@ public static class Checker
                         qualifiedStaticMethod.IsStatic)
                         return qualifiedStaticMethod.ReturnType;
                     if (member.Object is NameExpr className &&
-                        TryGetClassMethod(className.Name, member.Name, out var staticMethod) &&
+                        TryGetClassMethod(ResolveQualifiedUserType(className.Name), member.Name, out var staticMethod) &&
                         staticMethod.IsStatic)
                         return staticMethod.ReturnType;
 
@@ -1244,7 +1236,7 @@ public static class Checker
         }
 
         private bool IsUserType(string? type) =>
-            type is not null && _classes.Contains(type);
+            type is not null && (_classes.Contains(type) || _interfaces.Contains(type));
 
         private FnDecl? FindOperator(string? leftType, string? rightType, string op, IReadOnlyList<Expr> arguments)
         {
@@ -1367,17 +1359,18 @@ public static class Checker
 
         private void ValidateInheritance()
         {
-            foreach (var contract in _interfaceDeclarations.Values)
+            foreach (var (contractIdentity, contract) in _interfaceDeclarations)
             {
+                string contractNamespace = _interfaceNamespaces[contractIdentity];
                 foreach (string parent in contract.BaseInterfaces)
-                    if (!_interfaces.Contains(ResolveQualifiedUserType(parent)))
+                    if (!_interfaces.Contains(ResolveQualifiedUserType(parent, contractNamespace)))
                         Add(1, 1, "error", $"interface {contract.Name} extends unknown interface {parent}");
 
                 foreach (var duplicate in contract.Methods.GroupBy(method => method.Name, StringComparer.Ordinal)
                              .Where(group => group.Count() > 1))
                     Add(1, 1, "error", $"interface {contract.Name} declares duplicate method {duplicate.Key}");
 
-                foreach (var inheritedGroup in GetInterfaceMethods(contract.Name)
+                foreach (var inheritedGroup in GetInterfaceMethods(contractIdentity)
                              .GroupBy(method => method.Name, StringComparer.Ordinal))
                 {
                     var signatures = inheritedGroup
@@ -1390,10 +1383,11 @@ public static class Checker
                 }
             }
 
-            foreach (var cls in _classDeclarations.Values)
+            foreach (var (classIdentity, cls) in _classDeclarations)
             {
+                string classNamespace = _classNamespaces[classIdentity];
                 var bases = cls.BaseTypes ?? [];
-                var resolvedBases = bases.Select(ResolveQualifiedUserType).ToList();
+                var resolvedBases = bases.Select(type => ResolveQualifiedUserType(type, classNamespace)).ToList();
                 var classBases = resolvedBases.Where(_classes.Contains).ToList();
                 var interfaceBases = resolvedBases.Where(_interfaces.Contains).ToList();
 
@@ -1406,17 +1400,17 @@ public static class Checker
                 if (classBases.Count == 1 && resolvedBases.Count > 0 && resolvedBases[0] != classBases[0])
                     Add(1, 1, "error", $"base class {classBases[0]} must be first in class {cls.Name}'s inheritance list");
 
-                _classBaseTypes[cls.Name] = classBases.FirstOrDefault();
-                _classInterfaces[cls.Name] = interfaceBases;
+                _classBaseTypes[classIdentity] = classBases.FirstOrDefault();
+                _classInterfaces[classIdentity] = interfaceBases;
 
-                if (_classBaseTypes[cls.Name] is { } baseClass &&
+                if (_classBaseTypes[classIdentity] is { } baseClass &&
                     _classDeclarations.TryGetValue(baseClass, out var baseDeclaration) &&
                     baseDeclaration.Ctor is { Params.Count: > 0 })
                     Add(1, 1, "error",
                         $"base class {baseClass} must have a parameterless constructor; implicit base constructor calls do not accept arguments");
             }
 
-            foreach (var cls in _classDeclarations.Values)
+            foreach (var (classIdentity, cls) in _classDeclarations)
             {
                 foreach (var duplicate in cls.Fields.GroupBy(field => field.Name, StringComparer.Ordinal)
                              .Where(group => group.Count() > 1))
@@ -1429,17 +1423,17 @@ public static class Checker
 
                 foreach (var method in cls.Methods.Where(method => method.Operator is null))
                 {
-                    if (TryGetBaseClassMethod(cls.Name, method.Name, out var inheritedMethod) &&
+                    if (TryGetBaseClassMethod(classIdentity, method.Name, out var inheritedMethod) &&
                         !string.Equals(GetMethodSignature(method), GetMethodSignature(inheritedMethod), StringComparison.Ordinal))
                         Add(1, 1, "error",
                             $"method {cls.Name}.{method.Name} hides an inherited method with an incompatible signature");
                 }
 
-                foreach (string interfaceName in GetImplementedInterfaces(cls.Name))
+                foreach (string interfaceName in GetImplementedInterfaces(classIdentity))
                 {
                     foreach (var required in GetInterfaceMethods(interfaceName))
                     {
-                        if (!TryGetClassMethod(cls.Name, required.Name, out var implementation))
+                        if (!TryGetClassMethod(classIdentity, required.Name, out var implementation))
                         {
                             Add(1, 1, "error",
                                 $"class {cls.Name} does not implement {interfaceName}.{required.Name}()");
@@ -1458,9 +1452,9 @@ public static class Checker
                 }
             }
 
-            foreach (var cls in _classDeclarations.Values)
+            foreach (var classIdentity in _classDeclarations.Keys)
             {
-                string? current = cls.Name;
+                string? current = classIdentity;
                 var visited = new HashSet<string>(StringComparer.Ordinal);
                 while (current is not null && visited.Add(current))
                     current = _classBaseTypes.GetValueOrDefault(current);
@@ -1468,9 +1462,9 @@ public static class Checker
                     Add(1, 1, "error", $"class inheritance cycle detected at {current}");
             }
 
-            foreach (var contract in _interfaceDeclarations.Values)
-                if (InterfaceHasCycle(contract.Name))
-                    Add(1, 1, "error", $"interface inheritance cycle detected at {contract.Name}");
+            foreach (var interfaceIdentity in _interfaceDeclarations.Keys)
+                if (InterfaceHasCycle(interfaceIdentity))
+                    Add(1, 1, "error", $"interface inheritance cycle detected at {interfaceIdentity}");
         }
 
         private bool InterfaceHasCycle(string start)
@@ -1488,7 +1482,7 @@ public static class Checker
                 active.Add(current);
                 if (_interfaceDeclarations.TryGetValue(current, out var contract))
                     foreach (string parent in contract.BaseInterfaces)
-                        if (_interfaces.Contains(parent) && Visit(parent))
+                        if (_interfaces.Contains(ResolveQualifiedUserType(parent, _interfaceNamespaces[current])) && Visit(ResolveQualifiedUserType(parent, _interfaceNamespaces[current])))
                             return true;
                 active.Remove(current);
                 return false;
@@ -1564,7 +1558,7 @@ public static class Checker
                     return true;
                 }
                 foreach (string parent in contract.BaseInterfaces)
-                    pending.Push(ResolveQualifiedUserType(parent));
+                    pending.Push(ResolveQualifiedUserType(parent, _interfaceNamespaces[current]));
             }
 
             method = null!;
@@ -1584,7 +1578,7 @@ public static class Checker
                 foreach (var method in contract.Methods)
                     yield return method;
                 foreach (string parent in contract.BaseInterfaces)
-                    pending.Push(parent);
+                    pending.Push(ResolveQualifiedUserType(parent, _interfaceNamespaces[current]));
             }
         }
 
@@ -1619,7 +1613,7 @@ public static class Checker
                     return true;
                 if (_interfaceDeclarations.TryGetValue(current, out var contract))
                     foreach (string parentName in contract.BaseInterfaces)
-                        pending.Push(ResolveQualifiedUserType(parentName));
+                        pending.Push(ResolveQualifiedUserType(parentName, _interfaceNamespaces[current]));
             }
             return false;
         }
@@ -1644,14 +1638,28 @@ public static class Checker
             return separator <= 0 ? typeName : typeName[..separator].Replace('.', '_') + typeName[separator..];
         }
 
-        private string ResolveQualifiedUserType(string type)
+        private static string GetTypeIdentity(string namespaceName, string typeName) => namespaceName + "." + typeName;
+
+        private string ResolveQualifiedUserType(string type, string? declaringNamespace = null)
         {
             type = NormalizeQualifiedTypeName(type);
-            if (_qualifiedClasses.TryGetValue(type, out var className))
-                return className;
-            if (_qualifiedInterfaces.TryGetValue(type, out var interfaceName))
-                return interfaceName;
-            return type;
+            if (type.Contains('.', StringComparison.Ordinal))
+            {
+                if (_qualifiedClasses.TryGetValue(type, out var classIdentity)) return classIdentity;
+                if (_qualifiedInterfaces.TryGetValue(type, out var interfaceIdentity)) return interfaceIdentity;
+                return type;
+            }
+            string owner = (declaringNamespace ?? _unit.Name).Replace('.', '_');
+            string local = GetTypeIdentity(owner, type);
+            if (_classes.Contains(local) || _interfaces.Contains(local)) return local;
+            var imported = (_namespaceUsings.GetValueOrDefault(owner) ?? [])
+                .Select(ns => GetTypeIdentity(ns, type))
+                .Where(identity => _classes.Contains(identity) || _interfaces.Contains(identity))
+                .Distinct(StringComparer.Ordinal).ToList();
+            if (imported.Count == 1) return imported[0];
+            if (imported.Count > 1) return "?ambiguous:" + type;
+            var matches = _classes.Concat(_interfaces).Where(identity => identity.EndsWith("." + type, StringComparison.Ordinal)).Distinct(StringComparer.Ordinal).ToList();
+            return matches.Count == 1 ? matches[0] : type;
         }
 
         private bool IsKnownType(string type, bool allowVoid)
