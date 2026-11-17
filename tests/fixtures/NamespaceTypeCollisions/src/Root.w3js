@@ -1,0 +1,12 @@
+namespace NamespaceTypeCollisions
+{
+    using Alpha;
+    using Beta;
+
+    int VerifyDistinctTypes()
+    {
+        Alpha.Player first = new Alpha.Player();
+        Beta.Player second = new Beta.Player();
+        return first.GetId() + second.GetId();
+    }
+}
