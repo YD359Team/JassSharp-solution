@@ -485,8 +485,15 @@ public static class Checker
                     }
 
                     if (declaredType != "?" && !IsKnownType(declaredType, allowVoid: false))
-                        Add(variable.Line, variable.Col, "error",
-                            $"неизвестный тип {declaredType}; для типов Warcraft III добавьте using Warcraft3");
+                    {
+                        string resolvedType = ResolveQualifiedUserType(declaredType);
+                        if (resolvedType.StartsWith("?ambiguous:", StringComparison.Ordinal))
+                            Add(variable.Line, variable.Col, "error",
+                                $"неоднозначный тип {declaredType}: имя доступно из нескольких namespace; укажите полное имя");
+                        else
+                            Add(variable.Line, variable.Col, "error",
+                                $"неизвестный тип {declaredType}; для типов Warcraft III добавьте using Warcraft3");
+                    }
 
                     Declare(variable.Name, declaredType, variable.Line, variable.Col);
                     break;
@@ -1802,8 +1809,14 @@ public static class Checker
         private void ValidateDeclaredType(string type, int line, int col, bool allowVoid)
         {
             if (!IsKnownType(type, allowVoid))
-                Add(line, col, "error",
-                    $"неизвестный тип {type}; для типов Warcraft III добавьте using Warcraft3");
+            {
+                string resolved = ResolveQualifiedUserType(type);
+                if (resolved.StartsWith("?ambiguous:", StringComparison.Ordinal))
+                    Add(line, col, "error", $"неоднозначный тип {type}: имя доступно из нескольких namespace; укажите полное имя");
+                else
+                    Add(line, col, "error",
+                        $"неизвестный тип {type}; для типов Warcraft III добавьте using Warcraft3");
+            }
         }
 
         private bool IsKnownSymbol(string name)
