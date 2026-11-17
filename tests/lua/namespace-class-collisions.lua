@@ -1,8 +1,8 @@
 local generated = assert(arg[1], "expected generated Lua file path")
 dofile(generated)
 
-local alphaClass = __jasssharp_type_5_Alpha6_Player
-local betaClass = __jasssharp_type_4_Beta6_Player
+local alphaClass = __jasssharp_type_5_Alpha_6_Player
+local betaClass = __jasssharp_type_4_Beta_6_Player
 
 assert(type(alphaClass) == "table", "Alpha.Player alias was not emitted")
 assert(type(betaClass) == "table", "Beta.Player alias was not emitted")
