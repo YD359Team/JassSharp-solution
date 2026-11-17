@@ -1,0 +1,10 @@
+namespace DuplicateTypeDeclarationRoot
+{
+    class Collision
+    {
+    }
+
+    interface Collision
+    {
+    }
+}
