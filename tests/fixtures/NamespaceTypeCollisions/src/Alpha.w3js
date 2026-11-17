@@ -12,6 +12,11 @@ namespace Alpha
 
     class Player : BaseEntity
     {
+        static int GetStaticId()
+        {
+            return 10;
+        }
+
         int GetId()
         {
             return BaseValue + 1;
