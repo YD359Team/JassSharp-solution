@@ -963,6 +963,16 @@ public static class Checker
                 return;
             }
 
+            if (TryGetQualifiedName(member, out var qualifiedTypeMethod) &&
+                TryResolveQualifiedClassMethod(qualifiedTypeMethod, out var qualifiedClassName, out var qualifiedStaticMethod))
+            {
+                CheckArguments(member, call.Args, qualifiedStaticMethod.Params.Select(parameter => parameter.Type).ToArray());
+                if (!qualifiedStaticMethod.IsStatic)
+                    Add(member.Line, member.Col, "error",
+                        $"нестатический метод {qualifiedClassName}.{member.Name} нельзя вызывать через имя класса");
+                return;
+            }
+
             CheckExpression(member.Object);
             var receiverType = InferType(member.Object);
 
@@ -1092,6 +1102,10 @@ public static class Checker
                         TryResolveFunction(qualifiedName, member.Line, member.Col, out var qualifiedFunction, reportAmbiguity: false) &&
                         qualifiedFunction is not null)
                         return qualifiedFunction.ReturnType;
+                    if (TryGetQualifiedName(member, out var qualifiedTypeMethod) &&
+                        TryResolveQualifiedClassMethod(qualifiedTypeMethod, out _, out var qualifiedStaticMethod) &&
+                        qualifiedStaticMethod.IsStatic)
+                        return qualifiedStaticMethod.ReturnType;
                     if (member.Object is NameExpr className &&
                         TryGetClassMethod(className.Name, member.Name, out var staticMethod) &&
                         staticMethod.IsStatic)
@@ -1604,6 +1618,19 @@ public static class Checker
                     foreach (string parentName in contract.BaseInterfaces)
                         pending.Push(parentName);
             }
+            return false;
+        }
+
+        private bool TryResolveQualifiedClassMethod(string qualifiedName, out string className, out FnDecl method)
+        {
+            int separator = qualifiedName.LastIndexOf('.');
+            if (separator > 0 &&
+                _qualifiedClasses.TryGetValue(qualifiedName[..separator], out className!) &&
+                TryGetClassMethod(className, qualifiedName[(separator + 1)..], out method!))
+                return true;
+
+            className = null!;
+            method = null!;
             return false;
         }
 

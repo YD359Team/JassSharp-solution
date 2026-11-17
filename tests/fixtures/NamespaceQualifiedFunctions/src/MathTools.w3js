@@ -7,6 +7,21 @@ namespace MathTools
     const int BaseValue = 5;
     int Offset;
 
+    class Counter
+    {
+        int Value;
+
+        Counter(int value)
+        {
+            this.Value = value;
+        }
+
+        static int GetSeed()
+        {
+            return 11;
+        }
+    }
+
     enum Colors
     {
         Red = 1,

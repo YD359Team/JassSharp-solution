@@ -17,4 +17,10 @@ namespace QualifiedRoot
         MathTools.Offset = 7;
         return MathTools.BaseValue + MathTools.Offset;
     }
+
+    int VerifyQualifiedTypes()
+    {
+        MathTools.Counter counter = new MathTools.Counter(5);
+        return MathTools.Counter.GetSeed() + counter.Value;
+    }
 }

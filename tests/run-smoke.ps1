@@ -40,6 +40,12 @@ if (-not $qualifiedLua.Contains("(Colors_Red == Colors_Blue)")) {
 if (-not $qualifiedLua.Contains("return (BaseValue + Offset)")) {
     throw "Namespace-qualified globals and constants must resolve to their existing Lua names. Generated Lua: $qualifiedLua"
 }
+if (-not $qualifiedLua.Contains("Counter.new(5)")) {
+    throw "Namespace-qualified construction must resolve to the existing Lua class identifier. Generated Lua: $qualifiedLua"
+}
+if (-not $qualifiedLua.Contains("Counter.GetSeed()")) {
+    throw "Namespace-qualified static methods must resolve to the existing Lua class identifier. Generated Lua: $qualifiedLua"
+}
 
 $ambiguousSource = Join-Path $PSScriptRoot "fixtures/NamespaceAmbiguityProject/src/AmbiguousRoot.w3js"
 $previousErrorActionPreference = $ErrorActionPreference
