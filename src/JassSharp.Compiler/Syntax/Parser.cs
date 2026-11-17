@@ -266,6 +266,8 @@ public sealed class Parser(List<Token> tokens)
     private string ParseTypeName()
     {
         string typeName = Eat(TokKind.Id).Text;
+        while (Accept("."))
+            typeName += "." + Eat(TokKind.Id).Text;
         if (Accept("<"))
         {
             var arguments = new List<string>();
@@ -358,6 +360,15 @@ public sealed class Parser(List<Token> tokens)
         if (Peek.Kind != TokKind.Id || _i + 1 >= tokens.Count) return false;
 
         int nameIndex = _i + 1;
+        bool isQualifiedType = false;
+        while (nameIndex + 1 < tokens.Count &&
+               tokens[nameIndex].Kind == TokKind.Sym && tokens[nameIndex].Text == "." &&
+               tokens[nameIndex + 1].Kind == TokKind.Id)
+        {
+            isQualifiedType = true;
+            nameIndex += 2;
+        }
+
         if (nameIndex < tokens.Count && tokens[nameIndex].Text == "<")
         {
             int depth = 0;
@@ -386,7 +397,7 @@ public sealed class Parser(List<Token> tokens)
             tokens[nameIndex + 1].Kind == TokKind.Sym && tokens[nameIndex + 1].Text == "(")
             return false;
 
-        return TypeNames.Contains(Peek.Text) || char.IsUpper(Peek.Text[0]);
+        return isQualifiedType || TypeNames.Contains(Peek.Text) || char.IsUpper(Peek.Text[0]);
     }
 
     private Stmt ParseStmt()

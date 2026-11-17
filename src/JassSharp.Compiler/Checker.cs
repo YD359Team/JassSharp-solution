@@ -27,6 +27,8 @@ public static class Checker
         private readonly bool _strictUnknownCalls;
         private readonly HashSet<string> _classes = new(StringComparer.Ordinal);
         private readonly HashSet<string> _interfaces = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _qualifiedClasses = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, string> _qualifiedInterfaces = new(StringComparer.Ordinal);
         private readonly Dictionary<string, ClassDecl> _classDeclarations = new(StringComparer.Ordinal);
         private readonly Dictionary<string, InterfaceDecl> _interfaceDeclarations = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string?> _classBaseTypes = new(StringComparer.Ordinal);
@@ -78,12 +80,14 @@ public static class Checker
             foreach (var contract in unit.Interfaces ?? [])
             {
                 _interfaces.Add(contract.Name);
+                _qualifiedInterfaces[unit.Name + "." + contract.Name] = contract.Name;
                 _interfaceDeclarations[contract.Name] = contract;
             }
 
             foreach (var cls in unit.Classes)
             {
                 _classes.Add(cls.Name);
+                _qualifiedClasses[unit.Name + "." + cls.Name] = cls.Name;
                 _classDeclarations[cls.Name] = cls;
                 if (!_classFields.ContainsKey(cls.Name))
                     _classFields[cls.Name] = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -725,7 +729,8 @@ public static class Checker
                     break;
 
                 case NewExpr creation:
-                    if (_interfaces.Contains(creation.Type))
+                    string resolvedCreationType = ResolveQualifiedUserType(creation.Type);
+                    if (_interfaces.Contains(resolvedCreationType))
                         Add(creation.Line, creation.Col, "error", $"interface {creation.Type} cannot be instantiated");
                     else if (TryGetGenericArguments(creation.Type, out var constructedCollection, out _) &&
                         constructedCollection == "KeyValuePair")
@@ -1069,7 +1074,7 @@ public static class Checker
                 case NullExpr:
                     return "null";
                 case NewExpr creation:
-                    return creation.Type;
+                    return ResolveQualifiedUserType(creation.Type);
 
                 case CallExpr { Callee: NameExpr { Name: "original" } } when _hookOriginalSignature is { } originalSignature:
                     return originalSignature.ReturnType;
@@ -1314,6 +1319,8 @@ public static class Checker
 
         private bool IsCompatible(string actual, string expected)
         {
+            actual = ResolveQualifiedUserType(actual);
+            expected = ResolveQualifiedUserType(expected);
             if (actual == expected || actual == "null")
                 return true;
             if (expected == "float" && actual == "int")
@@ -1600,6 +1607,15 @@ public static class Checker
             return false;
         }
 
+        private string ResolveQualifiedUserType(string type)
+        {
+            if (_qualifiedClasses.TryGetValue(type, out var className))
+                return className;
+            if (_qualifiedInterfaces.TryGetValue(type, out var interfaceName))
+                return interfaceName;
+            return type;
+        }
+
         private bool IsKnownType(string type, bool allowVoid)
         {
             string baseType = StripArrayRanks(type);
@@ -1620,7 +1636,8 @@ public static class Checker
                 return true;
             if (allowVoid && baseType == "void")
                 return true;
-            if (_classes.Contains(baseType) || _interfaces.Contains(baseType))
+            string resolvedUserType = ResolveQualifiedUserType(baseType);
+            if (_classes.Contains(resolvedUserType) || _interfaces.Contains(resolvedUserType))
                 return true;
             return _hasWarcraft3 &&
                 (NativeCatalog.Types.Contains(baseType) || baseType is "integer" or "real" or "nothing" or "code");

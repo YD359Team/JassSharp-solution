@@ -19,6 +19,7 @@ public sealed class Codegen
     private readonly Dictionary<string, string> _qualifiedFunctions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EnumDecl> _qualifiedEnums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _qualifiedGlobals = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _qualifiedClasses = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<FnDecl>> _operatorMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EnumDecl> _enums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
@@ -48,6 +49,7 @@ public sealed class Codegen
 
                 foreach (var cls in imported.Classes)
                 {
+                    _qualifiedClasses[imported.Name + "." + cls.Name] = cls.Name;
                     _classFields[cls.Name] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
                     _classBaseCandidates[cls.Name] = cls.BaseTypes ?? [];
                     foreach (var method in cls.Methods)
@@ -83,6 +85,7 @@ public sealed class Codegen
 
         foreach (var cls in unit.Classes)
         {
+            _qualifiedClasses[unit.Name + "." + cls.Name] = cls.Name;
             _classFields[cls.Name] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
             _classBaseCandidates[cls.Name] = cls.BaseTypes ?? [];
             foreach (var m in cls.Methods)
@@ -1234,7 +1237,7 @@ end
             $"{ctor}({string.Join(", ", n.Args.Select(EmitExpr))})",
 
         NewExpr n =>
-            $"{n.Type}.new({string.Join(", ", n.Args.Select(EmitExpr))})",
+            $"{ResolveQualifiedClassName(n.Type)}.new({string.Join(", ", n.Args.Select(EmitExpr))})",
 
         MemberExpr m => EmitMember(m),
         CallExpr c => EmitCall(c),
@@ -1268,8 +1271,19 @@ end
         return string.Join("\n" + new string(' ', _indent * 4), lines);
     }
 
+    private string ResolveQualifiedClassName(string typeName) =>
+        _qualifiedClasses.TryGetValue(typeName, out var className) ? className : typeName;
+
     private string EmitMember(MemberExpr m)
     {
+        if (TryGetQualifiedName(m, out var qualifiedTypeMember))
+        {
+            int separator = qualifiedTypeMember.LastIndexOf('.');
+            if (separator > 0 &&
+                _qualifiedClasses.TryGetValue(qualifiedTypeMember[..separator], out var className))
+                return className + "." + qualifiedTypeMember[(separator + 1)..];
+        }
+
         if (TryGetQualifiedName(m, out var qualifiedGlobal) &&
             _qualifiedGlobals.TryGetValue(qualifiedGlobal, out var resolvedGlobal))
             return resolvedGlobal;
