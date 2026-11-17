@@ -868,7 +868,7 @@ end
             var argExpr = EmitExpr(args[i]);
             // simple: introduce temp or just substitute by emitting as local
             Line($"local {p.Name} = {argExpr}");
-            _locals[p.Name] = ResolveQualifiedTypeIdentity(p.Type, _methodNamespaces.GetValueOrDefault(meth, _namespaceName));
+            _locals[p.Name] = ResolveQualifiedTypeIdentity(p.Type, _methodNamespaces.GetValueOrDefault(meth) ?? _namespaceName);
         }
 
         // if method, bind self/this
@@ -1207,8 +1207,8 @@ end
             }
 
             if (member.Object is NameExpr className &&
-                FindClassMethod(ResolveQualifiedClassIdentity(className.Name), member.Name) is { IsStatic: true } staticMethod)
-                return ResolveQualifiedTypeIdentity(staticMethod.ReturnType, _methodNamespaces.GetValueOrDefault(staticMethod));
+                FindClassMethod(ResolveQualifiedClassIdentity(className.Name), member.Name) is { IsStatic: true } unqualifiedStaticMethod)
+                return ResolveQualifiedTypeIdentity(unqualifiedStaticMethod.ReturnType, _methodNamespaces.GetValueOrDefault(unqualifiedStaticMethod));
 
             var receiverType = RecvType(member.Object);
             if (receiverType is null)
