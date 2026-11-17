@@ -6,5 +6,6 @@ namespace AmbiguousTypeRoot
     void Verify()
     {
         Player value = new Player();
+        IIdentity contract = null;
     }
 }
