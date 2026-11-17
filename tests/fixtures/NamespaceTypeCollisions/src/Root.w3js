@@ -7,6 +7,8 @@ namespace NamespaceTypeCollisions
     {
         Alpha.Player first = new Alpha.Player();
         Beta.Player second = new Beta.Player();
-        return first.GetId() + second.GetId();
+        return first.GetId() + second.GetId()
+            + Alpha.Player.GetStaticId()
+            + Beta.Player.GetStaticId();
     }
 }
