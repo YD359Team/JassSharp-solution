@@ -99,8 +99,10 @@ public sealed class Codegen
         foreach (var candidate in _classBaseCandidates)
         {
             string? baseClass = candidate.Value
-                .Select(ResolveQualifiedClassName)
-                .FirstOrDefault(_classFields.ContainsKey);
+                .Select(typeName => (Identity: ResolveQualifiedClassIdentity(typeName), LuaName: ResolveQualifiedClassName(typeName)))
+                .Where(candidateType => candidateType.Identity is not null && _classFields.ContainsKey(candidateType.Identity))
+                .Select(candidateType => candidateType.LuaName)
+                .FirstOrDefault();
             if (baseClass is not null)
                 _classBases[candidate.Key] = baseClass;
         }
@@ -341,6 +343,7 @@ end
     {
         _className = cls.Name;
         Line($"{cls.Name} = {{}}");
+        Line($"{GetQualifiedClassSymbol(_namespaceName ?? string.Empty, cls.Name)} = {cls.Name}");
         Line($"{cls.Name}.__index = {cls.Name}");
         if (_classBases.TryGetValue(cls.Name, out var baseClassName))
             Line($"setmetatable({cls.Name}, {{ __index = {baseClassName} }})");
@@ -1282,7 +1285,29 @@ end
     private string ResolveQualifiedClassName(string typeName)
     {
         string normalized = NormalizeQualifiedTypeName(typeName);
+        if (!_qualifiedClasses.TryGetValue(normalized, out var className))
+            return typeName;
+
+        // Preserve the historical Lua identifier while the short name is unique.
+        // Colliding classes are addressed through a deterministic namespace alias.
+        int separator = typeName.LastIndexOf('.');
+        if (separator > 0 && _qualifiedClasses.Values.Count(candidate => candidate == className) > 1)
+            return GetQualifiedClassSymbol(typeName[..separator], className);
+
+        return className;
+    }
+
+    private string ResolveQualifiedClassIdentity(string typeName)
+    {
+        string normalized = NormalizeQualifiedTypeName(typeName);
         return _qualifiedClasses.TryGetValue(normalized, out var className) ? className : typeName;
+    }
+
+    private static string GetQualifiedClassSymbol(string namespaceName, string className)
+    {
+        string[] segments = namespaceName.Split('.').Append(className).ToArray();
+        return "__jasssharp_type_" + string.Join("_", segments.Select(segment =>
+            segment.Length.ToString(System.Globalization.CultureInfo.InvariantCulture) + "_" + segment));
     }
 
     private string EmitMember(MemberExpr m)
@@ -1291,8 +1316,8 @@ end
         {
             int separator = qualifiedTypeMember.LastIndexOf('.');
             if (separator > 0 &&
-                _qualifiedClasses.TryGetValue(NormalizeQualifiedTypeName(qualifiedTypeMember[..separator]), out var className))
-                return className + "." + qualifiedTypeMember[(separator + 1)..];
+                _qualifiedClasses.ContainsKey(NormalizeQualifiedTypeName(qualifiedTypeMember[..separator])))
+                return ResolveQualifiedClassName(qualifiedTypeMember[..separator]) + "." + qualifiedTypeMember[(separator + 1)..];
         }
 
         if (TryGetQualifiedName(m, out var qualifiedGlobal) &&
