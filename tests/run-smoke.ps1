@@ -52,7 +52,7 @@ if (-not $qualifiedLua.Contains("NestedGauge.new(9)") -or -not $qualifiedLua.Con
 if (-not $qualifiedLua.Contains("setmetatable(DerivedEntity, { __index = BaseEntity })")) {
     throw "Namespace-qualified base classes must resolve to their imported Lua class identifier. Generated Lua: $qualifiedLua"
 }
-if (-not $qualifiedLua.Contains("__jasssharp_type_9_MathTools10_BaseEntity.__init(self)")) {
+if (-not $qualifiedLua.Contains("__jasssharp_type_9_MathTools_10_BaseEntity.__init(self)")) {
     throw "Namespace-qualified base constructors must be invoked. Generated Lua: $qualifiedLua"
 }
 
@@ -92,10 +92,10 @@ if (-not (Test-Path $collisionLuaPath)) {
 }
 $collisionLua = Get-Content -LiteralPath $collisionLuaPath -Raw
 foreach ($fragment in @(
-    "__jasssharp_type_5_Alpha6_Player = Player",
-    "__jasssharp_type_4_Beta6_Player = Player",
-    "__jasssharp_type_5_Alpha6_Player.new()",
-    "__jasssharp_type_4_Beta6_Player.new()"
+    "__jasssharp_type_5_Alpha_6_Player = Player",
+    "__jasssharp_type_4_Beta_6_Player = Player",
+    "__jasssharp_type_5_Alpha_6_Player.new()",
+    "__jasssharp_type_4_Beta_6_Player.new()"
 )) {
     if (-not $collisionLua.Contains($fragment)) {
         throw "Namespace class collision output is missing expected fragment '$fragment'. Generated Lua: $collisionLua"
