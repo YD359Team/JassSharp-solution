@@ -1427,7 +1427,7 @@ public static class Checker
                     _classDeclarations.TryGetValue(baseClass, out var baseDeclaration) &&
                     baseDeclaration.Ctor is { Params.Count: > 0 })
                     Add(1, 1, "error",
-                        $"base class {baseClass} must have a parameterless constructor; implicit base constructor calls do not accept arguments");
+                        $"base class {GetShortTypeName(baseClass)} must have a parameterless constructor; implicit base constructor calls do not accept arguments");
             }
 
             foreach (var (classIdentity, cls) in _classDeclarations)
