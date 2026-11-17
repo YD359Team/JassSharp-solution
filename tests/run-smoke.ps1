@@ -195,10 +195,12 @@ catch {
     throw "Could not parse duplicate type declaration diagnostics as JSON. Exit code: $duplicateTypeExitCode. Output: $duplicateTypeText"
 }
 $duplicateTypeErrors = @($duplicateTypeDiagnostics | Where-Object {
-    $_.Severity -eq "error" -and $_.Message -like "*type 'Collision' is declared more than once*"
+    $_.Severity -eq "error" -and
+    $_.Message -like "*type 'Collision' is declared more than once*" -and
+    $_.Message -like "*(class, interface, enum)*"
 })
 if ($duplicateTypeExitCode -eq 0 -or $duplicateTypeErrors.Count -ne 1) {
-    throw "A class and interface cannot share the same fully qualified type name. Exit code: $duplicateTypeExitCode. Output: $duplicateTypeText"
+    throw "Duplicate class declarations and class/interface/enum name collisions must be rejected for one fully qualified type identity. Exit code: $duplicateTypeExitCode. Output: $duplicateTypeText"
 }
 
 Write-Host "[1a] Verifying hexadecimal literals and bitwise operators..."
