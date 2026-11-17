@@ -1,10 +1,20 @@
 namespace Alpha
 {
-    class Player
+    class BaseEntity
+    {
+        public int BaseValue;
+
+        BaseEntity()
+        {
+            BaseValue = 100;
+        }
+    }
+
+    class Player : BaseEntity
     {
         int GetId()
         {
-            return 1;
+            return BaseValue + 1;
         }
     }
 }
