@@ -1370,7 +1370,7 @@ public static class Checker
             foreach (var contract in _interfaceDeclarations.Values)
             {
                 foreach (string parent in contract.BaseInterfaces)
-                    if (!_interfaces.Contains(parent))
+                    if (!_interfaces.Contains(ResolveQualifiedUserType(parent)))
                         Add(1, 1, "error", $"interface {contract.Name} extends unknown interface {parent}");
 
                 foreach (var duplicate in contract.Methods.GroupBy(method => method.Name, StringComparer.Ordinal)
@@ -1393,16 +1393,17 @@ public static class Checker
             foreach (var cls in _classDeclarations.Values)
             {
                 var bases = cls.BaseTypes ?? [];
-                var classBases = bases.Where(_classes.Contains).ToList();
-                var interfaceBases = bases.Where(_interfaces.Contains).ToList();
+                var resolvedBases = bases.Select(ResolveQualifiedUserType).ToList();
+                var classBases = resolvedBases.Where(_classes.Contains).ToList();
+                var interfaceBases = resolvedBases.Where(_interfaces.Contains).ToList();
 
-                foreach (string baseName in bases)
-                    if (!_classes.Contains(baseName) && !_interfaces.Contains(baseName))
+                foreach (var (baseName, resolvedBaseName) in bases.Zip(resolvedBases))
+                    if (!_classes.Contains(resolvedBaseName) && !_interfaces.Contains(resolvedBaseName))
                         Add(1, 1, "error", $"type {cls.Name} inherits unknown type {baseName}");
 
                 if (classBases.Count > 1)
                     Add(1, 1, "error", $"class {cls.Name} can inherit only one class");
-                if (classBases.Count == 1 && bases.Count > 0 && bases[0] != classBases[0])
+                if (classBases.Count == 1 && resolvedBases.Count > 0 && resolvedBases[0] != classBases[0])
                     Add(1, 1, "error", $"base class {classBases[0]} must be first in class {cls.Name}'s inheritance list");
 
                 _classBaseTypes[cls.Name] = classBases.FirstOrDefault();
@@ -1563,7 +1564,7 @@ public static class Checker
                     return true;
                 }
                 foreach (string parent in contract.BaseInterfaces)
-                    pending.Push(parent);
+                    pending.Push(ResolveQualifiedUserType(parent));
             }
 
             method = null!;
@@ -1618,7 +1619,7 @@ public static class Checker
                     return true;
                 if (_interfaceDeclarations.TryGetValue(current, out var contract))
                     foreach (string parentName in contract.BaseInterfaces)
-                        pending.Push(parentName);
+                        pending.Push(ResolveQualifiedUserType(parentName));
             }
             return false;
         }

@@ -98,7 +98,9 @@ public sealed class Codegen
         }
         foreach (var candidate in _classBaseCandidates)
         {
-            string? baseClass = candidate.Value.FirstOrDefault(_classFields.ContainsKey);
+            string? baseClass = candidate.Value
+                .Select(ResolveQualifiedClassName)
+                .FirstOrDefault(_classFields.ContainsKey);
             if (baseClass is not null)
                 _classBases[candidate.Key] = baseClass;
         }

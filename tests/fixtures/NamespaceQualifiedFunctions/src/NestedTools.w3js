@@ -1,5 +1,10 @@
 namespace MathTools.Nested
 {
+    interface IAdvancedEntity : MathTools.IEntity
+    {
+        int GetLevel();
+    }
+
     class NestedGauge
     {
         int Value;

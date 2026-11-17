@@ -110,7 +110,7 @@ public sealed class Parser(List<Token> tokens)
         {
             do
             {
-                baseTypes.Add(Eat(TokKind.Id).Text);
+                baseTypes.Add(ParseTypeName());
             }
             while (Accept(","));
         }
@@ -213,7 +213,7 @@ public sealed class Parser(List<Token> tokens)
         {
             do
             {
-                baseInterfaces.Add(Eat(TokKind.Id).Text);
+                baseInterfaces.Add(ParseTypeName());
             }
             while (Accept(","));
         }

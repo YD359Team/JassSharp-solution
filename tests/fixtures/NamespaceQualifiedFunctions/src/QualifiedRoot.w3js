@@ -30,4 +30,18 @@ namespace QualifiedRoot
         MathTools.Nested.NestedGauge gauge = new MathTools.Nested.NestedGauge(9);
         return MathTools.Nested.NestedGauge.GetDefault() + gauge.Value;
     }
+
+    class DerivedEntity : MathTools.BaseEntity, MathTools.Nested.IAdvancedEntity
+    {
+        int GetLevel()
+        {
+            return 3;
+        }
+    }
+
+    int VerifyQualifiedInheritance()
+    {
+        DerivedEntity entity = new DerivedEntity();
+        return entity.GetId() + entity.GetLevel();
+    }
 }

@@ -49,6 +49,12 @@ if (-not $qualifiedLua.Contains("Counter.GetSeed()")) {
 if (-not $qualifiedLua.Contains("NestedGauge.new(9)") -or -not $qualifiedLua.Contains("NestedGauge.GetDefault()")) {
     throw "Nested namespace-qualified user types and static methods must resolve to their normalized Lua class identifier. Generated Lua: $qualifiedLua"
 }
+if (-not $qualifiedLua.Contains("setmetatable(DerivedEntity, { __index = BaseEntity })")) {
+    throw "Namespace-qualified base classes must resolve to their imported Lua class identifier. Generated Lua: $qualifiedLua"
+}
+if (-not $qualifiedLua.Contains("BaseEntity.__init(self)")) {
+    throw "Namespace-qualified base constructors must be invoked. Generated Lua: $qualifiedLua"
+}
 
 $ambiguousSource = Join-Path $PSScriptRoot "fixtures/NamespaceAmbiguityProject/src/AmbiguousRoot.w3js"
 $previousErrorActionPreference = $ErrorActionPreference

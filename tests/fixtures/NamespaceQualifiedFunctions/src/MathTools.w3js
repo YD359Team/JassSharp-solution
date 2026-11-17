@@ -7,6 +7,21 @@ namespace MathTools
     const int BaseValue = 5;
     int Offset;
 
+    interface IEntity
+    {
+        int GetId();
+    }
+
+    class BaseEntity
+    {
+        BaseEntity() { }
+
+        int GetId()
+        {
+            return 1;
+        }
+    }
+
     class Counter
     {
         int Value;
