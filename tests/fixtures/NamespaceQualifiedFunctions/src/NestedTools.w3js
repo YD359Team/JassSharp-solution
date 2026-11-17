@@ -1,0 +1,17 @@
+namespace MathTools.Nested
+{
+    class NestedGauge
+    {
+        int Value;
+
+        NestedGauge(int value)
+        {
+            this.Value = value;
+        }
+
+        static int GetDefault()
+        {
+            return 9;
+        }
+    }
+}

@@ -1271,8 +1271,17 @@ end
         return string.Join("\n" + new string(' ', _indent * 4), lines);
     }
 
-    private string ResolveQualifiedClassName(string typeName) =>
-        _qualifiedClasses.TryGetValue(typeName, out var className) ? className : typeName;
+    private static string NormalizeQualifiedTypeName(string typeName)
+    {
+        int separator = typeName.LastIndexOf('.');
+        return separator <= 0 ? typeName : typeName[..separator].Replace('.', '_') + typeName[separator..];
+    }
+
+    private string ResolveQualifiedClassName(string typeName)
+    {
+        string normalized = NormalizeQualifiedTypeName(typeName);
+        return _qualifiedClasses.TryGetValue(normalized, out var className) ? className : typeName;
+    }
 
     private string EmitMember(MemberExpr m)
     {
@@ -1280,7 +1289,7 @@ end
         {
             int separator = qualifiedTypeMember.LastIndexOf('.');
             if (separator > 0 &&
-                _qualifiedClasses.TryGetValue(qualifiedTypeMember[..separator], out var className))
+                _qualifiedClasses.TryGetValue(NormalizeQualifiedTypeName(qualifiedTypeMember[..separator]), out var className))
                 return className + "." + qualifiedTypeMember[(separator + 1)..];
         }
 

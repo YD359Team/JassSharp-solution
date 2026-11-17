@@ -1626,8 +1626,9 @@ public static class Checker
         private bool TryResolveQualifiedClassMethod(string qualifiedName, out string className, out FnDecl method)
         {
             int separator = qualifiedName.LastIndexOf('.');
+            string qualifiedTypeName = separator > 0 ? NormalizeQualifiedTypeName(qualifiedName[..separator]) : string.Empty;
             if (separator > 0 &&
-                _qualifiedClasses.TryGetValue(qualifiedName[..separator], out className!) &&
+                _qualifiedClasses.TryGetValue(qualifiedTypeName, out className!) &&
                 TryGetClassMethod(className, qualifiedName[(separator + 1)..], out method!))
                 return true;
 
@@ -1636,8 +1637,15 @@ public static class Checker
             return false;
         }
 
+        private static string NormalizeQualifiedTypeName(string typeName)
+        {
+            int separator = typeName.LastIndexOf('.');
+            return separator <= 0 ? typeName : typeName[..separator].Replace('.', '_') + typeName[separator..];
+        }
+
         private string ResolveQualifiedUserType(string type)
         {
+            type = NormalizeQualifiedTypeName(type);
             if (_qualifiedClasses.TryGetValue(type, out var className))
                 return className;
             if (_qualifiedInterfaces.TryGetValue(type, out var interfaceName))

@@ -23,4 +23,10 @@ namespace QualifiedRoot
         MathTools.Counter counter = new MathTools.Counter(5);
         return MathTools.Counter.GetSeed() + counter.Value;
     }
+
+    int VerifyNestedQualifiedTypes()
+    {
+        MathTools.Nested.NestedGauge gauge = new MathTools.Nested.NestedGauge(9);
+        return MathTools.Nested.NestedGauge.GetDefault() + gauge.Value;
+    }
 }

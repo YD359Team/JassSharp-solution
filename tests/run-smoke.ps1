@@ -46,6 +46,9 @@ if (-not $qualifiedLua.Contains("Counter.new(5)")) {
 if (-not $qualifiedLua.Contains("Counter.GetSeed()")) {
     throw "Namespace-qualified static methods must resolve to the existing Lua class identifier. Generated Lua: $qualifiedLua"
 }
+if (-not $qualifiedLua.Contains("NestedGauge.new(9)") -or -not $qualifiedLua.Contains("NestedGauge.GetDefault()")) {
+    throw "Nested namespace-qualified user types and static methods must resolve to their normalized Lua class identifier. Generated Lua: $qualifiedLua"
+}
 
 $ambiguousSource = Join-Path $PSScriptRoot "fixtures/NamespaceAmbiguityProject/src/AmbiguousRoot.w3js"
 $previousErrorActionPreference = $ErrorActionPreference
