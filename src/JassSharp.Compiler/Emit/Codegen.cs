@@ -1342,9 +1342,9 @@ end
         string identity = ResolveQualifiedClassIdentity(typeName, declaringNamespace);
         if (!_classNamespaces.TryGetValue(identity, out var namespaceName))
             return typeName;
-        string shortName = GetShortTypeName(identity);
-        int collisions = _qualifiedClasses.Values.Count(candidate => GetShortTypeName(candidate) == shortName);
-        return collisions > 1 ? GetQualifiedClassSymbol(namespaceName, shortName) : shortName;
+        // Always use the stable symbol. A module is emitted independently and cannot
+        // know every other module that may later overwrite the legacy short Lua global.
+        return GetQualifiedClassSymbol(namespaceName, GetShortTypeName(identity));
     }
 
     private string ResolveQualifiedClassIdentity(string typeName, string? declaringNamespace = null)
