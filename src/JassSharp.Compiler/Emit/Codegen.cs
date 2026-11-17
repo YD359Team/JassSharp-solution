@@ -1498,7 +1498,7 @@ end
         ThisExpr => _className,
         NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
         NameExpr n when CurrentFieldType(n.Name) is { } fieldType => fieldType,
-        NewExpr n => n.Type,
+        NewExpr n => ResolveQualifiedClassName(n.Type),
         BinaryExpr b => InferBinaryType(b),
         UnaryExpr u => FindOperator(InferType(u.Inner), null, u.Op, [u.Inner])?.Method.ReturnType ?? InferType(u.Inner),
         MemberExpr m => InferMemberType(m),
