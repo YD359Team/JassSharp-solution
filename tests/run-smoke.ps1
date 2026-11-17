@@ -52,7 +52,7 @@ if (-not $qualifiedLua.Contains("NestedGauge.new(9)") -or -not $qualifiedLua.Con
 if (-not $qualifiedLua.Contains("setmetatable(DerivedEntity, { __index = BaseEntity })")) {
     throw "Namespace-qualified base classes must resolve to their imported Lua class identifier. Generated Lua: $qualifiedLua"
 }
-if (-not $qualifiedLua.Contains("BaseEntity.__init(self)")) {
+if (-not $qualifiedLua.Contains("__jasssharp_type_9_MathTools10_BaseEntity.__init(self)")) {
     throw "Namespace-qualified base constructors must be invoked. Generated Lua: $qualifiedLua"
 }
 
