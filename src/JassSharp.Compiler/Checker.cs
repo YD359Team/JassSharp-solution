@@ -841,7 +841,7 @@ public static class Checker
                         : FindOperator(leftType, rightType, binary.Op, [binary.Left, binary.Right]);
                     if (binaryOverload is not null)
                     {
-                        CheckArguments(binary, [binary.Left, binary.Right], binaryOverload.Params.Select(p => p.Type).ToArray());
+                        CheckMethodArguments(binary, [binary.Left, binary.Right], binaryOverload);
                     }
                     else if (!isNullComparison && (IsUserType(leftType) || IsUserType(rightType)))
                     {
@@ -872,7 +872,7 @@ public static class Checker
                         CheckExpression(unary.Inner);
                     var unaryOverload = FindOperator(InferType(unary.Inner), null, unary.Op, [unary.Inner]);
                     if (unaryOverload is not null)
-                        CheckArguments(unary, [unary.Inner], unaryOverload.Params.Select(p => p.Type).ToArray());
+                        CheckMethodArguments(unary, [unary.Inner], unaryOverload);
                     else if (IsUserType(InferType(unary.Inner)))
                         Add(unary.Line, unary.Col, "error", $"унарный оператор {unary.Op} не определён для типа {InferType(unary.Inner)}");
                     break;
@@ -1116,7 +1116,7 @@ public static class Checker
                     if (TryGetQualifiedName(member, out var qualifiedTypeMethod) &&
                         TryResolveQualifiedClassMethod(qualifiedTypeMethod, out _, out var qualifiedStaticMethod) &&
                         qualifiedStaticMethod.IsStatic)
-                        return qualifiedStaticMethod.ReturnType;
+                        return ResolveQualifiedUserType(qualifiedStaticMethod.ReturnType, _declarationNamespaces.GetValueOrDefault(qualifiedStaticMethod, _unit.Name));
                     if (member.Object is NameExpr className &&
                         TryGetClassMethod(ResolveQualifiedUserType(className.Name), member.Name, out var staticMethod) &&
                         staticMethod.IsStatic)
@@ -1826,8 +1826,8 @@ public static class Checker
         {
             return _functions.ContainsKey(name) ||
                    _globals.ContainsKey(name) ||
-                   _classes.Contains(name) ||
-                   _interfaces.Contains(name) ||
+                   _classes.Contains(ResolveQualifiedUserType(name)) ||
+                   _interfaces.Contains(ResolveQualifiedUserType(name)) ||
                    (_hasWarcraft3 && NativeCatalog.Natives.Contains(name)) ||
                    (_hasWarcraft3 && (NativeCatalog.Constants.Contains(name) || Warcraft3AdditionalConstants.Constants.Contains(name))) ||
                    (_hasWarcraft3 && NativeSigs.Map.ContainsKey(name)) ||
