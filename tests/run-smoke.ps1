@@ -726,7 +726,7 @@ $geometryFragments = @(
     "function LineSegment2:ClosestPoint(point)",
     "function LineSegment2:DistanceToPoint(point)",
     "function LineSegment2:ContainsPoint(point)",
-    "local reversedRectangle = Rect2.new(10.0, 5.0, -10.0, -5.0)"
+    "local reversedRectangle = __jasssharp_type_8_Geometry_5_Rect2.new(10.0, 5.0, -10.0, -5.0)"
 )
 foreach ($fragment in $geometryFragments) {
     if (-not $geometryLua.Contains($fragment)) {
@@ -1321,7 +1321,7 @@ foreach ($fragment in @(
     "function EntityBase.__init(self)",
     "function UnitActor.__init(self)",
     "EntityBase.__init(self)",
-    "UnitActor.new()",
+    "__jasssharp_type_29_InterfacesAndInheritanceSmoke_9_UnitActor.new()",
     "actorContract:Act(3)",
     "actorContract:Id()",
     "actorContract:Trace()",
