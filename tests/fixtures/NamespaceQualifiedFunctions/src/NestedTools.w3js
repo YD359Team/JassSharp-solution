@@ -1,5 +1,7 @@
 namespace MathTools.Nested
 {
+    using MathTools;
+
     interface IAdvancedEntity : MathTools.IEntity
     {
         int GetLevel();
