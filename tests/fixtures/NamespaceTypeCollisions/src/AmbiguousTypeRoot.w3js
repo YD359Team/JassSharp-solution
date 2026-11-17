@@ -1,0 +1,10 @@
+namespace AmbiguousTypeRoot
+{
+    using Alpha;
+    using Beta;
+
+    void Verify()
+    {
+        Player value = new Player();
+    }
+}
