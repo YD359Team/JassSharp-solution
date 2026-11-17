@@ -1,0 +1,10 @@
+namespace Beta
+{
+    class Player
+    {
+        int GetId()
+        {
+            return 2;
+        }
+    }
+}
