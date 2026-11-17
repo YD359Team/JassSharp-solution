@@ -4,7 +4,17 @@ namespace DuplicateTypeDeclarationRoot
     {
     }
 
+    class Collision
+    {
+    }
+
     interface Collision
     {
+    }
+
+    enum Collision
+    {
+        First,
+        Second
     }
 }
