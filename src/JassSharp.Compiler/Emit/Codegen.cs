@@ -1380,10 +1380,14 @@ end
     private string EmitNormalCall(CallExpr c)
     {
         if (c.Callee is MemberExpr qualifiedMember &&
-            TryGetQualifiedName(qualifiedMember, out var qualifiedName) &&
-            _qualifiedFunctions.TryGetValue(qualifiedName, out var resolvedFunction))
+            TryGetQualifiedName(qualifiedMember, out var qualifiedName))
         {
-            return $"{resolvedFunction}({string.Join(", ", c.Args.Select(EmitExpr))})";
+            int separator = qualifiedName.LastIndexOf('.');
+            string symbolName = separator < 0
+                ? qualifiedName
+                : qualifiedName[..separator].Replace('.', '_') + qualifiedName[separator..];
+            if (_qualifiedFunctions.TryGetValue(symbolName, out var resolvedFunction))
+                return $"{resolvedFunction}({string.Join(", ", c.Args.Select(EmitExpr))})";
         }
 
         if (c.Callee is MemberExpr mem)
