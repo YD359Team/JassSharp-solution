@@ -13,6 +13,7 @@ public sealed class Codegen
     private readonly Stack<(string ContinueLabel, string? BreakFlag)> _loopTargets = new();
     private Dictionary<string, string> _locals = new(StringComparer.Ordinal);
     private string? _className;
+    private string? _classLuaSymbol;
     private bool _currentMethodIsStatic;
     private readonly Dictionary<string, FnDecl> _inlineMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FnDecl> _methods = new(StringComparer.Ordinal);
@@ -344,6 +345,7 @@ end
     private void EmitClassLua(ClassDecl cls)
     {
         _className = cls.Name;
+        _classLuaSymbol = GetQualifiedClassSymbol(_namespaceName ?? string.Empty, cls.Name);
         Line($"{cls.Name} = {{}}");
         Line($"{GetQualifiedClassSymbol(_namespaceName ?? string.Empty, cls.Name)} = {cls.Name}");
         Line($"{cls.Name}.__index = {cls.Name}");
@@ -367,8 +369,8 @@ end
 
         Line($"function {cls.Name}.new({string.Join(", ", constructorParameters.Select(parameter => parameter.Name))})");
         _indent++;
-        Line($"local self = setmetatable({{}}, {cls.Name})");
-        Line($"{cls.Name}.__init(self{(constructorParameters.Count == 0 ? "" : ", " + string.Join(", ", constructorParameters.Select(parameter => parameter.Name)))})");
+        Line($"local self = setmetatable({{}}, {_classLuaSymbol})");
+        Line($"{_classLuaSymbol}.__init(self{(constructorParameters.Count == 0 ? "" : ", " + string.Join(", ", constructorParameters.Select(parameter => parameter.Name)))})");
         Line("return self");
         _indent--;
         Line("end");
@@ -398,6 +400,7 @@ end
         Line("");
         _currentMethodIsStatic = false;
         _className = null;
+        _classLuaSymbol = null;
     }
 
     private void RegisterOperator(string owner, string op, FnDecl method)
@@ -437,7 +440,7 @@ end
             {
                 string condition = string.Join(" and ", method.Params.Select((parameter, index) =>
                     LuaTypeCheck(parameter.Type, args[index])));
-                Line($"if {condition} then return {cls.Name}.{OperatorFunctionName(method)}({string.Join(", ", args)}) end");
+                Line($"if {condition} then return {_classLuaSymbol ?? cls.Name}.{OperatorFunctionName(method)}({string.Join(", ", args)}) end");
             }
             Line("return nil");
             _indent--;
@@ -1211,6 +1214,7 @@ end
         NullExpr => "nil",
         ThisExpr => "self",
         NameExpr n when ShouldEmitCurrentField(n.Name) => $"self.{n.Name}",
+        NameExpr n when !_locals.ContainsKey(n.Name) && n.Name == _className => _classLuaSymbol ?? n.Name,
         NameExpr n => n.Name,
 
         UnaryExpr u when FindOperator(InferType(u.Inner), null, u.Op, [u.Inner]) is { } overload =>
@@ -1506,7 +1510,7 @@ end
                 FindClassMethod(_className, id.Name) is { } classMethod)
             {
                 return classMethod.IsStatic
-                    ? $"{_className}.{id.Name}({arguments})"
+                    ? $"{_classLuaSymbol ?? _className}.{id.Name}({arguments})"
                     : $"self:{id.Name}({arguments})";
             }
 
