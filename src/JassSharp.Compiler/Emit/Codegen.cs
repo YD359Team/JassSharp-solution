@@ -346,7 +346,7 @@ end
         var constructor = cls.Ctor;
         var constructorParameters = constructor?.Params ?? [];
         _currentMethodIsStatic = false;
-        _locals = constructorParameters.ToDictionary(parameter => parameter.Name, parameter => parameter.Type, StringComparer.Ordinal);
+        _locals = constructorParameters.ToDictionary(parameter => parameter.Name, parameter => ResolveQualifiedClassName(parameter.Type), StringComparer.Ordinal);
         Line($"function {cls.Name}.__init(self{(constructorParameters.Count == 0 ? "" : ", " + string.Join(", ", constructorParameters.Select(parameter => parameter.Name)))})");
         _indent++;
         if (_classBases.TryGetValue(cls.Name, out baseClassName))
@@ -369,7 +369,7 @@ end
         foreach (var m in cls.Methods)
         {
             _currentMethodIsStatic = m.IsStatic;
-            _locals = m.Params.ToDictionary(p => p.Name, p => p.Type, StringComparer.Ordinal);
+            _locals = m.Params.ToDictionary(p => p.Name, p => ResolveQualifiedClassName(p.Type), StringComparer.Ordinal);
             if (m.Operator is { } op)
             {
                 Line($"function {cls.Name}.{OperatorFunctionName(m)}({string.Join(", ", m.Params.Select(p => p.Name))})");
@@ -513,7 +513,7 @@ end
             _currentMethodIsStatic = false;
             _locals = hook.Params.ToDictionary(
                 parameter => parameter.Name,
-                parameter => parameter.Type,
+                parameter => ResolveQualifiedClassName(parameter.Type),
                 StringComparer.Ordinal);
             _locals["original"] = "function";
 
@@ -530,7 +530,7 @@ end
     {
         _locals = fn.Params.ToDictionary(
             p => p.Name,
-            p => p.Type,
+            p => ResolveQualifiedClassName(p.Type),
             StringComparer.Ordinal);
 
         string functionName = fn.Name == "OnInit"
@@ -576,7 +576,7 @@ end
                     var inferredType = v.Type == "var" && v.Init is not null
                         ? InferType(v.Init) ?? throw new InvalidOperationException($"Не удалось вывести тип переменной {v.Name}")
                         : v.Type;
-                    _locals[v.Name] = inferredType;
+                    _locals[v.Name] = ResolveQualifiedClassName(inferredType);
                     var init = v.Init is null ? null : EmitExpr(v.Init);
                     if (init is not null)
                         Line($"local {v.Name} = {init}");
@@ -941,7 +941,7 @@ end
         NameExpr n when _locals.TryGetValue(n.Name, out var t) => t,
         NameExpr n when CurrentFieldType(n.Name) is { } fieldType => fieldType,
         ThisExpr => _className,
-        NewExpr n => n.Type,
+        NewExpr n => ResolveQualifiedClassName(n.Type),
         NumExpr n => IsFloatingLiteral(n.Text) ? "float" : "int",
         StrExpr => "string",
         InterpolatedExpr => "string",

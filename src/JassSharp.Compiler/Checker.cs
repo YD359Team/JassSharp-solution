@@ -1063,7 +1063,9 @@ public static class Checker
                         return localType;
                     if (TryGetCurrentField(name.Name, out var fieldType))
                         return fieldType;
-                    return _globals.TryGetValue(name.Name, out var globalType) ? globalType : null;
+                    return _globals.TryGetValue(name.Name, out var globalType)
+                        ? ResolveQualifiedUserType(globalType)
+                        : null;
 
                 case ThisExpr:
                     return _currentClass;
@@ -1173,7 +1175,7 @@ public static class Checker
                         return member.Name switch { "Key" => pairArgs[0], "Value" => pairArgs[1], _ => null };
 
                     if (TryGetClassField(receiverType, member.Name, out var fieldType2))
-                        return fieldType2;
+                        return ResolveQualifiedUserType(fieldType2);
 
                     var nativeMember = _hasWarcraft3 ? NativeTable.Find(receiverType, member.Name) : null;
                     if (nativeMember is null || nativeMember.Kind == MemberKind.Method)
@@ -1799,7 +1801,7 @@ public static class Checker
             if (reportDuplicate && scope.ContainsKey(name))
                 Add(line, col, "error", $"повторное объявление переменной {name}");
 
-            scope[name] = type;
+            scope[name] = ResolveQualifiedUserType(type);
         }
 
         private bool TryLookup(string name, out string type)
