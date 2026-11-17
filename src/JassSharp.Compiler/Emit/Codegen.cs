@@ -27,6 +27,7 @@ public sealed class Codegen
     private readonly Dictionary<string, List<string>> _classBaseCandidates = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _classBases = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _classBaseIdentities = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _classBaseStableSymbols = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, FnDecl>> _interfaceMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<string>> _interfaceBases = new(StringComparer.Ordinal);
 
@@ -101,12 +102,20 @@ public sealed class Codegen
         foreach (var candidate in _classBaseCandidates)
         {
             var baseClass = candidate.Value
-                .Select(typeName => (Identity: ResolveQualifiedClassIdentity(typeName), LuaName: ResolveQualifiedClassName(typeName)))
+                .Select(typeName =>
+                {
+                    int separator = typeName.LastIndexOf('.');
+                    string namespaceName = separator > 0 ? typeName[..separator] : _namespaceName ?? string.Empty;
+                    string identity = ResolveQualifiedClassIdentity(typeName);
+                    return (Identity: identity, LuaName: ResolveQualifiedClassName(typeName),
+                        StableLuaName: GetQualifiedClassSymbol(namespaceName, identity));
+                })
                 .FirstOrDefault(candidateType => _classFields.ContainsKey(candidateType.Identity));
             if (baseClass.Identity is not null)
             {
                 _classBaseIdentities[candidate.Key] = baseClass.Identity;
                 _classBases[candidate.Key] = baseClass.LuaName;
+                _classBaseStableSymbols[candidate.Key] = baseClass.StableLuaName;
             }
         }
 
@@ -359,7 +368,10 @@ end
         Line($"function {cls.Name}.__init(self{(constructorParameters.Count == 0 ? "" : ", " + string.Join(", ", constructorParameters.Select(parameter => parameter.Name)))})");
         _indent++;
         if (_classBases.TryGetValue(cls.Name, out baseClassName))
-            Line($"{baseClassName}.__init(self)");
+        {
+            string stableBaseSymbol = _classBaseStableSymbols.GetValueOrDefault(cls.Name, baseClassName);
+            Line($"{stableBaseSymbol}.__init(self)");
+        }
         foreach (var field in cls.Fields.Where(field => field.IsArray))
             Line($"self.{field.Name} = {{}}");
         if (constructor is not null)
