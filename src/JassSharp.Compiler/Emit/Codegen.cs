@@ -1012,7 +1012,7 @@ end
             if (_classFields.TryGetValue(current, out var fields) &&
                 fields.TryGetValue(fieldName, out type!))
                 return true;
-            current = _classBases.GetValueOrDefault(current);
+            current = _classBaseIdentities.GetValueOrDefault(current);
         }
         type = null!;
         return false;
