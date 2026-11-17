@@ -32,6 +32,7 @@ public static class Checker
         private readonly Dictionary<string, string> _classNamespaces = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _interfaceNamespaces = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string[]> _namespaceUsings = new(StringComparer.Ordinal);
+        private readonly Dictionary<FnDecl, string> _declarationNamespaces = new(ReferenceEqualityComparer.Instance);
         private readonly Dictionary<string, ClassDecl> _classDeclarations = new(StringComparer.Ordinal);
         private readonly Dictionary<string, InterfaceDecl> _interfaceDeclarations = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string?> _classBaseTypes = new(StringComparer.Ordinal);
@@ -86,6 +87,7 @@ public static class Checker
                 string identity = GetTypeIdentity(unit.Name, contract.Name);
                 _interfaces.Add(identity); _qualifiedInterfaces[identity] = identity;
                 _interfaceNamespaces[identity] = unit.Name; _interfaceDeclarations[identity] = contract;
+                foreach (var method in contract.Methods) _declarationNamespaces[method] = unit.Name;
             }
             foreach (var cls in unit.Classes)
             {
@@ -94,6 +96,8 @@ public static class Checker
                 _classNamespaces[identity] = unit.Name; _classDeclarations[identity] = cls;
                 _classFields[identity] = new Dictionary<string, string>(StringComparer.Ordinal);
                 _classMethods[identity] = new Dictionary<string, FnDecl>(StringComparer.Ordinal);
+                if (cls.Ctor is not null) _declarationNamespaces[cls.Ctor] = unit.Name;
+                foreach (var method in cls.Methods) _declarationNamespaces[method] = unit.Name;
                 foreach (var field in cls.Fields) _classFields[identity][field.Name] = field.Type;
                 foreach (var method in cls.Methods)
                 {
@@ -913,7 +917,7 @@ public static class Checker
                 if (_currentClass is not null &&
                     TryGetClassMethod(_currentClass, name.Name, out var currentClassMethod))
                 {
-                    CheckArguments(name, call.Args, currentClassMethod.Params.Select(p => p.Type).ToArray());
+                    CheckMethodArguments(name, call.Args, currentClassMethod);
                     if (!currentClassMethod.IsStatic && _currentMethodIsStatic)
                     {
                         Add(name.Line, name.Col, "error",
@@ -958,7 +962,7 @@ public static class Checker
             if (TryGetQualifiedName(member, out var qualifiedTypeMethod) &&
                 TryResolveQualifiedClassMethod(qualifiedTypeMethod, out var qualifiedClassName, out var qualifiedStaticMethod))
             {
-                CheckArguments(member, call.Args, qualifiedStaticMethod.Params.Select(parameter => parameter.Type).ToArray());
+                CheckMethodArguments(member, call.Args, qualifiedStaticMethod);
                 if (!qualifiedStaticMethod.IsStatic)
                     Add(member.Line, member.Col, "error",
                         $"нестатический метод {qualifiedClassName}.{member.Name} нельзя вызывать через имя класса");
@@ -971,7 +975,7 @@ public static class Checker
             if (receiverType is not null &&
                 TryGetClassMethod(receiverType, member.Name, out var instanceMethod))
             {
-                CheckArguments(member, call.Args, instanceMethod.Params.Select(p => p.Type).ToArray());
+                CheckMethodArguments(member, call.Args, instanceMethod);
                 if (instanceMethod.IsStatic)
                     Add(member.Line, member.Col, "error",
                         $"статический метод {receiverType}.{member.Name} необходимо вызывать через имя класса");
@@ -981,7 +985,7 @@ public static class Checker
             if (receiverType is not null && _interfaces.Contains(receiverType) &&
                 TryGetInterfaceMethod(receiverType, member.Name, out var interfaceMethod))
             {
-                CheckArguments(member, call.Args, interfaceMethod.Params.Select(p => p.Type).ToArray());
+                CheckMethodArguments(member, call.Args, interfaceMethod);
                 return;
             }
 
@@ -989,7 +993,7 @@ public static class Checker
                 !_scopes.Any(scope => scope.ContainsKey(className.Name)) &&
                 TryGetClassMethod(ResolveQualifiedUserType(className.Name), member.Name, out var classMethod))
             {
-                CheckArguments(member, call.Args, classMethod.Params.Select(p => p.Type).ToArray());
+                CheckMethodArguments(member, call.Args, classMethod);
                 if (!classMethod.IsStatic)
                     Add(member.Line, member.Col, "error",
                         $"нестатический метод {className.Name}.{member.Name} нельзя вызывать через имя класса");
@@ -1021,6 +1025,12 @@ public static class Checker
 
             foreach (var argument in call.Args)
                 CheckExpression(argument);
+        }
+
+        private void CheckMethodArguments(Expr callee, IReadOnlyList<Expr> arguments, FnDecl method)
+        {
+            string ownerNamespace = _declarationNamespaces.GetValueOrDefault(method, _unit.Name);
+            CheckArguments(callee, arguments, method.Params.Select(parameter => ResolveQualifiedUserType(parameter.Type, ownerNamespace)).ToArray());
         }
 
         private void CheckArguments(Expr callee, IReadOnlyList<Expr> arguments, IReadOnlyList<string> parameters)
@@ -1103,7 +1113,7 @@ public static class Checker
                     if (member.Object is NameExpr className &&
                         TryGetClassMethod(ResolveQualifiedUserType(className.Name), member.Name, out var staticMethod) &&
                         staticMethod.IsStatic)
-                        return staticMethod.ReturnType;
+                        return ResolveQualifiedUserType(staticMethod.ReturnType, _declarationNamespaces.GetValueOrDefault(staticMethod, _unit.Name));
 
                     var receiverType = InferType(member.Object);
                     if (receiverType is null)
@@ -1123,11 +1133,11 @@ public static class Checker
                     }
 
                     if (TryGetClassMethod(receiverType, member.Name, out var method))
-                        return method.ReturnType;
+                        return ResolveQualifiedUserType(method.ReturnType, _declarationNamespaces.GetValueOrDefault(method, _unit.Name));
 
                     if (_interfaces.Contains(receiverType) &&
                         TryGetInterfaceMethod(receiverType, member.Name, out var interfaceMethod))
-                        return interfaceMethod.ReturnType;
+                        return ResolveQualifiedUserType(interfaceMethod.ReturnType, _declarationNamespaces.GetValueOrDefault(interfaceMethod, _unit.Name));
 
                     var nativeMember = _hasWarcraft3 ? NativeTable.Find(receiverType, member.Name) : null;
                     if (nativeMember?.Kind != MemberKind.Method)
@@ -1167,7 +1177,7 @@ public static class Checker
                         return member.Name switch { "Key" => pairArgs[0], "Value" => pairArgs[1], _ => null };
 
                     if (TryGetClassField(receiverType, member.Name, out var fieldType2))
-                        return ResolveQualifiedUserType(fieldType2);
+                        return ResolveQualifiedUserType(fieldType2, _classNamespaces.GetValueOrDefault(className, _unit.Name));
 
                     var nativeMember = _hasWarcraft3 ? NativeTable.Find(receiverType, member.Name) : null;
                     if (nativeMember is null || nativeMember.Kind == MemberKind.Method)
@@ -1443,10 +1453,11 @@ public static class Checker
                         }
 
                         bool sameSignature = !implementation.IsStatic &&
-                            implementation.ReturnType == required.ReturnType &&
+                            ResolveQualifiedUserType(implementation.ReturnType, _declarationNamespaces.GetValueOrDefault(implementation, _unit.Name)) ==
+                                ResolveQualifiedUserType(required.ReturnType, _declarationNamespaces.GetValueOrDefault(required, _unit.Name)) &&
                             implementation.Params.Count == required.Params.Count &&
-                            implementation.Params.Select(parameter => parameter.Type)
-                                .SequenceEqual(required.Params.Select(parameter => parameter.Type), StringComparer.Ordinal);
+                            implementation.Params.Select(parameter => ResolveQualifiedUserType(parameter.Type, _declarationNamespaces.GetValueOrDefault(implementation, _unit.Name)))
+                                .SequenceEqual(required.Params.Select(parameter => ResolveQualifiedUserType(parameter.Type, _declarationNamespaces.GetValueOrDefault(required, _unit.Name))), StringComparer.Ordinal);
                         if (!sameSignature)
                             Add(1, 1, "error",
                                 $"method {cls.Name}.{required.Name} does not match {interfaceName}.{required.Name}()");
@@ -1491,9 +1502,13 @@ public static class Checker
             }
         }
 
-        private static string GetMethodSignature(FnDecl method) =>
-            method.ReturnType + "(" + string.Join(",", method.Params.Select(parameter => parameter.Type)) + ")" +
-            (method.IsStatic ? " static" : " instance");
+        private string GetMethodSignature(FnDecl method)
+        {
+            string ownerNamespace = _declarationNamespaces.GetValueOrDefault(method, _unit.Name);
+            return ResolveQualifiedUserType(method.ReturnType, ownerNamespace) + "(" +
+                   string.Join(",", method.Params.Select(parameter => ResolveQualifiedUserType(parameter.Type, ownerNamespace))) + ")" +
+                   (method.IsStatic ? " static" : " instance");
+        }
 
         private bool TryGetBaseClassMethod(string className, string methodName, out FnDecl method)
         {
