@@ -774,8 +774,8 @@ if (-not (Test-Path $timerLuaPath)) {
 $timerLua = Get-Content -LiteralPath $timerLuaPath -Raw
 $timerFragments = @(
     "CreateTimer()",
-    "TimerStart(self._handle, Math.Max(timeout, 0.0), false, callback)",
-    "TimerStart(self._handle, Math.Max(timeout, 0.0), true, callback)",
+    "TimerStart(self._handle, __jasssharp_type_4_Math_4_Math.Max(timeout, 0.0), false, callback)",
+    "TimerStart(self._handle, __jasssharp_type_4_Math_4_Math.Max(timeout, 0.0), true, callback)",
     "PauseTimer(self._handle)",
     "ResumeTimer(self._handle)",
     "TimerGetElapsed(self._handle)",
@@ -830,8 +830,8 @@ $requiredFragments = @(
     "function Math.MoveTowards(current, target, maxDelta)",
     "function Math.Repeat(value, length)",
     "function Math.LerpAngle(a, b, t)",
-    "local radians = Math.DegToRad(180.0)",
-    "local angle = Math.LerpAngle(350.0, 10.0, 0.5)"
+    "local radians = __jasssharp_type_4_Math_4_Math.DegToRad(180.0)",
+    "local angle = __jasssharp_type_4_Math_4_Math.LerpAngle(350.0, 10.0, 0.5)"
 )
 
 foreach ($fragment in $requiredFragments) {
