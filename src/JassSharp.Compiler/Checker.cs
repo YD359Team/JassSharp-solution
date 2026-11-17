@@ -1231,7 +1231,7 @@ public static class Checker
                         ? null
                         : FindOperator(InferType(binary.Left), InferType(binary.Right), binary.Op, [binary.Left, binary.Right]);
                     if (overload is not null)
-                        return overload.ReturnType;
+                        return ResolveQualifiedUserType(overload.ReturnType, _declarationNamespaces.GetValueOrDefault(overload, _unit.Name));
 
                     var left = InferType(binary.Left);
                     var right = InferType(binary.Right);
