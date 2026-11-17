@@ -1456,7 +1456,7 @@ public static class Checker
                         if (!TryGetClassMethod(classIdentity, required.Name, out var implementation))
                         {
                             Add(1, 1, "error",
-                                $"class {cls.Name} does not implement {interfaceName}.{required.Name}()");
+                                $"class {cls.Name} does not implement {GetShortTypeName(interfaceName)}.{required.Name}()");
                             continue;
                         }
 
@@ -1667,6 +1667,12 @@ public static class Checker
         }
 
         private static string GetTypeIdentity(string namespaceName, string typeName) => namespaceName + "." + typeName;
+
+        private static string GetShortTypeName(string identity)
+        {
+            int separator = identity.LastIndexOf('.');
+            return separator < 0 ? identity : identity[(separator + 1)..];
+        }
 
         private string ResolveQualifiedUserType(string type, string? declaringNamespace = null)
         {
