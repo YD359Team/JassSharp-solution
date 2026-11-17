@@ -1473,6 +1473,15 @@ try {
     $globalCollisionCheckOutput = dotnet run --configuration Release --no-build --project $project -- check $globalCollisionSource 2>&1
     $globalCollisionCheckExitCode = $LASTEXITCODE
     $globalCollisionCheckText = $globalCollisionCheckOutput -join "`n"
+    try {
+        $globalCollisionDiagnostics = $globalCollisionCheckText | ConvertFrom-Json -ErrorAction Stop
+        if ($globalCollisionDiagnostics -is [array]) {
+            $globalCollisionCheckText = ($globalCollisionDiagnostics | ForEach-Object { $_.Message }) -join "`n"
+        }
+    }
+    catch {
+        # Preserve plain-text output for diagnostics emitted by older CLI paths.
+    }
     $globalCollisionOutput = dotnet run --configuration Release --no-build --project $project -- map --project $globalCollisionProject 2>&1
     $globalCollisionExitCode = $LASTEXITCODE
     $globalCollisionText = $globalCollisionOutput -join "`n"
