@@ -826,12 +826,16 @@ public static class Checker
                     CheckExpression(binary.Right);
                     var leftType = InferType(binary.Left);
                     var rightType = InferType(binary.Right);
-                    var binaryOverload = FindOperator(leftType, rightType, binary.Op, [binary.Left, binary.Right]);
+                    bool isNullComparison = binary.Op is "==" or "!=" &&
+                        (binary.Left is NullExpr || binary.Right is NullExpr);
+                    var binaryOverload = isNullComparison
+                        ? null
+                        : FindOperator(leftType, rightType, binary.Op, [binary.Left, binary.Right]);
                     if (binaryOverload is not null)
                     {
                         CheckArguments(binary, [binary.Left, binary.Right], binaryOverload.Params.Select(p => p.Type).ToArray());
                     }
-                    else if (IsUserType(leftType) || IsUserType(rightType))
+                    else if (!isNullComparison && (IsUserType(leftType) || IsUserType(rightType)))
                     {
                         Add(binary.Line, binary.Col, "error", $"оператор {binary.Op} не определён для типов {leftType ?? "?"} и {rightType ?? "?"}");
                     }
@@ -1190,7 +1194,11 @@ public static class Checker
 
                 case BinaryExpr binary:
                 {
-                    var overload = FindOperator(InferType(binary.Left), InferType(binary.Right), binary.Op, [binary.Left, binary.Right]);
+                    bool isNullComparison = binary.Op is "==" or "!=" &&
+                        (binary.Left is NullExpr || binary.Right is NullExpr);
+                    var overload = isNullComparison
+                        ? null
+                        : FindOperator(InferType(binary.Left), InferType(binary.Right), binary.Op, [binary.Left, binary.Right]);
                     if (overload is not null)
                         return overload.ReturnType;
 

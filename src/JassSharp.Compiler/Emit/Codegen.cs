@@ -1084,6 +1084,9 @@ end
 
     private (string Owner, FnDecl Method)? FindOperator(string? leftType, string? rightType, string op, IReadOnlyList<Expr> arguments)
     {
+        if (op is "==" or "!=" && arguments.Any(argument => argument is NullExpr))
+            return null;
+
         (string Owner, FnDecl Method)? best = null;
         int bestScore = int.MaxValue;
 
@@ -1623,6 +1626,7 @@ end
     {
         "&&" => "and",
         "||" => "or",
+        "!=" => "~=",
         "^" => "~",
         _ => op,
     };
