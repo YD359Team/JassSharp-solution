@@ -126,6 +126,30 @@ if ($typeMismatchExitCode -eq 0 -or $typeMismatchErrors.Count -ne 1) {
     throw "Classes with the same short name from different namespaces must remain incompatible. Exit code: $typeMismatchExitCode. Output: $typeMismatchText"
 }
 
+$interfaceMismatchSource = Join-Path $collisionProject "src/InterfaceTypeMismatchRoot.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $interfaceMismatchOutput = dotnet run --configuration Release --no-build --project $project -- check $interfaceMismatchSource 2>&1
+    $interfaceMismatchExitCode = $LASTEXITCODE
+    $interfaceMismatchText = $interfaceMismatchOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $interfaceMismatchDiagnostics = @(ConvertFrom-Json -InputObject $interfaceMismatchText)
+}
+catch {
+    throw "Could not parse namespace interface mismatch diagnostics as JSON. Exit code: $interfaceMismatchExitCode. Output: $interfaceMismatchText"
+}
+$interfaceMismatchErrors = @($interfaceMismatchDiagnostics | Where-Object {
+    $_.Severity -eq "error" -and $_.Message -like "*несовместимое присваивание*"
+})
+if ($interfaceMismatchExitCode -eq 0 -or $interfaceMismatchErrors.Count -ne 1) {
+    throw "Same-named interfaces from different namespaces must remain incompatible. Exit code: $interfaceMismatchExitCode. Output: $interfaceMismatchText"
+}
+
 $ambiguousTypeSource = Join-Path $collisionProject "src/AmbiguousTypeRoot.w3js"
 $previousErrorActionPreference = $ErrorActionPreference
 try {
@@ -146,8 +170,11 @@ catch {
 $ambiguousTypeErrors = @($ambiguousTypeDiagnostics | Where-Object {
     $_.Severity -eq "error" -and $_.Message -like "*неоднозначный тип Player*"
 })
-if ($ambiguousTypeExitCode -eq 0 -or $ambiguousTypeErrors.Count -ne 1) {
-    throw "Unqualified type names imported from multiple namespaces must report one ambiguity error. Exit code: $ambiguousTypeExitCode. Output: $ambiguousTypeText"
+$ambiguousInterfaceErrors = @($ambiguousTypeDiagnostics | Where-Object {
+    $_.Severity -eq "error" -and $_.Message -like "*неоднозначный тип IIdentity*"
+})
+if ($ambiguousTypeExitCode -eq 0 -or $ambiguousTypeErrors.Count -ne 1 -or $ambiguousInterfaceErrors.Count -ne 1) {
+    throw "Unqualified class and interface names imported from multiple namespaces must report ambiguity errors. Exit code: $ambiguousTypeExitCode. Output: $ambiguousTypeText"
 }
 
 Write-Host "[1a] Verifying hexadecimal literals and bitwise operators..."
@@ -1317,7 +1344,7 @@ if (-not (Test-Path $inheritanceLuaPath)) {
 }
 $inheritanceLua = Get-Content -LiteralPath $inheritanceLuaPath -Raw
 foreach ($fragment in @(
-    "setmetatable(UnitActor, { __index = EntityBase })",
+    "setmetatable(UnitActor, { __index = __jasssharp_type_29_InterfacesAndInheritanceSmoke_10_EntityBase })",
     "function EntityBase.__init(self)",
     "function UnitActor.__init(self)",
     "EntityBase.__init(self)",
