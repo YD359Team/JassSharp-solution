@@ -32,6 +32,7 @@ public static class Checker
         private readonly Dictionary<string, string?> _classBaseTypes = new(StringComparer.Ordinal);
         private readonly Dictionary<string, List<string>> _classInterfaces = new(StringComparer.Ordinal);
         private readonly Dictionary<string, FnDecl> _functions = new(StringComparer.Ordinal);
+        private readonly List<(string Namespace, FnDecl Function, bool IsCurrent)> _functionSymbols = [];
         private readonly HashSet<string> _inlineFunctions = new(StringComparer.Ordinal);
         private readonly List<FnDecl> _hooks = [];
         private NativeSig? _hookOriginalSignature;
@@ -107,6 +108,7 @@ public static class Checker
 
             foreach (var fn in unit.Functions)
             {
+                _functionSymbols.Add((unit.Name, fn, ReferenceEquals(unit, _unit)));
                 if (fn.IsHook)
                 {
                     if (ReferenceEquals(unit, _unit))
@@ -216,6 +218,82 @@ public static class Checker
             var operators = declared.Select(method => method.Operator!).ToHashSet(StringComparer.Ordinal);
             if (operators.Contains("==") != operators.Contains("!="))
                 Add(1, 1, "error", "операторы == и != должны объявляться парой");
+        }
+
+        private static bool TryGetQualifiedName(Expr expression, out string name)
+        {
+            switch (expression)
+            {
+                case NameExpr identifier:
+                    name = identifier.Name;
+                    return true;
+                case MemberExpr member when TryGetQualifiedName(member.Object, out var prefix):
+                    name = prefix + "." + member.Name;
+                    return true;
+                default:
+                    name = string.Empty;
+                    return false;
+            }
+        }
+
+        private bool TryResolveFunction(
+            string name,
+            int line,
+            int col,
+            out FnDecl? function,
+            bool reportAmbiguity = true)
+        {
+            List<(string Namespace, FnDecl Function, bool IsCurrent)> matches;
+            if (name.Contains('.', StringComparison.Ordinal))
+            {
+                int separator = name.LastIndexOf('.');
+                string namespaceName = name[..separator].Replace('.', '_');
+                string functionName = name[(separator + 1)..];
+                matches = _functionSymbols
+                    .Where(symbol => symbol.Namespace == namespaceName &&
+                                     symbol.Function.Name == functionName &&
+                                     !symbol.Function.IsHook)
+                    .ToList();
+            }
+            else
+            {
+                var current = _functionSymbols
+                    .Where(symbol => symbol.IsCurrent &&
+                                     symbol.Function.Name == name &&
+                                     !symbol.Function.IsHook)
+                    .ToList();
+                if (current.Count > 0)
+                {
+                    matches = current;
+                }
+                else
+                {
+                    matches = _functionSymbols
+                        .Where(symbol => !symbol.IsCurrent &&
+                                         _unit.Usings.Contains(symbol.Namespace, StringComparer.Ordinal) &&
+                                         symbol.Function.Name == name &&
+                                         !symbol.Function.IsHook)
+                        .ToList();
+                }
+            }
+
+            if (matches.Count == 1)
+            {
+                function = matches[0].Function;
+                return true;
+            }
+
+            function = null;
+            if (matches.Count > 1 && reportAmbiguity)
+            {
+                string candidates = string.Join(", ", matches
+                    .Select(match => match.Namespace + "." + match.Function.Name)
+                    .Distinct(StringComparer.Ordinal)
+                    .OrderBy(candidate => candidate, StringComparer.Ordinal));
+                Add(line, col, "error", $"неоднозначный вызов {name}: имя доступно из нескольких namespace ({candidates}); укажите полное имя");
+            }
+
+            return matches.Count > 0;
         }
 
         private void CheckHooks()
@@ -747,6 +825,18 @@ public static class Checker
                 return;
             }
 
+            if (TryGetQualifiedName(call.Callee, out var qualifiedName) &&
+                qualifiedName.Contains('.', StringComparison.Ordinal) &&
+                TryResolveFunction(qualifiedName, call.Line, call.Col, out var qualifiedFunction))
+            {
+                if (qualifiedFunction is not null)
+                    CheckArguments(call.Callee, call.Args, qualifiedFunction.Params.Select(parameter => parameter.Type).ToArray());
+                else
+                    foreach (var argument in call.Args)
+                        CheckExpression(argument);
+                return;
+            }
+
             if (call.Callee is NameExpr name)
             {
                 if (name.Name == "original")
@@ -771,9 +861,13 @@ public static class Checker
                             $"нестатический метод {_currentClass}.{name.Name} нельзя вызывать из статического метода без экземпляра");
                     }
                 }
-                else if (_functions.TryGetValue(name.Name, out var function))
+                else if (TryResolveFunction(name.Name, name.Line, name.Col, out var function))
                 {
-                    CheckArguments(name, call.Args, function.Params.Select(p => p.Type).ToArray());
+                    if (function is not null)
+                        CheckArguments(name, call.Args, function.Params.Select(p => p.Type).ToArray());
+                    else
+                        foreach (var argument in call.Args)
+                            CheckExpression(argument);
                 }
                 else if (_hasWarcraft3 && NativeSigs.Map.TryGetValue(name.Name, out var native))
                 {
@@ -919,12 +1013,18 @@ public static class Checker
                     return originalSignature.ReturnType;
 
                 case CallExpr { Callee: NameExpr name }:
-                    if (_functions.TryGetValue(name.Name, out var function))
+                    if (TryResolveFunction(name.Name, name.Line, name.Col, out var function, reportAmbiguity: false) &&
+                        function is not null)
                         return function.ReturnType;
                     return _hasWarcraft3 && NativeSigs.Map.TryGetValue(name.Name, out var native) ? native.ReturnType : null;
 
                 case CallExpr { Callee: MemberExpr member }:
                 {
+                    if (TryGetQualifiedName(member, out var qualifiedName) &&
+                        qualifiedName.Contains('.', StringComparison.Ordinal) &&
+                        TryResolveFunction(qualifiedName, member.Line, member.Col, out var qualifiedFunction, reportAmbiguity: false) &&
+                        qualifiedFunction is not null)
+                        return qualifiedFunction.ReturnType;
                     if (member.Object is NameExpr className &&
                         TryGetClassMethod(className.Name, member.Name, out var staticMethod) &&
                         staticMethod.IsStatic)

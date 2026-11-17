@@ -16,6 +16,7 @@ public sealed class Codegen
     private bool _currentMethodIsStatic;
     private readonly Dictionary<string, FnDecl> _inlineMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, FnDecl> _methods = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, string> _qualifiedFunctions = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<FnDecl>> _operatorMethods = new(StringComparer.Ordinal);
     private readonly Dictionary<string, EnumDecl> _enums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
@@ -58,7 +59,10 @@ public sealed class Codegen
                 foreach (var en in imported.Enums)
                     _enums[en.Name] = en;
                 foreach (var fn in imported.Functions.Where(function => !function.IsHook))
+                {
                     _methods[fn.Name] = fn;
+                    _qualifiedFunctions[imported.Name + "." + fn.Name] = fn.Name;
+                }
             }
         }
 
@@ -90,7 +94,10 @@ public sealed class Codegen
         foreach (var en in unit.Enums)
             _enums[en.Name] = en;
         foreach (var fn in unit.Functions.Where(function => !function.IsHook))
+        {
             _methods[fn.Name] = fn;
+            _qualifiedFunctions[unit.Name + "." + fn.Name] = fn.Name;
+        }
 
         // collect inline
         foreach (var kv in _methods)
@@ -1372,6 +1379,13 @@ end
 
     private string EmitNormalCall(CallExpr c)
     {
+        if (c.Callee is MemberExpr qualifiedMember &&
+            TryGetQualifiedName(qualifiedMember, out var qualifiedName) &&
+            _qualifiedFunctions.TryGetValue(qualifiedName, out var resolvedFunction))
+        {
+            return $"{resolvedFunction}({string.Join(", ", c.Args.Select(EmitExpr))})";
+        }
+
         if (c.Callee is MemberExpr mem)
         {
             var rt = RecvType(mem.Object);
@@ -1406,6 +1420,22 @@ end
             return $"{id.Name}({arguments})";
         }
         return $"{EmitExpr(c.Callee)}({string.Join(", ", c.Args.Select(EmitExpr))})";
+    }
+
+    private static bool TryGetQualifiedName(Expr expression, out string name)
+    {
+        switch (expression)
+        {
+            case NameExpr identifier:
+                name = identifier.Name;
+                return true;
+            case MemberExpr member when TryGetQualifiedName(member.Object, out var prefix):
+                name = prefix + "." + member.Name;
+                return true;
+            default:
+                name = string.Empty;
+                return false;
+        }
     }
 
     private string? RecvType(Expr obj) => obj switch
