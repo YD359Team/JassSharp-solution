@@ -80,6 +80,28 @@ if ($ambiguousExitCode -eq 0 -or $ambiguousErrors.Count -ne 1) {
     throw "Unqualified calls matching multiple imported namespaces must report one ambiguity error. Exit code: $ambiguousExitCode. Output: $ambiguousText"
 }
 
+Write-Host "[1e] Verifying same-named classes from different namespaces..."
+$collisionProject = Join-Path $PSScriptRoot "fixtures/NamespaceTypeCollisions"
+$collisionBuildOutput = dotnet run --configuration Release --no-build --project $project -- map --project $collisionProject
+if ($LASTEXITCODE -ne 0) {
+    throw "Namespace class collision project failed to build: $($collisionBuildOutput -join [Environment]::NewLine)"
+}
+$collisionLuaPath = Join-Path $collisionProject "bin/NamespaceTypeCollisions.lua"
+if (-not (Test-Path $collisionLuaPath)) {
+    throw "Expected namespace class collision Lua output was not created: $collisionLuaPath"
+}
+$collisionLua = Get-Content -LiteralPath $collisionLuaPath -Raw
+foreach ($fragment in @(
+    "__jasssharp_type_5_Alpha6_Player = Player",
+    "__jasssharp_type_4_Beta6_Player = Player",
+    "__jasssharp_type_5_Alpha6_Player.new()",
+    "__jasssharp_type_4_Beta6_Player.new()"
+)) {
+    if (-not $collisionLua.Contains($fragment)) {
+        throw "Namespace class collision output is missing expected fragment '$fragment'. Generated Lua: $collisionLua"
+    }
+}
+
 Write-Host "[1a] Verifying hexadecimal literals and bitwise operators..."
 $bitwiseFixture = Join-Path $PSScriptRoot "fixtures/BitwiseSmoke.w3js"
 $bitwiseBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $bitwiseFixture --target lua
