@@ -1198,10 +1198,13 @@ end
 
         if (expression.Callee is MemberExpr member)
         {
-            if (TryGetQualifiedName(member.Object, out var staticOwnerName) &&
-                _qualifiedClasses.TryGetValue(NormalizeQualifiedTypeName(staticOwnerName), out var staticOwnerIdentity) &&
-                FindClassMethod(staticOwnerIdentity, member.Name) is { IsStatic: true } staticMethod)
-                return ResolveQualifiedTypeIdentity(staticMethod.ReturnType, _methodNamespaces.GetValueOrDefault(staticMethod));
+            if (TryGetQualifiedName(member.Object, out var staticOwnerName))
+            {
+                string staticOwnerIdentity = ResolveQualifiedClassIdentity(staticOwnerName);
+                if (_classNamespaces.ContainsKey(staticOwnerIdentity) &&
+                    FindClassMethod(staticOwnerIdentity, member.Name) is { IsStatic: true } staticMethod)
+                    return ResolveQualifiedTypeIdentity(staticMethod.ReturnType, _methodNamespaces.GetValueOrDefault(staticMethod));
+            }
 
             if (member.Object is NameExpr className &&
                 FindClassMethod(ResolveQualifiedClassIdentity(className.Name), member.Name) is { IsStatic: true } staticMethod)
@@ -1600,10 +1603,13 @@ end
 
         if (c.Callee is MemberExpr mem)
         {
-            if (TryGetQualifiedName(mem.Object, out var staticOwnerName) &&
-                _qualifiedClasses.TryGetValue(NormalizeQualifiedTypeName(staticOwnerName), out var staticOwnerIdentity) &&
-                FindClassMethod(staticOwnerIdentity, mem.Name) is { IsStatic: true })
-                return $"{ResolveQualifiedClassLuaName(staticOwnerIdentity)}.{mem.Name}({string.Join(", ", c.Args.Select(EmitExpr))})";
+            if (TryGetQualifiedName(mem.Object, out var staticOwnerName))
+            {
+                string staticOwnerIdentity = ResolveQualifiedClassIdentity(staticOwnerName);
+                if (_classNamespaces.ContainsKey(staticOwnerIdentity) &&
+                    FindClassMethod(staticOwnerIdentity, mem.Name) is { IsStatic: true })
+                    return $"{ResolveQualifiedClassLuaName(staticOwnerIdentity)}.{mem.Name}({string.Join(", ", c.Args.Select(EmitExpr))})";
+            }
 
             var rt = RecvType(mem.Object);
             var prop = rt is null ? null : NativeTable.Find(rt, mem.Name);
