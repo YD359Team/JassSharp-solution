@@ -27,6 +27,7 @@ public static class Checker
         private readonly bool _strictUnknownCalls;
         private readonly HashSet<string> _classes = new(StringComparer.Ordinal);
         private readonly HashSet<string> _interfaces = new(StringComparer.Ordinal);
+        private readonly List<(string Identity, string Namespace, string Name, string Kind)> _typeSymbols = [];
         private readonly Dictionary<string, string> _qualifiedClasses = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _qualifiedInterfaces = new(StringComparer.Ordinal);
         private readonly Dictionary<string, string> _classNamespaces = new(StringComparer.Ordinal);
@@ -85,6 +86,7 @@ public static class Checker
             foreach (var contract in unit.Interfaces ?? [])
             {
                 string identity = GetTypeIdentity(unit.Name, contract.Name);
+                _typeSymbols.Add((identity, unit.Name, contract.Name, "interface"));
                 _interfaces.Add(identity); _qualifiedInterfaces[identity] = identity;
                 _interfaceNamespaces[identity] = unit.Name; _interfaceDeclarations[identity] = contract;
                 foreach (var method in contract.Methods) _declarationNamespaces[method] = unit.Name;
@@ -92,6 +94,7 @@ public static class Checker
             foreach (var cls in unit.Classes)
             {
                 string identity = GetTypeIdentity(unit.Name, cls.Name);
+                _typeSymbols.Add((identity, unit.Name, cls.Name, "class"));
                 _classes.Add(identity); _qualifiedClasses[identity] = identity;
                 _classNamespaces[identity] = unit.Name; _classDeclarations[identity] = cls;
                 _classFields[identity] = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -112,7 +115,10 @@ public static class Checker
             }
 
             foreach (var enumeration in unit.Enums)
+            {
+                _typeSymbols.Add((GetTypeIdentity(unit.Name, enumeration.Name), unit.Name, enumeration.Name, "enum"));
                 _enumSymbols.Add((unit.Name, enumeration, ReferenceEquals(unit, _unit)));
+            }
 
             foreach (var fn in unit.Functions)
             {
@@ -1379,6 +1385,16 @@ public static class Checker
 
         private void ValidateInheritance()
         {
+            foreach (var duplicate in _typeSymbols
+                         .GroupBy(symbol => symbol.Identity, StringComparer.Ordinal)
+                         .Where(group => group.Count() > 1))
+            {
+                var declaration = duplicate.First();
+                Add(1, 1, "error",
+                    $"type '{declaration.Name}' is declared more than once in namespace '{declaration.Namespace}' " +
+                    $"({string.Join(", ", duplicate.Select(symbol => symbol.Kind).Distinct(StringComparer.Ordinal))})");
+            }
+
             foreach (var (contractIdentity, contract) in _interfaceDeclarations)
             {
                 string contractNamespace = _interfaceNamespaces[contractIdentity];
