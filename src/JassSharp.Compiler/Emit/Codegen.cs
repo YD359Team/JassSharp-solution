@@ -91,6 +91,7 @@ public sealed class Codegen
                 foreach (var fn in imported.Functions.Where(function => !function.IsHook))
                 {
                     _methods[fn.Name] = fn;
+                    _methodNamespaces[fn] = imported.Name;
                     _qualifiedFunctions[imported.Name + "." + fn.Name] = fn.Name;
                 }
             }
@@ -155,6 +156,7 @@ public sealed class Codegen
         foreach (var fn in unit.Functions.Where(function => !function.IsHook))
         {
             _methods[fn.Name] = fn;
+            _methodNamespaces[fn] = unit.Name;
             _qualifiedFunctions[unit.Name + "." + fn.Name] = fn.Name;
         }
 
@@ -475,7 +477,7 @@ end
             foreach (var method in group)
             {
                 string condition = string.Join(" and ", method.Params.Select((parameter, index) =>
-                    LuaTypeCheck(parameter.Type, args[index])));
+                    LuaTypeCheck(parameter.Type, args[index], _methodNamespaces.GetValueOrDefault(method))));
                 Line($"if {condition} then return {_classLuaSymbol ?? cls.Name}.{OperatorFunctionName(method)}({string.Join(", ", args)}) end");
             }
             Line("return nil");
@@ -484,12 +486,12 @@ end
         }
     }
 
-    private static string LuaTypeCheck(string type, string expression) => type switch
+    private string LuaTypeCheck(string type, string expression, string? declaringNamespace = null) => type switch
     {
         "int" or "float" => $"type({expression}) == \"number\"",
         "bool" => $"type({expression}) == \"boolean\"",
         "string" => $"type({expression}) == \"string\"",
-        _ => $"getmetatable({expression}) == {type}"
+        _ => $"getmetatable({expression}) == {ResolveQualifiedClassLuaName(type, declaringNamespace)}"
     };
 
     private static string? LuaMetamethod(string op, int arity) => (op, arity) switch
@@ -1196,6 +1198,11 @@ end
 
         if (expression.Callee is MemberExpr member)
         {
+            if (TryGetQualifiedName(member.Object, out var staticOwnerName) &&
+                _qualifiedClasses.TryGetValue(NormalizeQualifiedTypeName(staticOwnerName), out var staticOwnerIdentity) &&
+                FindClassMethod(staticOwnerIdentity, member.Name) is { IsStatic: true } staticMethod)
+                return ResolveQualifiedTypeIdentity(staticMethod.ReturnType, _methodNamespaces.GetValueOrDefault(staticMethod));
+
             if (member.Object is NameExpr className &&
                 FindClassMethod(ResolveQualifiedClassIdentity(className.Name), member.Name) is { IsStatic: true } staticMethod)
                 return ResolveQualifiedTypeIdentity(staticMethod.ReturnType, _methodNamespaces.GetValueOrDefault(staticMethod));
@@ -1650,7 +1657,9 @@ end
         NameExpr n when CurrentFieldType(n.Name) is { } fieldType => fieldType,
         NewExpr n => ResolveQualifiedTypeIdentity(n.Type, _namespaceName),
         BinaryExpr b => InferBinaryType(b),
-        UnaryExpr u => FindOperator(InferType(u.Inner), null, u.Op, [u.Inner])?.Method.ReturnType ?? InferType(u.Inner),
+        UnaryExpr u => FindOperator(InferType(u.Inner), null, u.Op, [u.Inner]) is { } overload
+            ? ResolveQualifiedTypeIdentity(overload.Method.ReturnType, _methodNamespaces.GetValueOrDefault(overload.Method))
+            : InferType(u.Inner),
         MemberExpr m => InferMemberType(m),
         CallExpr c => InferCallType(c),
         _ => null,
