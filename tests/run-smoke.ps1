@@ -40,16 +40,16 @@ if (-not $qualifiedLua.Contains("(Colors_Red == Colors_Blue)")) {
 if (-not $qualifiedLua.Contains("return (BaseValue + Offset)")) {
     throw "Namespace-qualified globals and constants must resolve to their existing Lua names. Generated Lua: $qualifiedLua"
 }
-if (-not $qualifiedLua.Contains("Counter.new(5)")) {
+if (-not $qualifiedLua.Contains("__jasssharp_type_9_MathTools_7_Counter.new(5)")) {
     throw "Namespace-qualified construction must resolve to the existing Lua class identifier. Generated Lua: $qualifiedLua"
 }
-if (-not $qualifiedLua.Contains("Counter.GetSeed()")) {
+if (-not $qualifiedLua.Contains("__jasssharp_type_9_MathTools_7_Counter.GetSeed()")) {
     throw "Namespace-qualified static methods must resolve to the existing Lua class identifier. Generated Lua: $qualifiedLua"
 }
-if (-not $qualifiedLua.Contains("NestedGauge.new(9)") -or -not $qualifiedLua.Contains("NestedGauge.GetDefault()")) {
+if (-not $qualifiedLua.Contains("__jasssharp_type_16_MathTools_Nested_11_NestedGauge.new(9)") -or -not $qualifiedLua.Contains("__jasssharp_type_16_MathTools_Nested_11_NestedGauge.GetDefault()")) {
     throw "Nested namespace-qualified user types and static methods must resolve to their normalized Lua class identifier. Generated Lua: $qualifiedLua"
 }
-if (-not $qualifiedLua.Contains("setmetatable(DerivedEntity, { __index = BaseEntity })")) {
+if (-not $qualifiedLua.Contains("setmetatable(DerivedEntity, { __index = __jasssharp_type_9_MathTools_10_BaseEntity }))) {
     throw "Namespace-qualified base classes must resolve to their imported Lua class identifier. Generated Lua: $qualifiedLua"
 }
 if (-not $qualifiedLua.Contains("__jasssharp_type_9_MathTools_10_BaseEntity.__init(self)")) {
