@@ -1184,7 +1184,7 @@ public static class Checker
                         return member.Name switch { "Key" => pairArgs[0], "Value" => pairArgs[1], _ => null };
 
                     if (TryGetClassField(receiverType, member.Name, out var fieldType2))
-                        return ResolveQualifiedUserType(fieldType2, _classNamespaces.GetValueOrDefault(className, _unit.Name));
+                        return fieldType2;
 
                     var nativeMember = _hasWarcraft3 ? NativeTable.Find(receiverType, member.Name) : null;
                     if (nativeMember is null || nativeMember.Kind == MemberKind.Method)
@@ -1556,8 +1556,11 @@ public static class Checker
             while (current is not null && visited.Add(current))
             {
                 if (_classFields.TryGetValue(current, out var fields) &&
-                    fields.TryGetValue(fieldName, out type!))
+                    fields.TryGetValue(fieldName, out var fieldType))
+                {
+                    type = ResolveQualifiedUserType(fieldType, _classNamespaces.GetValueOrDefault(current, _unit.Name));
                     return true;
+                }
                 current = _classBaseTypes.GetValueOrDefault(current);
             }
 
