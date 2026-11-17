@@ -22,5 +22,6 @@ assert(getmetatable(alpha) == alphaClass, "Alpha.Player.new created an instance 
 assert(getmetatable(beta) == betaClass, "Beta.Player.new created an instance of another class")
 assert(alpha:GetId() == 101, "Alpha.Player inherited fields or methods from the wrong base class")
 assert(beta:GetId() == 202, "Beta.Player inherited fields or methods from the wrong base class")
+assert(VerifyDistinctTypes() == 333, "qualified static methods resolved to the wrong namespace class")
 
 print("Namespace class and inheritance collision runtime checks passed.")
