@@ -102,6 +102,54 @@ foreach ($fragment in @(
     }
 }
 
+$typeMismatchSource = Join-Path $collisionProject "src/TypeMismatchRoot.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $typeMismatchOutput = dotnet run --configuration Release --no-build --project $project -- check $typeMismatchSource 2>&1
+    $typeMismatchExitCode = $LASTEXITCODE
+    $typeMismatchText = $typeMismatchOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $typeMismatchDiagnostics = @(ConvertFrom-Json -InputObject $typeMismatchText)
+}
+catch {
+    throw "Could not parse namespace type mismatch diagnostics as JSON. Exit code: $typeMismatchExitCode. Output: $typeMismatchText"
+}
+$typeMismatchErrors = @($typeMismatchDiagnostics | Where-Object {
+    $_.Severity -eq "error" -and $_.Message -like "*несовместимое присваивание*"
+})
+if ($typeMismatchExitCode -eq 0 -or $typeMismatchErrors.Count -ne 1) {
+    throw "Classes with the same short name from different namespaces must remain incompatible. Exit code: $typeMismatchExitCode. Output: $typeMismatchText"
+}
+
+$ambiguousTypeSource = Join-Path $collisionProject "src/AmbiguousTypeRoot.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $ambiguousTypeOutput = dotnet run --configuration Release --no-build --project $project -- check $ambiguousTypeSource 2>&1
+    $ambiguousTypeExitCode = $LASTEXITCODE
+    $ambiguousTypeText = $ambiguousTypeOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $ambiguousTypeDiagnostics = @(ConvertFrom-Json -InputObject $ambiguousTypeText)
+}
+catch {
+    throw "Could not parse ambiguous namespace type diagnostics as JSON. Exit code: $ambiguousTypeExitCode. Output: $ambiguousTypeText"
+}
+$ambiguousTypeErrors = @($ambiguousTypeDiagnostics | Where-Object {
+    $_.Severity -eq "error" -and $_.Message -like "*неоднозначный тип Player*"
+})
+if ($ambiguousTypeExitCode -eq 0 -or $ambiguousTypeErrors.Count -ne 1) {
+    throw "Unqualified type names imported from multiple namespaces must report one ambiguity error. Exit code: $ambiguousTypeExitCode. Output: $ambiguousTypeText"
+}
+
 Write-Host "[1a] Verifying hexadecimal literals and bitwise operators..."
 $bitwiseFixture = Join-Path $PSScriptRoot "fixtures/BitwiseSmoke.w3js"
 $bitwiseBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $bitwiseFixture --target lua
