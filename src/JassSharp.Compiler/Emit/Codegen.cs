@@ -1024,7 +1024,7 @@ end
                 return method;
             if (_interfaceBases.TryGetValue(current, out var parents))
                 foreach (string parent in parents)
-                    pending.Push(parent);
+                    pending.Push(ResolveQualifiedInterfaceIdentity(parent, _interfaceNamespaces.GetValueOrDefault(current)));
         }
         return null;
     }
@@ -1049,8 +1049,11 @@ end
         while (current is not null && visited.Add(current))
         {
             if (_classFields.TryGetValue(current, out var fields) &&
-                fields.TryGetValue(fieldName, out type!))
+                fields.TryGetValue(fieldName, out var fieldType))
+            {
+                type = ResolveQualifiedTypeIdentity(fieldType, _classNamespaces.GetValueOrDefault(current));
                 return true;
+            }
             current = _classBaseIdentities.GetValueOrDefault(current);
         }
         type = null!;
@@ -1324,44 +1327,90 @@ end
         return separator <= 0 ? typeName : typeName[..separator].Replace('.', '_') + typeName[separator..];
     }
 
-    private string ResolveQualifiedClassName(string typeName)
+    private string ResolveQualifiedClassLuaName(string typeName, string? declaringNamespace = null)
     {
-        string normalized = NormalizeQualifiedTypeName(typeName);
-        if (!_qualifiedClasses.TryGetValue(normalized, out var className))
+        string identity = ResolveQualifiedClassIdentity(typeName, declaringNamespace);
+        if (!_classNamespaces.TryGetValue(identity, out var namespaceName))
             return typeName;
-
-        // Preserve the historical Lua identifier while the short name is unique.
-        // Colliding classes are addressed through a deterministic namespace alias.
-        int separator = typeName.LastIndexOf('.');
-        if (separator > 0 && _qualifiedClasses.Values.Count(candidate => candidate == className) > 1)
-            return GetQualifiedClassSymbol(typeName[..separator], className);
-
-        return className;
+        string shortName = GetShortTypeName(identity);
+        int collisions = _qualifiedClasses.Values.Count(candidate => GetShortTypeName(candidate) == shortName);
+        return collisions > 1 ? GetQualifiedClassSymbol(namespaceName, shortName) : shortName;
     }
 
-    private string ResolveQualifiedClassIdentity(string typeName)
+    private string ResolveQualifiedClassIdentity(string typeName, string? declaringNamespace = null)
     {
         string normalized = NormalizeQualifiedTypeName(typeName);
-        return _qualifiedClasses.TryGetValue(normalized, out var className) ? className : typeName;
+        if (_qualifiedClasses.TryGetValue(normalized, out var qualifiedIdentity))
+            return qualifiedIdentity;
+        if (typeName.Contains('.', StringComparison.Ordinal))
+            return normalized;
+
+        string owner = declaringNamespace ?? _namespaceName ?? string.Empty;
+        string localKey = NormalizeQualifiedTypeName(GetTypeIdentity(owner, typeName));
+        if (_qualifiedClasses.TryGetValue(localKey, out var localIdentity))
+            return localIdentity;
+
+        var imported = (_namespaceUsings.GetValueOrDefault(owner) ?? [])
+            .Select(ns => NormalizeQualifiedTypeName(GetTypeIdentity(ns, typeName)))
+            .Where(_qualifiedClasses.ContainsKey)
+            .Select(key => _qualifiedClasses[key])
+            .Distinct(StringComparer.Ordinal).ToList();
+        if (imported.Count == 1)
+            return imported[0];
+
+        var matches = _qualifiedClasses.Values
+            .Where(identity => GetShortTypeName(identity) == typeName)
+            .Distinct(StringComparer.Ordinal).ToList();
+        return matches.Count == 1 ? matches[0] : typeName;
+    }
+
+    private string ResolveQualifiedInterfaceIdentity(string typeName, string? declaringNamespace = null)
+    {
+        string normalized = NormalizeQualifiedTypeName(typeName);
+        if (_qualifiedInterfaces.TryGetValue(normalized, out var identity))
+            return identity;
+        if (typeName.Contains('.', StringComparison.Ordinal))
+            return normalized;
+
+        string owner = declaringNamespace ?? _namespaceName ?? string.Empty;
+        string localKey = NormalizeQualifiedTypeName(GetTypeIdentity(owner, typeName));
+        if (_qualifiedInterfaces.TryGetValue(localKey, out identity))
+            return identity;
+
+        var imported = (_namespaceUsings.GetValueOrDefault(owner) ?? [])
+            .Select(ns => NormalizeQualifiedTypeName(GetTypeIdentity(ns, typeName)))
+            .Where(_qualifiedInterfaces.ContainsKey)
+            .Select(key => _qualifiedInterfaces[key])
+            .Distinct(StringComparer.Ordinal).ToList();
+        return imported.Count == 1 ? imported[0] : typeName;
+    }
+
+    private string ResolveQualifiedTypeIdentity(string typeName, string? declaringNamespace = null)
+    {
+        if (typeName.EndsWith("[]", StringComparison.Ordinal))
+            return ResolveQualifiedTypeIdentity(typeName[..^2], declaringNamespace) + "[]";
+        if (TryGetGenericArguments(typeName, out var genericName, out var arguments))
+            return genericName + "<" + string.Join(",", arguments.Select(argument => ResolveQualifiedTypeIdentity(argument, declaringNamespace))) + ">";
+
+        string classIdentity = ResolveQualifiedClassIdentity(typeName, declaringNamespace);
+        if (classIdentity != typeName || _classNamespaces.ContainsKey(classIdentity))
+            return classIdentity;
+        return ResolveQualifiedInterfaceIdentity(typeName, declaringNamespace);
     }
 
     private string ResolveQualifiedClassNamespace(string typeName)
     {
-        int separator = typeName.LastIndexOf('.');
-        if (separator > 0)
-            return typeName[..separator].Replace('.', '_');
+        string identity = ResolveQualifiedClassIdentity(typeName);
+        return _classNamespaces.GetValueOrDefault(identity, _namespaceName ?? string.Empty);
+    }
 
-        string currentNamespace = _namespaceName ?? string.Empty;
-        string currentKey = NormalizeQualifiedTypeName(currentNamespace + "." + typeName);
-        if (_qualifiedClassNamespaces.TryGetValue(currentKey, out var currentMatch))
-            return currentMatch;
+    private static string GetTypeIdentity(string namespaceName, string typeName) =>
+        namespaceName.Replace('.', '_') + "." + typeName;
 
-        return _qualifiedClassNamespaces
-            .Where(candidate => candidate.Key.EndsWith("." + typeName, StringComparison.Ordinal))
-            .Select(candidate => candidate.Value)
-            .Distinct(StringComparer.Ordinal)
-            .OrderBy(candidate => candidate, StringComparer.Ordinal)
-            .FirstOrDefault() ?? currentNamespace;
+    private static string GetShortTypeName(string identity)
+    {
+        int separator = identity.LastIndexOf('.');
+        return separator < 0 ? identity : identity[(separator + 1)..];
     }
 
     private static string GetQualifiedClassSymbol(string namespaceName, string className)
