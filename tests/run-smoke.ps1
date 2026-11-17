@@ -177,6 +177,30 @@ if ($ambiguousTypeExitCode -eq 0 -or $ambiguousTypeErrors.Count -ne 1 -or $ambig
     throw "Unqualified class and interface names imported from multiple namespaces must report ambiguity errors. Exit code: $ambiguousTypeExitCode. Output: $ambiguousTypeText"
 }
 
+$duplicateTypeSource = Join-Path $collisionProject "src/DuplicateTypeDeclarationRoot.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $duplicateTypeOutput = dotnet run --configuration Release --no-build --project $project -- check $duplicateTypeSource 2>&1
+    $duplicateTypeExitCode = $LASTEXITCODE
+    $duplicateTypeText = $duplicateTypeOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $duplicateTypeDiagnostics = @(ConvertFrom-Json -InputObject $duplicateTypeText)
+}
+catch {
+    throw "Could not parse duplicate type declaration diagnostics as JSON. Exit code: $duplicateTypeExitCode. Output: $duplicateTypeText"
+}
+$duplicateTypeErrors = @($duplicateTypeDiagnostics | Where-Object {
+    $_.Severity -eq "error" -and $_.Message -like "*type 'Collision' is declared more than once*"
+})
+if ($duplicateTypeExitCode -eq 0 -or $duplicateTypeErrors.Count -ne 1) {
+    throw "A class and interface cannot share the same fully qualified type name. Exit code: $duplicateTypeExitCode. Output: $duplicateTypeText"
+}
+
 Write-Host "[1a] Verifying hexadecimal literals and bitwise operators..."
 $bitwiseFixture = Join-Path $PSScriptRoot "fixtures/BitwiseSmoke.w3js"
 $bitwiseBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $bitwiseFixture --target lua
