@@ -22,7 +22,6 @@ public sealed class Codegen
     private readonly Dictionary<string, EnumDecl> _qualifiedEnums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _qualifiedGlobals = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _qualifiedClasses = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, string> _qualifiedClassNamespaces = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _qualifiedInterfaces = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _interfaceNamespaces = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _classNamespaces = new(StringComparer.Ordinal);
@@ -32,7 +31,6 @@ public sealed class Codegen
     private readonly Dictionary<string, EnumDecl> _enums = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, string>> _classFields = new(StringComparer.Ordinal);
     private readonly Dictionary<string, List<string>> _classBaseCandidates = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, string> _classBases = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _classBaseIdentities = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string> _classBaseStableSymbols = new(StringComparer.Ordinal);
     private readonly Dictionary<string, Dictionary<string, FnDecl>> _interfaceMethods = new(StringComparer.Ordinal);
@@ -66,7 +64,6 @@ public sealed class Codegen
                 {
                     string identity = GetTypeIdentity(imported.Name, cls.Name);
                     _qualifiedClasses[NormalizeQualifiedTypeName(identity)] = identity;
-                    _qualifiedClassNamespaces[NormalizeQualifiedTypeName(identity)] = imported.Name;
                     _classNamespaces[identity] = imported.Name;
                     _classFields[identity] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
                     _classBaseCandidates[identity] = cls.BaseTypes ?? [];
@@ -112,7 +109,6 @@ public sealed class Codegen
         {
             string identity = GetTypeIdentity(unit.Name, cls.Name);
             _qualifiedClasses[NormalizeQualifiedTypeName(identity)] = identity;
-            _qualifiedClassNamespaces[NormalizeQualifiedTypeName(identity)] = unit.Name;
             _classNamespaces[identity] = unit.Name;
             _classFields[identity] = cls.Fields.ToDictionary(field => field.Name, field => field.Type, StringComparer.Ordinal);
             _classBaseCandidates[identity] = cls.BaseTypes ?? [];
@@ -139,7 +135,6 @@ public sealed class Codegen
             if (baseClass.Identity is not null)
             {
                 _classBaseIdentities[candidate.Key] = baseClass.Identity;
-                _classBases[candidate.Key] = baseClass.LuaName;
                 _classBaseStableSymbols[candidate.Key] = baseClass.StableLuaName;
             }
         }
@@ -1406,12 +1401,6 @@ end
         if (classIdentity != typeName || _classNamespaces.ContainsKey(classIdentity))
             return classIdentity;
         return ResolveQualifiedInterfaceIdentity(typeName, declaringNamespace);
-    }
-
-    private string ResolveQualifiedClassNamespace(string typeName)
-    {
-        string identity = ResolveQualifiedClassIdentity(typeName);
-        return _classNamespaces.GetValueOrDefault(identity, _namespaceName ?? string.Empty);
     }
 
     private static string GetTypeIdentity(string namespaceName, string typeName) =>
