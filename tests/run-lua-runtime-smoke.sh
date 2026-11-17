@@ -36,4 +36,9 @@ dotnet run --configuration Release --no-build --project "$COMPILER" -- \
 "$LUA_BIN" "$ROOT/tests/lua/math-geometry-runtime.lua" \
     "$ROOT/tests/fixtures/bin/MathGeometryApiSmoke.lua"
 
+dotnet run --configuration Release --no-build --project "$COMPILER" -- \
+    map --project "$ROOT/tests/fixtures/NamespaceTypeCollisions"
+"$LUA_BIN" "$ROOT/tests/lua/namespace-class-collisions.lua" \
+    "$ROOT/tests/fixtures/NamespaceTypeCollisions/bin/NamespaceTypeCollisions.lua"
+
 echo "All JASS# Lua runtime integration checks passed."
