@@ -1,0 +1,10 @@
+namespace Alpha
+{
+    class Player
+    {
+        int GetId()
+        {
+            return 1;
+        }
+    }
+}
