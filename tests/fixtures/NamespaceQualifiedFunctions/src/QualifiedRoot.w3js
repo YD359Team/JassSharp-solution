@@ -1,0 +1,9 @@
+namespace QualifiedRoot
+{
+    using MathTools;
+
+    int Verify()
+    {
+        return MathTools.Add(2, 3);
+    }
+}

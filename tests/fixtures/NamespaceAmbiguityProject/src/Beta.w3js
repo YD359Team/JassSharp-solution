@@ -1,0 +1,7 @@
+namespace Beta
+{
+    int Shared(int value)
+    {
+        return value + 2;
+    }
+}

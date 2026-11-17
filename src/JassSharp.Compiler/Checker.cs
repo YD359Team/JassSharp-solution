@@ -244,7 +244,7 @@ public static class Checker
             bool reportAmbiguity = true)
         {
             List<(string Namespace, FnDecl Function, bool IsCurrent)> matches;
-            if (name.Contains('.'))
+            if (name.Contains('.', StringComparison.Ordinal))
             {
                 int separator = name.LastIndexOf('.');
                 string namespaceName = name[..separator].Replace('.', '_');
@@ -826,7 +826,7 @@ public static class Checker
             }
 
             if (TryGetQualifiedName(call.Callee, out var qualifiedName) &&
-                qualifiedName.Contains('.') &&
+                qualifiedName.Contains('.', StringComparison.Ordinal) &&
                 TryResolveFunction(qualifiedName, call.Line, call.Col, out var qualifiedFunction))
             {
                 if (qualifiedFunction is not null)
@@ -1021,7 +1021,7 @@ public static class Checker
                 case CallExpr { Callee: MemberExpr member }:
                 {
                     if (TryGetQualifiedName(member, out var qualifiedName) &&
-                        qualifiedName.Contains('.') &&
+                        qualifiedName.Contains('.', StringComparison.Ordinal) &&
                         TryResolveFunction(qualifiedName, member.Line, member.Col, out var qualifiedFunction, reportAmbiguity: false) &&
                         qualifiedFunction is not null)
                         return qualifiedFunction.ReturnType;

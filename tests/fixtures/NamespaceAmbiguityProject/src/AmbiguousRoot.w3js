@@ -1,0 +1,10 @@
+namespace AmbiguousRoot
+{
+    using Alpha;
+    using Beta;
+
+    int Verify()
+    {
+        return Shared(1);
+    }
+}
