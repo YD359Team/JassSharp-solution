@@ -868,7 +868,7 @@ end
             var argExpr = EmitExpr(args[i]);
             // simple: introduce temp or just substitute by emitting as local
             Line($"local {p.Name} = {argExpr}");
-            _locals[p.Name] = p.Type;
+            _locals[p.Name] = ResolveQualifiedTypeIdentity(p.Type, _methodNamespaces.GetValueOrDefault(meth, _namespaceName));
         }
 
         // if method, bind self/this
@@ -1309,7 +1309,7 @@ end
         var saved = _locals;
         _locals = new Dictionary<string, string>(saved, StringComparer.Ordinal);
         foreach (var p in l.Params)
-            _locals[p.Name] = p.Type;
+            _locals[p.Name] = ResolveQualifiedTypeIdentity(p.Type, _namespaceName);
 
         var lines = new List<string>();
         var oldLines = _lines;
@@ -1600,6 +1600,11 @@ end
 
         if (c.Callee is MemberExpr mem)
         {
+            if (TryGetQualifiedName(mem.Object, out var staticOwnerName) &&
+                _qualifiedClasses.TryGetValue(NormalizeQualifiedTypeName(staticOwnerName), out var staticOwnerIdentity) &&
+                FindClassMethod(staticOwnerIdentity, mem.Name) is { IsStatic: true })
+                return $"{ResolveQualifiedClassLuaName(staticOwnerIdentity)}.{mem.Name}({string.Join(", ", c.Args.Select(EmitExpr))})";
+
             var rt = RecvType(mem.Object);
             var prop = rt is null ? null : NativeTable.Find(rt, mem.Name);
             var recv = EmitExpr(mem.Object);
