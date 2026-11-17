@@ -116,6 +116,7 @@ public static class Checker
 
             foreach (var fn in unit.Functions)
             {
+                _declarationNamespaces[fn] = unit.Name;
                 _functionSymbols.Add((unit.Name, fn, ReferenceEquals(unit, _unit)));
                 if (fn.IsHook)
                 {
@@ -322,7 +323,7 @@ public static class Checker
             if (matches.Count != 1)
                 return false;
 
-            type = matches[0].Type;
+            type = ResolveQualifiedUserType(matches[0].Type, matches[0].Namespace);
             return true;
         }
 
@@ -900,7 +901,7 @@ public static class Checker
                 TryResolveFunction(qualifiedName, call.Line, call.Col, out var qualifiedFunction))
             {
                 if (qualifiedFunction is not null)
-                    CheckArguments(call.Callee, call.Args, qualifiedFunction.Params.Select(parameter => parameter.Type).ToArray());
+                    CheckMethodArguments(call.Callee, call.Args, qualifiedFunction);
                 else
                     foreach (var argument in call.Args)
                         CheckExpression(argument);
@@ -934,7 +935,7 @@ public static class Checker
                 else if (TryResolveFunction(name.Name, name.Line, name.Col, out var function))
                 {
                     if (function is not null)
-                        CheckArguments(name, call.Args, function.Params.Select(p => p.Type).ToArray());
+                        CheckMethodArguments(name, call.Args, function);
                     else
                         foreach (var argument in call.Args)
                             CheckExpression(argument);
@@ -1103,7 +1104,7 @@ public static class Checker
                 case CallExpr { Callee: NameExpr name }:
                     if (TryResolveFunction(name.Name, name.Line, name.Col, out var function, reportAmbiguity: false) &&
                         function is not null)
-                        return function.ReturnType;
+                        return ResolveQualifiedUserType(function.ReturnType, _declarationNamespaces.GetValueOrDefault(function, _unit.Name));
                     return _hasWarcraft3 && NativeSigs.Map.TryGetValue(name.Name, out var native) ? native.ReturnType : null;
 
                 case CallExpr { Callee: MemberExpr member }:
@@ -1112,7 +1113,7 @@ public static class Checker
                         qualifiedName.Contains('.') &&
                         TryResolveFunction(qualifiedName, member.Line, member.Col, out var qualifiedFunction, reportAmbiguity: false) &&
                         qualifiedFunction is not null)
-                        return qualifiedFunction.ReturnType;
+                        return ResolveQualifiedUserType(qualifiedFunction.ReturnType, _declarationNamespaces.GetValueOrDefault(qualifiedFunction, _unit.Name));
                     if (TryGetQualifiedName(member, out var qualifiedTypeMethod) &&
                         TryResolveQualifiedClassMethod(qualifiedTypeMethod, out _, out var qualifiedStaticMethod) &&
                         qualifiedStaticMethod.IsStatic)
