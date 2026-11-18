@@ -197,7 +197,7 @@ catch {
 $duplicateTypeErrors = @($duplicateTypeDiagnostics | Where-Object {
     $_.Severity -eq "error" -and
     $_.Message -like "*type 'Collision' is declared more than once*" -and
-    $_.Message -like "*(class, interface, enum)*"
+    $_.Message -like "*(interface, class, enum)*"
 })
 if ($duplicateTypeExitCode -eq 0 -or $duplicateTypeErrors.Count -ne 1) {
     throw "Duplicate class declarations and class/interface/enum name collisions must be rejected for one fully qualified type identity. Exit code: $duplicateTypeExitCode. Output: $duplicateTypeText"
