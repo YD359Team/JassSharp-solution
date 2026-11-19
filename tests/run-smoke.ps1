@@ -1,0 +1,1649 @@
+$ErrorActionPreference = "Stop"
+
+$repoRoot = Split-Path -Parent $PSScriptRoot
+$project = Join-Path $repoRoot "src/JassSharp.Compiler/JassSharp.Compiler.csproj"
+$fixture = Join-Path $PSScriptRoot "fixtures/MathOperatorsSmoke.w3js"
+$invalidFixture = Join-Path $PSScriptRoot "fixtures/StaticMethodMisuse.w3js"
+$typeFixture = Join-Path $PSScriptRoot "fixtures/TypeSafetySmoke.w3js"
+$mathLibrary = Join-Path $repoRoot "standard-library/Math.w3js"
+$vectorLibrary = Join-Path $repoRoot "standard-library/Vectors.w3js"
+$geometryLibrary = Join-Path $repoRoot "standard-library/Geometry.w3js"
+$timerLibrary = Join-Path $repoRoot "standard-library/Timers.w3js"
+$frameLibrary = Join-Path $repoRoot "standard-library/Frames.w3js"
+$output = Join-Path $PSScriptRoot "fixtures/bin/MathOperatorsSmoke.lua"
+$headlessProject = Join-Path $PSScriptRoot "headless-smoke"
+$headlessOutput = Join-Path $headlessProject "bin/HeadlessSmoke.lua"
+
+Write-Host "[1/25] Building compiler..."
+dotnet build $project -c Release
+if ($LASTEXITCODE -ne 0) {
+    throw "Compiler build failed with exit code $LASTEXITCODE"
+}
+
+Write-Host "[1d] Verifying namespace-qualified functions, enums and ambiguous imports..."
+$qualifiedProject = Join-Path $PSScriptRoot "fixtures/NamespaceQualifiedFunctions"
+$qualifiedBuildOutput = dotnet run --configuration Release --no-build --project $project -- map --project $qualifiedProject
+if ($LASTEXITCODE -ne 0) {
+    throw "Namespace-qualified function project failed to build: $($qualifiedBuildOutput -join [Environment]::NewLine)"
+}
+$qualifiedLuaPath = Join-Path $qualifiedProject "bin/NamespaceQualifiedFunctions.lua"
+if (-not (Test-Path $qualifiedLuaPath)) {
+    throw "Expected namespace-qualified Lua output was not created: $qualifiedLuaPath"
+}
+$qualifiedLua = Get-Content -LiteralPath $qualifiedLuaPath -Raw
+if (-not $qualifiedLua.Contains("return Add(2, 3)")) {
+    throw "Namespace-qualified calls must resolve to the imported Lua function without changing its ABI. Generated Lua: $qualifiedLua"
+}
+if (-not $qualifiedLua.Contains("(Colors_Red == Colors_Blue)")) {
+    throw "Namespace-qualified enum members must resolve to the imported enum without changing its Lua ABI. Generated Lua: $qualifiedLua"
+}
+if (-not $qualifiedLua.Contains("return (BaseValue + Offset)")) {
+    throw "Namespace-qualified globals and constants must resolve to their existing Lua names. Generated Lua: $qualifiedLua"
+}
+if (-not $qualifiedLua.Contains("__jasssharp_type_9_MathTools_7_Counter.new(5)")) {
+    throw "Namespace-qualified construction must resolve to the existing Lua class identifier. Generated Lua: $qualifiedLua"
+}
+if (-not $qualifiedLua.Contains("__jasssharp_type_9_MathTools_7_Counter.GetSeed()")) {
+    throw "Namespace-qualified static methods must resolve to the existing Lua class identifier. Generated Lua: $qualifiedLua"
+}
+if (-not $qualifiedLua.Contains("__jasssharp_type_16_MathTools_Nested_11_NestedGauge.new(9)") -or -not $qualifiedLua.Contains("__jasssharp_type_16_MathTools_Nested_11_NestedGauge.GetDefault()")) {
+    throw "Nested namespace-qualified user types and static methods must resolve to their normalized Lua class identifier. Generated Lua: $qualifiedLua"
+}
+if (-not $qualifiedLua.Contains("setmetatable(DerivedEntity, { __index = __jasssharp_type_9_MathTools_10_BaseEntity }")) {
+    throw "Namespace-qualified base classes must resolve to their imported Lua class identifier. Generated Lua: $qualifiedLua"
+}
+if (-not $qualifiedLua.Contains("__jasssharp_type_9_MathTools_10_BaseEntity.__init(self)")) {
+    throw "Namespace-qualified base constructors must be invoked. Generated Lua: $qualifiedLua"
+}
+
+$ambiguousSource = Join-Path $PSScriptRoot "fixtures/NamespaceAmbiguityProject/src/AmbiguousRoot.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $ambiguousOutput = dotnet run --configuration Release --no-build --project $project -- check $ambiguousSource 2>&1
+    $ambiguousExitCode = $LASTEXITCODE
+    $ambiguousText = $ambiguousOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $ambiguousDiagnostics = @(ConvertFrom-Json -InputObject $ambiguousText)
+}
+catch {
+    throw "Could not parse namespace ambiguity diagnostics as JSON. Exit code: $ambiguousExitCode. Output: $ambiguousText"
+}
+$ambiguousErrors = @($ambiguousDiagnostics | Where-Object {
+    $_.Severity -eq "error" -and $_.Message -like "*неоднозначный вызов Shared*"
+})
+if ($ambiguousExitCode -eq 0 -or $ambiguousErrors.Count -ne 1) {
+    throw "Unqualified calls matching multiple imported namespaces must report one ambiguity error. Exit code: $ambiguousExitCode. Output: $ambiguousText"
+}
+
+Write-Host "[1e] Verifying same-named classes from different namespaces..."
+$collisionProject = Join-Path $PSScriptRoot "fixtures/NamespaceTypeCollisions"
+$collisionBuildOutput = dotnet run --configuration Release --no-build --project $project -- map --project $collisionProject
+if ($LASTEXITCODE -ne 0) {
+    throw "Namespace class collision project failed to build: $($collisionBuildOutput -join [Environment]::NewLine)"
+}
+$collisionLuaPath = Join-Path $collisionProject "bin/NamespaceTypeCollisions.lua"
+if (-not (Test-Path $collisionLuaPath)) {
+    throw "Expected namespace class collision Lua output was not created: $collisionLuaPath"
+}
+$collisionLua = Get-Content -LiteralPath $collisionLuaPath -Raw
+foreach ($fragment in @(
+    "__jasssharp_type_5_Alpha_6_Player = Player",
+    "__jasssharp_type_4_Beta_6_Player = Player",
+    "__jasssharp_type_5_Alpha_6_Player.new()",
+    "__jasssharp_type_4_Beta_6_Player.new()"
+)) {
+    if (-not $collisionLua.Contains($fragment)) {
+        throw "Namespace class collision output is missing expected fragment '$fragment'. Generated Lua: $collisionLua"
+    }
+}
+
+$typeMismatchSource = Join-Path $collisionProject "src/TypeMismatchRoot.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $typeMismatchOutput = dotnet run --configuration Release --no-build --project $project -- check $typeMismatchSource 2>&1
+    $typeMismatchExitCode = $LASTEXITCODE
+    $typeMismatchText = $typeMismatchOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $typeMismatchDiagnostics = @(ConvertFrom-Json -InputObject $typeMismatchText)
+}
+catch {
+    throw "Could not parse namespace type mismatch diagnostics as JSON. Exit code: $typeMismatchExitCode. Output: $typeMismatchText"
+}
+$typeMismatchErrors = @($typeMismatchDiagnostics | Where-Object {
+    $_.Severity -eq "error" -and $_.Message -like "*несовместимое присваивание*"
+})
+if ($typeMismatchExitCode -eq 0 -or $typeMismatchErrors.Count -ne 1) {
+    throw "Classes with the same short name from different namespaces must remain incompatible. Exit code: $typeMismatchExitCode. Output: $typeMismatchText"
+}
+
+$interfaceMismatchSource = Join-Path $collisionProject "src/InterfaceTypeMismatchRoot.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $interfaceMismatchOutput = dotnet run --configuration Release --no-build --project $project -- check $interfaceMismatchSource 2>&1
+    $interfaceMismatchExitCode = $LASTEXITCODE
+    $interfaceMismatchText = $interfaceMismatchOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $interfaceMismatchDiagnostics = @(ConvertFrom-Json -InputObject $interfaceMismatchText)
+}
+catch {
+    throw "Could not parse namespace interface mismatch diagnostics as JSON. Exit code: $interfaceMismatchExitCode. Output: $interfaceMismatchText"
+}
+$interfaceMismatchErrors = @($interfaceMismatchDiagnostics | Where-Object {
+    $_.Severity -eq "error" -and $_.Message -like "*несовместимое присваивание*"
+})
+if ($interfaceMismatchExitCode -eq 0 -or $interfaceMismatchErrors.Count -ne 1) {
+    throw "Same-named interfaces from different namespaces must remain incompatible. Exit code: $interfaceMismatchExitCode. Output: $interfaceMismatchText"
+}
+
+$ambiguousTypeSource = Join-Path $collisionProject "src/AmbiguousTypeRoot.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $ambiguousTypeOutput = dotnet run --configuration Release --no-build --project $project -- check $ambiguousTypeSource 2>&1
+    $ambiguousTypeExitCode = $LASTEXITCODE
+    $ambiguousTypeText = $ambiguousTypeOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $ambiguousTypeDiagnostics = @(ConvertFrom-Json -InputObject $ambiguousTypeText)
+}
+catch {
+    throw "Could not parse ambiguous namespace type diagnostics as JSON. Exit code: $ambiguousTypeExitCode. Output: $ambiguousTypeText"
+}
+$ambiguousTypeErrors = @($ambiguousTypeDiagnostics | Where-Object {
+    $_.Severity -eq "error" -and $_.Message -like "*неоднозначный тип Player*"
+})
+$ambiguousInterfaceErrors = @($ambiguousTypeDiagnostics | Where-Object {
+    $_.Severity -eq "error" -and $_.Message -like "*неоднозначный тип IIdentity*"
+})
+if ($ambiguousTypeExitCode -eq 0 -or $ambiguousTypeErrors.Count -ne 1 -or $ambiguousInterfaceErrors.Count -ne 1) {
+    throw "Unqualified class and interface names imported from multiple namespaces must report ambiguity errors. Exit code: $ambiguousTypeExitCode. Output: $ambiguousTypeText"
+}
+
+$duplicateTypeSource = Join-Path $collisionProject "src/DuplicateTypeDeclarationRoot.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $duplicateTypeOutput = dotnet run --configuration Release --no-build --project $project -- check $duplicateTypeSource 2>&1
+    $duplicateTypeExitCode = $LASTEXITCODE
+    $duplicateTypeText = $duplicateTypeOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $duplicateTypeDiagnostics = @(ConvertFrom-Json -InputObject $duplicateTypeText)
+}
+catch {
+    throw "Could not parse duplicate type declaration diagnostics as JSON. Exit code: $duplicateTypeExitCode. Output: $duplicateTypeText"
+}
+$duplicateTypeErrors = @($duplicateTypeDiagnostics | Where-Object {
+    $_.Severity -eq "error" -and
+    $_.Message -like "*type 'Collision' is declared more than once*" -and
+    $_.Message -like "*(interface, class, enum)*"
+})
+if ($duplicateTypeExitCode -eq 0 -or $duplicateTypeErrors.Count -ne 1) {
+    throw "Duplicate class declarations and class/interface/enum name collisions must be rejected for one fully qualified type identity. Exit code: $duplicateTypeExitCode. Output: $duplicateTypeText"
+}
+
+Write-Host "[1a] Verifying hexadecimal literals and bitwise operators..."
+$bitwiseFixture = Join-Path $PSScriptRoot "fixtures/BitwiseSmoke.w3js"
+$bitwiseBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $bitwiseFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Bitwise fixture failed to compile: $($bitwiseBuildOutput -join [Environment]::NewLine)"
+}
+$bitwiseLuaPath = Join-Path $PSScriptRoot "fixtures/bin/BitwiseSmoke.lua"
+if (-not (Test-Path $bitwiseLuaPath)) {
+    throw "Expected generated bitwise Lua file was not created: $bitwiseLuaPath"
+}
+$bitwiseLua = Get-Content -LiteralPath $bitwiseLuaPath -Raw
+foreach ($fragment in @(
+    "local abc = (2748)",
+    "local combined = (flags | mask)",
+    "local intersection = (flags & mask)",
+    "local toggled = (flags ~ mask)",
+    "local shiftedLeft = (1 << 5)",
+    "local shiftedRight = (32 >> 2)",
+    "local allBits = (-1)",
+    "local deadBeef = (-559038737)",
+    "local signBit = (-2147483647 - 1)",
+    "local minValue = (-2147483647 - 1)",
+    "local precedence = (1 | (2 ~ (3 & (4 << 1))))",
+    "flags = (flags | (16))",
+    "flags = (flags & (255))",
+    "flags = (flags ~ (1))",
+    "flags = (flags << 1)",
+    "flags = (flags >> 1)"
+)) {
+    if (-not $bitwiseLua.Contains($fragment)) {
+        throw "Generated bitwise Lua is missing expected fragment: $fragment"
+    }
+}
+if ($bitwiseLua.Contains("bit32.") -or $bitwiseLua.Contains("bit.")) {
+    throw "Bitwise code generation must use native Lua 5.3 operators, not external bit libraries."
+}
+
+Write-Host "[1b] Verifying bitwise operand types and 32-bit literal overflow..."
+$bitwiseInvalidFixture = Join-Path $PSScriptRoot "fixtures/BitwiseTypeMismatchSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $bitwiseDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $bitwiseInvalidFixture 2>&1
+    $bitwiseExitCode = $LASTEXITCODE
+    $bitwiseText = $bitwiseDiagnostics -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $parsedBitwiseDiagnostics = ConvertFrom-Json -InputObject $bitwiseText
+}
+catch {
+    throw "Could not parse bitwise diagnostics as JSON. Exit code: $bitwiseExitCode. Output: $bitwiseText"
+}
+$bitwiseErrors = @($parsedBitwiseDiagnostics | Where-Object { $_.Severity -eq "error" })
+$bitwiseErrorLines = @($bitwiseErrors | ForEach-Object { [int]$_.Line } | Sort-Object) -join ","
+if ($bitwiseExitCode -eq 0 -or $bitwiseErrors.Count -ne 5 -or $bitwiseErrorLines -ne "6,7,8,9,10") {
+    throw "Bitwise type checking or 32-bit literal overflow validation failed. Exit code: $bitwiseExitCode. Error lines: $bitwiseErrorLines. Output: $bitwiseText"
+}
+
+Write-Host "[1c] Verifying overflow validation in constants and enum members..."
+$bitwiseConstantsFixture = Join-Path $PSScriptRoot "fixtures/BitwiseConstantOverflowSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $bitwiseConstantsDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $bitwiseConstantsFixture 2>&1
+    $bitwiseConstantsExitCode = $LASTEXITCODE
+    $bitwiseConstantsText = $bitwiseConstantsDiagnostics -join [Environment]::NewLine
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $parsedBitwiseConstantsDiagnostics = ConvertFrom-Json -InputObject $bitwiseConstantsText
+}
+catch {
+    throw "Could not parse constant/enum overflow diagnostics as JSON. Exit code: $bitwiseConstantsExitCode. Output: $bitwiseConstantsText"
+}
+$bitwiseConstantsErrors = @($parsedBitwiseConstantsDiagnostics | Where-Object { $_.Severity -eq "error" })
+$bitwiseConstantsErrorLines = @($bitwiseConstantsErrors | ForEach-Object { [int]$_.Line } | Sort-Object) -join ","
+if ($bitwiseConstantsExitCode -eq 0 -or $bitwiseConstantsErrors.Count -ne 2 -or $bitwiseConstantsErrorLines -ne "3,7") {
+    throw "Overflow validation did not cover const and enum expressions. Exit code: $bitwiseConstantsExitCode. Error lines: $bitwiseConstantsErrorLines. Output: $bitwiseConstantsText"
+}
+
+Write-Host "[2/25] Verifying invalid static method calls are rejected..."
+$misuseDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $invalidFixture 2>&1
+$misuseExitCode = $LASTEXITCODE
+$misuseText = $misuseDiagnostics -join "`n"
+$hasStaticCallError = $misuseText.Contains("Factory.Create")
+$hasInstanceCallError = $misuseText.Contains("Factory.Get")
+$hasStaticFieldError = $misuseText.Contains("StoredValue")
+$hasErrorSeverity = $misuseText.Contains('"Severity":"error"')
+
+if ($misuseExitCode -eq 0 -or -not $hasErrorSeverity -or -not $hasStaticCallError -or -not $hasInstanceCallError -or -not $hasStaticFieldError) {
+    throw "Static/instance misuse was not rejected with all expected diagnostics. Exit code: $misuseExitCode. Output: $misuseText"
+}
+
+Write-Host "[2a] Verifying opt-in strict unknown-call diagnostics..."
+$unknownCallFixture = Join-Path $PSScriptRoot "fixtures/UnknownCallSmoke.w3js"
+$strictUnknownCallsConfig = Join-Path $PSScriptRoot "fixtures/strict-unknown-calls.json"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $defaultUnknownCallOutput = dotnet run --configuration Release --no-build --project $project -- check $unknownCallFixture 2>&1
+    $defaultUnknownCallExitCode = $LASTEXITCODE
+    $strictUnknownCallOutput = dotnet run --configuration Release --no-build --project $project -- check $unknownCallFixture --config $strictUnknownCallsConfig 2>&1
+    $strictUnknownCallExitCode = $LASTEXITCODE
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+$defaultUnknownCallText = $defaultUnknownCallOutput -join "`n"
+$strictUnknownCallText = $strictUnknownCallOutput -join "`n"
+try {
+    $defaultUnknownCallDiagnostics = ConvertFrom-Json -InputObject $defaultUnknownCallText
+    $strictUnknownCallDiagnostics = ConvertFrom-Json -InputObject $strictUnknownCallText
+}
+catch {
+    throw "Could not parse unknown-call diagnostics. Default exit: $defaultUnknownCallExitCode. Strict exit: $strictUnknownCallExitCode. Default output: $defaultUnknownCallText. Strict output: $strictUnknownCallText"
+}
+$defaultUnknownCall = @($defaultUnknownCallDiagnostics | Where-Object { $_.Message -like "*ExternalLuaFunction*" })
+$defaultUnknownMethod = @($defaultUnknownCallDiagnostics | Where-Object { $_.Message -like "*MissingMethod*" })
+$defaultUnknownNativeMethod = @($defaultUnknownCallDiagnostics | Where-Object { $_.Message -like "*MissingNativeMethod*" })
+$strictUnknownCall = @($strictUnknownCallDiagnostics | Where-Object { $_.Message -like "*ExternalLuaFunction*" })
+$strictUnknownMethod = @($strictUnknownCallDiagnostics | Where-Object { $_.Message -like "*MissingMethod*" })
+$strictUnknownNativeMethod = @($strictUnknownCallDiagnostics | Where-Object { $_.Message -like "*MissingNativeMethod*" })
+if ($defaultUnknownCallExitCode -ne 0 -or $defaultUnknownCall.Count -ne 1 -or $defaultUnknownCall[0].Severity -ne "warning" -or
+    $defaultUnknownMethod.Count -ne 1 -or $defaultUnknownMethod[0].Severity -ne "warning" -or
+    $defaultUnknownNativeMethod.Count -ne 1 -or $defaultUnknownNativeMethod[0].Severity -ne "warning") {
+    throw "Unknown external calls and unresolved typed/native methods must remain warnings by default. Exit code: $defaultUnknownCallExitCode. Output: $defaultUnknownCallText"
+}
+if ($strictUnknownCallExitCode -eq 0 -or $strictUnknownCall.Count -ne 1 -or $strictUnknownCall[0].Severity -ne "error" -or
+    $strictUnknownMethod.Count -ne 1 -or $strictUnknownMethod[0].Severity -ne "error" -or
+    $strictUnknownNativeMethod.Count -ne 1 -or $strictUnknownNativeMethod[0].Severity -ne "error") {
+    throw "strictUnknownCalls did not promote unknown calls and unresolved typed/native methods to errors. Exit code: $strictUnknownCallExitCode. Output: $strictUnknownCallText"
+}
+
+Write-Host "[3/25] Verifying build rejects semantic errors..."
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    # PowerShell can promote native stderr output to a terminating error when
+    # ErrorActionPreference is Stop, even when a non-zero exit code is expected.
+    $ErrorActionPreference = "Continue"
+    $invalidBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $invalidFixture 2>&1
+    $invalidBuildExitCode = $LASTEXITCODE
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+
+if ($invalidBuildExitCode -eq 0) {
+    throw "Build accepted a fixture with invalid static/instance method calls. Output: $($invalidBuildOutput -join [Environment]::NewLine)"
+}
+
+Write-Host "[4/25] Verifying strict assignment compatibility..."
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    # Native stderr can become a terminating PowerShell error under Stop.
+    $ErrorActionPreference = "Continue"
+    $typeDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $typeFixture 2>&1
+    $typeExitCode = $LASTEXITCODE
+    $typeText = $typeDiagnostics -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+
+# The compiler emits JSON with escaped Unicode. Parse it so assertions operate
+# on decoded diagnostic messages instead of their serialized representation.
+try {
+    $parsedTypeDiagnostics = ConvertFrom-Json -InputObject $typeText
+}
+catch {
+    throw "Could not parse type-safety diagnostics as JSON. Exit code: $typeExitCode. Output: $typeText"
+}
+
+$typeErrors = @($parsedTypeDiagnostics | Where-Object { $_.Severity -eq "error" })
+$errorLines = @($typeErrors | ForEach-Object { [int]$_.Line } | Sort-Object)
+$actualErrorLines = $errorLines -join ","
+$expectedErrorLines = "7,8,10,11"
+
+# Keep this assertion ASCII-only: Windows PowerShell 5.1 may decode a UTF-8
+# script without BOM using the active ANSI code page, corrupting Cyrillic text.
+# These four source lines correspond to float->int, bool->int, var reassignment,
+# and var without an initializer, respectively.
+if ($typeExitCode -eq 0 -or $typeErrors.Count -ne 4 -or $actualErrorLines -ne $expectedErrorLines) {
+    throw "Strict assignment compatibility was not enforced at all expected source locations. Exit code: $typeExitCode. Error lines: $actualErrorLines. Output: $typeText"
+}
+
+Write-Host "[5/25] Checking the operator/Math fixture and embedded standard-library modules..."
+dotnet run --configuration Release --no-build --project $project -- check $fixture
+if ($LASTEXITCODE -ne 0) {
+    throw "Fixture check failed with exit code $LASTEXITCODE"
+}
+
+dotnet run --configuration Release --no-build --project $project -- check $mathLibrary
+if ($LASTEXITCODE -ne 0) {
+    throw "Math standard-library check failed with exit code $LASTEXITCODE"
+}
+
+dotnet run --configuration Release --no-build --project $project -- check $vectorLibrary
+if ($LASTEXITCODE -ne 0) {
+    throw "Vector standard-library check failed with exit code $LASTEXITCODE"
+}
+
+dotnet run --configuration Release --no-build --project $project -- check $geometryLibrary
+if ($LASTEXITCODE -ne 0) {
+    throw "Geometry standard-library check failed with exit code $LASTEXITCODE"
+}
+
+dotnet run --configuration Release --no-build --project $project -- check $timerLibrary
+if ($LASTEXITCODE -ne 0) {
+    throw "Timer standard-library check failed with exit code $LASTEXITCODE"
+}
+
+dotnet run --configuration Release --no-build --project $project -- check $frameLibrary
+if ($LASTEXITCODE -ne 0) {
+    throw "Frame standard-library check failed with exit code $LASTEXITCODE"
+}
+
+Write-Host "[5a] Building typed frame controls fixture..."
+$frameControlsFixture = Join-Path $PSScriptRoot "fixtures/FrameControlsSmoke.w3js"
+$frameControlsBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $frameControlsFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Frame controls fixture failed to compile: $($frameControlsBuildOutput -join [Environment]::NewLine)"
+}
+$frameControlsLuaPath = Join-Path $PSScriptRoot "fixtures/bin/FrameControlsSmoke.lua"
+if (-not (Test-Path $frameControlsLuaPath)) {
+    throw "Expected generated frame controls Lua file was not created: $frameControlsLuaPath"
+}
+$frameControlsLua = Get-Content -LiteralPath $frameControlsLuaPath -Raw
+foreach ($fragment in @(
+    '"CHECKBOX"',
+    '"POPUPMENU"',
+    '"MENU"',
+    'FRAMEEVENT_CHECKBOX_CHECKED',
+    'FRAMEEVENT_CHECKBOX_UNCHECKED',
+    'FRAMEEVENT_POPUPMENU_ITEM_CHANGED',
+    'function TextFrame:Subscribe'
+)) {
+    if (-not $frameControlsLua.Contains($fragment)) {
+        throw "Generated frame controls Lua is missing expected fragment: $fragment"
+    }
+}
+
+Write-Host "[5b] Building generic collection fixture..."
+$collectionsFixture = Join-Path $PSScriptRoot "fixtures/CollectionsSmoke.w3js"
+$collectionsBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $collectionsFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Generic collections fixture failed to compile: $($collectionsBuildOutput -join [Environment]::NewLine)"
+}
+$collectionsLuaPath = Join-Path $PSScriptRoot "fixtures/bin/CollectionsSmoke.lua"
+if (-not (Test-Path $collectionsLuaPath)) {
+    throw "Expected generated collections Lua file was not created: $collectionsLuaPath"
+}
+$collectionsLua = Get-Content -LiteralPath $collectionsLuaPath -Raw
+foreach ($fragment in @(
+    '__queue_new()',
+    '__queue_enqueue(queue, 10)',
+    '__queue_dequeue(queue)',
+    '__stack_new()',
+    '__stack_push(stack, "first")',
+    '__dictionary_new()',
+    '__dictionary_add(scores, "Player1", 100)',
+    '__dictionary_tryadd(scores, "Player2", 200)',
+    '__dictionary_tryremove(scores, "Player2")',
+    '__dictionary_set(scores, "Player1", 150)',
+    '__collection_store(nil)',
+    '__collection_load(',
+    'pairs(__foreachCollection',
+    'Key = __foreachIndex',
+    'Value = __collection_load(__foreachValue'
+)) {
+    if (-not $collectionsLua.Contains($fragment)) {
+        throw "Generated collections Lua is missing expected fragment: $fragment"
+    }
+}
+
+Write-Host "[5c] Verifying generic collection type safety..."
+$collectionsInvalidFixture = Join-Path $PSScriptRoot "fixtures/CollectionsTypeMismatchSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $collectionsDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $collectionsInvalidFixture 2>&1
+    $collectionsExitCode = $LASTEXITCODE
+    $collectionsText = $collectionsDiagnostics -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $parsedCollectionsDiagnostics = ConvertFrom-Json -InputObject $collectionsText
+}
+catch {
+    throw "Could not parse generic collection diagnostics as JSON. Exit code: $collectionsExitCode. Output: $collectionsText"
+}
+$collectionErrors = @($parsedCollectionsDiagnostics | Where-Object { $_.Severity -eq "error" })
+if ($collectionsExitCode -eq 0 -or $collectionErrors.Count -ne 4) {
+    throw "Generic collection type safety did not reject all four invalid type mismatches. Exit code: $collectionsExitCode. Errors: $($collectionErrors.Count). Output: $collectionsText"
+}
+
+Write-Host "[5d] Building interpolation and raw string fixture..."
+$stringsFixture = Join-Path $PSScriptRoot "fixtures/StringsSmoke.w3js"
+$stringsBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $stringsFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "String fixture failed to compile: $($stringsBuildOutput -join [Environment]::NewLine)"
+}
+$stringsLuaPath = Join-Path $PSScriptRoot "fixtures/bin/StringsSmoke.lua"
+if (-not (Test-Path $stringsLuaPath)) {
+    throw "Expected generated strings Lua file was not created: $stringsLuaPath"
+}
+$stringsLua = Get-Content -LiteralPath $stringsLuaPath -Raw
+foreach ($fragment in @(
+    'Product: ',
+    'tostring(((x * y) * z))',
+    'Result=',
+    'enabled=',
+    '{literal} and {',
+    'First line\nSecond line\nThird line',
+    'Product: ',
+    'Enabled: ',
+    'Braces: {literal}',
+    'Line one\nLine two\tindented',
+    'C:\\temp\\file'
+)) {
+    if (-not $stringsLua.Contains($fragment)) {
+        throw "Generated strings Lua is missing expected fragment: $fragment"
+    }
+}
+
+Write-Host "[5e] Verifying interpolation type safety..."
+$stringsInvalidFixture = Join-Path $PSScriptRoot "fixtures/StringsTypeMismatchSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $stringsDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $stringsInvalidFixture 2>&1
+    $stringsExitCode = $LASTEXITCODE
+    $stringsText = $stringsDiagnostics -join [Environment]::NewLine
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $parsedStringsDiagnostics = ConvertFrom-Json -InputObject $stringsText
+}
+catch {
+    throw "Could not parse interpolation diagnostics as JSON. Exit code: $stringsExitCode. Output: $stringsText"
+}
+$stringsErrors = @($parsedStringsDiagnostics | Where-Object { $_.Severity -eq "error" })
+if ($stringsExitCode -eq 0 -or $stringsErrors.Count -ne 1) {
+    throw "Interpolation type safety did not reject assigning a string to int. Exit code: $stringsExitCode. Errors: $($stringsErrors.Count). Output: $stringsText"
+}
+
+Write-Host "[5f] Building the Strings standard-library API..."
+$stringsApiFixture = Join-Path $PSScriptRoot "fixtures/StringsApiSmoke.w3js"
+$stringsApiBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $stringsApiFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Strings API fixture failed to compile: $($stringsApiBuildOutput -join [Environment]::NewLine)"
+}
+$stringsApiLuaPath = Join-Path $PSScriptRoot "fixtures/bin/StringsApiSmoke.lua"
+if (-not (Test-Path $stringsApiLuaPath)) {
+    throw "Expected generated Strings API Lua file was not created: $stringsApiLuaPath"
+}
+$stringsApiLua = Get-Content -LiteralPath $stringsApiLuaPath -Raw
+foreach ($fragment in @(
+    "function Strings.Substring(value, startIndex, length)",
+    "function Strings.Replace(value, oldValue, newValue)",
+    "function Strings.IndexOf(value, searchValue)",
+    "function Strings.LastIndexOf(value, searchValue)",
+    "function Strings.Contains(value, searchValue)",
+    "function Strings.Trim(value)",
+    "function Strings.TrimStart(value)",
+    "function Strings.TrimEnd(value)",
+    "function Strings.ToLower(value)",
+    "function Strings.ToUpper(value)",
+    "function Strings.Split(value, separator)",
+    "function Strings.Join(separator, values)",
+    "utf8.offset(value, (startIndex + 1))",
+    "utf8.len(source)"
+)) {
+    if (-not $stringsApiLua.Contains($fragment)) {
+        throw "Generated Strings API Lua is missing expected fragment: $fragment"
+    }
+}
+
+Write-Host "[5g] Verifying do-while and Lua.Raw..."
+$doWhileFixture = Join-Path $PSScriptRoot "fixtures/DoWhileSmoke.w3js"
+$doWhileOutput = dotnet run --configuration Release --no-build --project $project -- build $doWhileFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Do-while fixture failed to compile: $($doWhileOutput -join [Environment]::NewLine)"
+}
+$doWhileLuaPath = Join-Path $PSScriptRoot "fixtures/bin/DoWhileSmoke.lua"
+if (-not (Test-Path $doWhileLuaPath)) {
+    throw "Expected generated do-while Lua file was not created: $doWhileLuaPath"
+}
+$doWhileLua = Get-Content -LiteralPath $doWhileLuaPath -Raw
+if (-not $doWhileLua.Contains("repeat") -or -not $doWhileLua.Contains("until not ((value < 3))")) {
+    throw "Do-while did not lower to Lua repeat/until. Output: $doWhileLua"
+}
+
+$luaRawFixture = Join-Path $PSScriptRoot "fixtures/LuaRawSmoke.w3js"
+$luaRawOutput = dotnet run --configuration Release --no-build --project $project -- build $luaRawFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Lua.Raw fixture failed to compile: $($luaRawOutput -join [Environment]::NewLine)"
+}
+$luaRawPath = Join-Path $PSScriptRoot "fixtures/bin/LuaRawSmoke.lua"
+if (-not (Test-Path $luaRawPath)) {
+    throw "Expected generated Lua.Raw file was not created: $luaRawPath"
+}
+$luaRaw = Get-Content -LiteralPath $luaRawPath -Raw
+if (-not $luaRaw.Contains("local rawValue = 42") -or -not $luaRaw.Contains("assert(rawValue == 42)")) {
+    throw "Lua.Raw block was not emitted verbatim. Output: $luaRaw"
+}
+
+Write-Host "[5h] Verifying Lua.Raw restrictions and the removal of vJASS..."
+$rawExpressionFixture = Join-Path $PSScriptRoot "fixtures/LuaRawExpressionRejectedSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $rawExpressionDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $rawExpressionFixture 2>&1
+    $rawExpressionExitCode = $LASTEXITCODE
+    $rawExpressionText = $rawExpressionDiagnostics -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+if ($rawExpressionExitCode -eq 0 -or -not $rawExpressionText.Contains("Lua.Raw")) {
+    throw "Lua.Raw was accepted as an expression. Exit code: $rawExpressionExitCode. Output: $rawExpressionText"
+}
+
+$vjassDirectiveFixture = Join-Path $PSScriptRoot "fixtures/VjassDirectiveRejectedSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $vjassDirectiveDiagnostics = dotnet run --configuration Release --no-build --project $project -- check $vjassDirectiveFixture 2>&1
+    $vjassDirectiveExitCode = $LASTEXITCODE
+    $vjassDirectiveText = $vjassDirectiveDiagnostics -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+if ($vjassDirectiveExitCode -eq 0) {
+    throw "The removed target-conditional directive was accepted. Output: $vjassDirectiveText"
+}
+
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $vjassTargetOutput = dotnet run --configuration Release --no-build --project $project -- build $doWhileFixture --target vjass 2>&1
+    $vjassTargetExitCode = $LASTEXITCODE
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+if ($vjassTargetExitCode -eq 0) {
+    throw "The removed vJASS target was accepted. Output: $($vjassTargetOutput -join [Environment]::NewLine)"
+}
+
+Write-Host "[5i] Checking Color, floating text, lightning and Warcraft III 3.0 RPG modules..."
+$visualLibraries = @(
+    "Colors.w3js",
+    "FloatingText.w3js",
+    "Lightning.w3js",
+    "Inventory.w3js",
+    "RpgStats.w3js",
+    "Effects.w3js",
+    "Camera.w3js",
+    "Audio.w3js"
+)
+foreach ($libraryName in $visualLibraries) {
+    $libraryPath = Join-Path $repoRoot ("standard-library/" + $libraryName)
+    $libraryOutput = dotnet run --configuration Release --no-build --project $project -- check $libraryPath
+    if ($LASTEXITCODE -ne 0) {
+        throw "$libraryName standard-library check failed: $($libraryOutput -join [Environment]::NewLine)"
+    }
+}
+$visualFixture = Join-Path $PSScriptRoot "fixtures/VisualRpgSmoke.w3js"
+$visualBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $visualFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Visual/RPG fixture failed to compile: $($visualBuildOutput -join [Environment]::NewLine)"
+}
+$visualLuaPath = Join-Path $PSScriptRoot "fixtures/bin/VisualRpgSmoke.lua"
+if (-not (Test-Path $visualLuaPath)) {
+    throw "Expected visual/RPG Lua file was not created: $visualLuaPath"
+}
+$visualLua = Get-Content -LiteralPath $visualLuaPath -Raw
+foreach ($fragment in @(
+    "function Color.FromBytes(red, green, blue, alpha)",
+    "function Color:ToArgb()",
+    "BlzFrameSetTextColor(target, self:ToArgb())",
+    "SetUnitVertexColor(target, self:RedByte(), self:GreenByte(), self:BlueByte(), self:AlphaByte())",
+    "SetDestructableColor(target, color)",
+    "SetLightningColor(target, self.R, self.G, self.B, self.A)",
+    "function FloatingTextTag.new(text, x, y, z, size, lifespan, fadepoint)",
+    "SetTextTagPosUnit(self._handle, target, zOffset)",
+    "DestroyTextTag(self._handle)",
+    "function LightningEffect.new(codeName, checkVisibility, start, end)",
+    "MoveLightningEx(self._handle, checkVisibility",
+    "DestroyLightning(self._handle)",
+    "BlzUnitExtendedInventorySize(self._owner)",
+    "BlzUnitItemInBagSlot(self._owner, slot)",
+    "BlzUnitHasAnyItemEquipped(self._owner)",
+    "ChooseRandomItemExWithFilterAndIncludes(type, level, equipment, tag, includeInvalidMorphs, includeNonPickRandom)",
+    "BlzUnitEquipItem(self._owner, value)",
+    "BlzUnitUnequipItemFromSlot(self._owner, slot)",
+    "BlzResetUnitTalents(target)",
+    "UnitAddAbility(target, abilityRawcode)",
+    "SetUnitAbilityLevel(target, abilityRawcode, rank)",
+    "UnitMakeAbilityPermanent(target, permanent, abilityRawcode)",
+    "BlzUnitHeal(target, source, amount, isItem, applyStatBonuses)",
+    "GetHeroStr(self._owner, includeBonuses)",
+    "GetHeroAgi(self._owner, includeBonuses)",
+    "GetHeroInt(self._owner, includeBonuses)",
+    "BlzGetUnitArmor(self._owner)",
+    "BlzSetUnitArmor(self._owner, value)",
+    "BlzGetUnitBaseDamage(self._owner, weaponIndex)",
+    "BlzSetUnitBaseDamage(self._owner, value, weaponIndex)",
+    "BlzGetUnitDiceNumber(self._owner, weaponIndex)",
+    "BlzSetUnitDiceNumber(self._owner, value, weaponIndex)",
+    "BlzGetUnitDiceSides(self._owner, weaponIndex)",
+    "BlzSetUnitDiceSides(self._owner, value, weaponIndex)",
+    "BlzGetUnitAttackCooldown(self._owner, weaponIndex)",
+    "BlzSetUnitAttackCooldown(self._owner, seconds, weaponIndex)",
+    "BlzGetUnitMaxHP(self._owner)",
+    "BlzSetUnitMaxHP(self._owner, value)",
+    "BlzGetUnitMaxMana(self._owner)",
+    "BlzSetUnitMaxMana(self._owner, value)",
+    "GetUnitMoveSpeed(self._owner)",
+    "SetUnitMoveSpeed(self._owner, value)",
+    "GetUnitState(self._owner, UNIT_STATE_LIFE)",
+    "SetUnitState(self._owner, UNIT_STATE_LIFE, value)",
+    "BlzGetUnitAbilityCooldown(self._owner, abilityRawcode, level)",
+    "BlzGetUnitAbilityCooldownRemaining(self._owner, abilityRawcode)",
+    "BlzSetUnitAbilityCooldownRemaining(self._owner, abilityRawcode, seconds)",
+    "BlzGetUnitAbilityCooldownPercent(self._owner, abilityRawcode)",
+    "BlzSetUnitAbilityCooldownPercent(self._owner, abilityRawcode, percent)",
+    "BlzAdjustUnitAbilityCooldownPercent(self._owner, abilityRawcode, deltaPercent)",
+    "BlzAdjustUnitAbilityCooldownRemaining(self._owner, abilityRawcode, deltaSeconds)",
+    "BlzEndUnitAbilityCooldown(self._owner, abilityRawcode)",
+    "BlzStartUnitAbilityCooldown(self._owner, abilityRawcode, seconds)",
+    "BlzRemoveEffect(value)",
+    "BlzSetCameraAllowsHotkeyTargetLock(allowed)",
+    "BlzGetCameraAllowsHotkeyTargetLock()",
+    "SetThematicMusicAbsoluteVolume(volume)"
+)) {
+    if (-not $visualLua.Contains($fragment)) {
+        throw "Generated visual/RPG Lua is missing expected fragment: $fragment"
+    }
+}
+if ($visualLua.Contains("function UnitInventory.__gc") -or
+    $visualLua.Contains("function FloatingTextTag.__gc") -or
+    $visualLua.Contains("function LightningEffect.__gc")) {
+    throw "Game handle wrappers must use explicit disposal, not Lua GC finalizers."
+}
+
+Write-Host "[6/25] Generating Lua and validating 2D geometry..."
+$geometryFixture = Join-Path $PSScriptRoot "fixtures/GeometrySmoke.w3js"
+$geometryBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $geometryFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Geometry fixture failed to compile: $($geometryBuildOutput -join [Environment]::NewLine)"
+}
+$geometryLuaPath = Join-Path $PSScriptRoot "fixtures/bin/GeometrySmoke.lua"
+if (-not (Test-Path $geometryLuaPath)) {
+    throw "Expected generated geometry Lua file was not created: $geometryLuaPath"
+}
+$geometryLua = Get-Content -LiteralPath $geometryLuaPath -Raw
+$geometryFragments = @(
+    "function Circle:Contains(point)",
+    "function Circle:ClosestPoint(point)",
+    "function Circle:Intersects(other)",
+    "function Rect2:Contains(point)",
+    "function Rect2:IntersectsCircle(circle)",
+    "function LineSegment2:ClosestPoint(point)",
+    "function LineSegment2:DistanceToPoint(point)",
+    "function LineSegment2:ContainsPoint(point)",
+    "local reversedRectangle = __jasssharp_type_8_Geometry_5_Rect2.new(10.0, 5.0, -10.0, -5.0)"
+)
+foreach ($fragment in $geometryFragments) {
+    if (-not $geometryLua.Contains($fragment)) {
+        throw "Generated geometry Lua is missing expected fragment: $fragment"
+    }
+}
+
+Write-Host "[7/25] Building timer fixture and checking native timer integration..."
+$timerFixture = Join-Path $PSScriptRoot "fixtures/TimerSmoke.w3js"
+$timerBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $timerFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Timer fixture failed to compile: $($timerBuildOutput -join [Environment]::NewLine)"
+}
+$timerLuaPath = Join-Path $PSScriptRoot "fixtures/bin/TimerSmoke.lua"
+if (-not (Test-Path $timerLuaPath)) {
+    throw "Expected generated timer Lua file was not created: $timerLuaPath"
+}
+$timerLua = Get-Content -LiteralPath $timerLuaPath -Raw
+$timerFragments = @(
+    "CreateTimer()",
+    "TimerStart(self._handle, __jasssharp_type_4_Math_4_Math.Max(timeout, 0.0), false, callback)",
+    "TimerStart(self._handle, __jasssharp_type_4_Math_4_Math.Max(timeout, 0.0), true, callback)",
+    "PauseTimer(self._handle)",
+    "ResumeTimer(self._handle)",
+    "TimerGetElapsed(self._handle)",
+    "TimerGetRemaining(self._handle)",
+    "TimerGetTimeout(self._handle)",
+    "function GameTimer:Dispose()",
+    "DestroyTimer(self._handle)",
+    "function()"
+)
+foreach ($fragment in $timerFragments) {
+    if (-not $timerLua.Contains($fragment)) {
+        throw "Generated timer Lua is missing expected fragment: $fragment"
+    }
+}
+if ($timerLua.Contains("function GameTimer.__gc") -or $timerLua.Contains("newproxy")) {
+    throw "Timer disposal must remain explicit and must not use Lua garbage collection."
+}
+
+Write-Host "[8/25] Generating Math/vector Lua..."
+dotnet run --configuration Release --no-build --project $project -- build $fixture
+if ($LASTEXITCODE -ne 0) {
+    throw "Fixture build failed with exit code $LASTEXITCODE"
+}
+
+if (-not (Test-Path $output)) {
+    throw "Expected generated Lua file was not created: $output"
+}
+
+Write-Host "[9/25] Verifying generated static calls, Math helpers, and operator adapters..."
+$lua = Get-Content -LiteralPath $output -Raw
+$requiredFragments = @(
+    "function Score.FromValue(value)",
+    "local inferredInt = 42",
+    "local inferredFloat = 2.5",
+    "local inferredScore = __jasssharp_type_18_MathOperatorsSmoke_5_Score.FromValue(7.0)",
+    "local remainder = (17 % 5)",
+    "local fractionalRemainder = (7.5 % 2.0)",
+    "remainder = (remainder % 3)",
+    "function Score.__operator_Modulo_Score_Score(left, right)",
+    "__jasssharp_type_18_MathOperatorsSmoke_5_Score.FromValue(10.0)",
+    "function Vector2.__add(arg0, arg1)",
+    "__operator_Add_Vector2_Vector2",
+    "function Priority.__operator_LessThan_Priority_Priority(left, right)",
+    "self.Stored = __jasssharp_type_18_MathOperatorsSmoke_5_Score.new(value)",
+    "return self.Stored:GetValue()",
+    "math.sqrt(((self.X * self.X) + (self.Y * self.Y)))",
+    "((self.Y * other.Z) - (self.Z * other.Y))",
+    "((self.X * other.Y) - (self.Y * other.X))",
+    "function Math.Pi()",
+    "function Math.InverseLerp(a, b, value)",
+    "function Math.SmoothStep(a, b, t)",
+    "function Math.MoveTowards(current, target, maxDelta)",
+    "function Math.Repeat(value, length)",
+    "function Math.LerpAngle(a, b, t)",
+    "local radians = __jasssharp_type_4_Math_4_Math.DegToRad(180.0)",
+    "local angle = __jasssharp_type_4_Math_4_Math.LerpAngle(350.0, 10.0, 0.5)"
+)
+
+foreach ($fragment in $requiredFragments) {
+    if (-not $lua.Contains($fragment)) {
+        throw "Generated Lua is missing expected fragment: $fragment"
+    }
+}
+
+Write-Host "[10/25] Verifying headless mode emits standalone Lua without Warcraft entry points..."
+$headlessBuildOutput = dotnet run --configuration Release --no-build --project $project -- map --project $headlessProject
+if ($LASTEXITCODE -ne 0) {
+    throw "Headless build failed: $($headlessBuildOutput -join [Environment]::NewLine)"
+}
+if (-not (Test-Path $headlessOutput)) {
+    throw "Expected headless Lua output was not created: $headlessOutput"
+}
+$headlessLua = Get-Content -LiteralPath $headlessOutput -Raw
+$forbiddenHeadlessFragments = @("function config()", "function main()", "InitBlizzard()", "if not BJDebugMsg")
+foreach ($fragment in $forbiddenHeadlessFragments) {
+    if ($headlessLua.Contains($fragment)) {
+        throw "Headless Lua unexpectedly contains Warcraft runtime fragment: $fragment"
+    }
+}
+if (-not $headlessLua.Contains('print("headless mode")')) {
+    throw "Headless Print call was not translated to Lua print."
+}
+if (-not $headlessLua.Contains("function Add(left, right)")) {
+    throw "Headless compilation unexpectedly required a Warcraft III entry point or omitted ordinary functions."
+}
+if (-not $headlessLua.Contains("return (left + right)")) {
+    throw "Headless expression-bodied function was not emitted as a Lua return."
+}
+
+$missingUsingFixture = Join-Path $headlessProject "src/HeadlessWarcraftMissingUsing.w3js"
+$missingUsingOutput = dotnet run --configuration Release --no-build --project $project -- check $missingUsingFixture 2>&1
+$missingUsingExitCode = $LASTEXITCODE
+if ($missingUsingExitCode -eq 0) {
+    throw "Headless mode accepted Warcraft III symbols without using Warcraft3."
+}
+
+Write-Host "[11/25] Verifying explicit using Warcraft3 enables the built-in module..."
+$warcraftProject = Join-Path $PSScriptRoot "headless-warcraft-smoke"
+$warcraftBuildOutput = dotnet run --configuration Release --no-build --project $project -- map --project $warcraftProject
+if ($LASTEXITCODE -ne 0) {
+    throw "Headless Warcraft3 module build failed: $($warcraftBuildOutput -join [Environment]::NewLine)"
+}
+$warcraftLua = Get-Content -LiteralPath (Join-Path $warcraftProject "bin/HeadlessWarcraftUsing.lua") -Raw
+if (-not $warcraftLua.Contains("CreateGroup()") -or $warcraftLua.Contains("function main()")) {
+    throw "Explicit Warcraft3 module did not compile to standalone Lua as expected."
+}
+
+Write-Host "[12/25] Verifying jagged array parsing, typing, and Lua indexing..."
+$arrayFixture = Join-Path $PSScriptRoot "fixtures/ArrayTypesSmoke.w3js"
+$arrayBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $arrayFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Jagged array fixture failed to compile: $($arrayBuildOutput -join [Environment]::NewLine)"
+}
+$arrayLuaPath = Join-Path $PSScriptRoot "fixtures/bin/ArrayTypesSmoke.lua"
+if (-not (Test-Path $arrayLuaPath)) {
+    throw "Jagged array Lua output was not created: $arrayLuaPath"
+}
+$arrayLua = Get-Content -LiteralPath $arrayLuaPath -Raw
+$arrayFragments = @(
+    "GlobalMatrix = {}",
+    "local matrix = {}",
+    "matrix[0 + 1] = {}",
+    "matrix[0 + 1][1 + 1] = 42",
+    "local row = matrix[0 + 1]",
+    "local inferredMatrix = {}",
+    "local inferredRow = inferredMatrix[0 + 1]",
+    "local weights = {}",
+    "weights[0 + 1] = {}",
+    "weights[0 + 1][0 + 1] = 2.5"
+)
+foreach ($fragment in $arrayFragments) {
+    if (-not $arrayLua.Contains($fragment)) {
+        throw "Jagged array Lua output is missing expected fragment: $fragment"
+    }
+}
+
+Write-Host "[13/25] Verifying incompatible array element types are rejected..."
+$arrayMismatchFixture = Join-Path $PSScriptRoot "fixtures/ArrayTypeMismatchSmoke.w3js"
+$arrayMismatchOutput = dotnet run --configuration Release --no-build --project $project -- check $arrayMismatchFixture 2>&1
+if ($LASTEXITCODE -eq 0) {
+    throw "Compiler accepted assignment from float[] to int[]."
+}
+
+Write-Host "[14/25] Verifying foreach array loops and Warcraft group iteration..."
+$foreachFixture = Join-Path $PSScriptRoot "fixtures/ForeachSmoke.w3js"
+$foreachBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $foreachFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Foreach fixture failed to compile: $($foreachBuildOutput -join [Environment]::NewLine)"
+}
+$foreachLuaPath = Join-Path $PSScriptRoot "fixtures/bin/ForeachSmoke.lua"
+$foreachLua = Get-Content -LiteralPath $foreachLuaPath -Raw
+$foreachFragments = @(
+    "local __foreachCollection1 = matrix",
+    "for __foreachIndex1 = 1, #__foreachCollection1 do",
+    "local row = __collection_load(__foreachCollection1[__foreachIndex1])",
+    "local __foreachCollection2 = row",
+    "for __foreachIndex2 = 1, #__foreachCollection2 do",
+    "local value = __collection_load(__foreachCollection2[__foreachIndex2])",
+    "ForGroup(units, function()",
+    "local unit = GetEnumUnit()"
+)
+foreach ($fragment in $foreachFragments) {
+    if (-not $foreachLua.Contains($fragment)) {
+        throw "Foreach Lua output is missing expected fragment: $fragment"
+    }
+}
+
+Write-Host "[15/25] Verifying unsupported foreach collection types are rejected..."
+$unsupportedForeachFixture = Join-Path $PSScriptRoot "fixtures/ForeachUnsupportedSmoke.w3js"
+$unsupportedForeachOutput = dotnet run --configuration Release --no-build --project $project -- check $unsupportedForeachFixture 2>&1
+if ($LASTEXITCODE -eq 0) {
+    throw "Compiler accepted foreach over a scalar value."
+}
+
+Write-Host "[16/25] Verifying manually invoked class destructors..."
+$destructorFixture = Join-Path $PSScriptRoot "fixtures/DestructorSmoke.w3js"
+$destructorBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $destructorFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Destructor fixture failed to compile: $($destructorBuildOutput -join [Environment]::NewLine)"
+}
+$destructorLuaPath = Join-Path $PSScriptRoot "fixtures/bin/DestructorSmoke.lua"
+$destructorLua = Get-Content -LiteralPath $destructorLuaPath -Raw
+if (-not $destructorLua.Contains("function TemporaryResource:Dispose()") -or
+    -not $destructorLua.Contains("resource:Dispose()") -or
+    -not $destructorLua.Contains('BJDebugMsg("resource released")')) {
+    throw "Destructor was not emitted as a manually callable Dispose method."
+}
+if ($destructorLua.Contains("TemporaryResource.__gc") -or $destructorLua.Contains("newproxy")) {
+    throw "Destructor must not be wired to automatic Lua garbage collection."
+}
+
+Write-Host "[17/25] Verifying invalid destructor declarations are rejected..."
+$invalidDestructorFixtures = @(
+    @{ Path = "DestructorWrongNameSmoke.w3js"; Description = "mismatched destructor name" },
+    @{ Path = "DestructorParametersSmoke.w3js"; Description = "destructor parameters" },
+    @{ Path = "DestructorStaticSmoke.w3js"; Description = "static destructor" },
+    @{ Path = "DestructorVisibilitySmoke.w3js"; Description = "destructor visibility modifier" },
+    @{ Path = "DestructorDuplicateSmoke.w3js"; Description = "duplicate destructor" },
+    @{ Path = "DestructorDisposeConflictSmoke.w3js"; Description = "explicit Dispose conflict" }
+)
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    # Invalid compiler input is expected to produce a non-zero native exit code.
+    $ErrorActionPreference = "Continue"
+    foreach ($invalidCase in $invalidDestructorFixtures) {
+        $invalidDestructorPath = Join-Path $PSScriptRoot ("fixtures/" + $invalidCase.Path)
+        $invalidDestructorOutput = dotnet run --configuration Release --no-build --project $project -- check $invalidDestructorPath 2>&1
+        $invalidDestructorExitCode = $LASTEXITCODE
+        if ($invalidDestructorExitCode -eq 0) {
+            throw "Compiler accepted invalid destructor declaration ($($invalidCase.Description)): $invalidDestructorPath"
+        }
+    }
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+
+
+Write-Host "[18/25] Verifying native UnitGroup ownership, operations, callbacks, and disposal..."
+$groupLibrary = Join-Path $repoRoot "standard-library/Groups.w3js"
+$groupFixture = Join-Path $PSScriptRoot "fixtures/GroupSmoke.w3js"
+
+dotnet run --configuration Release --no-build --project $project -- check $groupLibrary
+if ($LASTEXITCODE -ne 0) {
+    throw "Groups standard-library check failed with exit code $LASTEXITCODE"
+}
+
+$groupBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $groupFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Group fixture failed to compile: $($groupBuildOutput -join [Environment]::NewLine)"
+}
+$groupLuaPath = Join-Path $PSScriptRoot "fixtures/bin/GroupSmoke.lua"
+if (-not (Test-Path $groupLuaPath)) {
+    throw "Expected generated group Lua file was not created: $groupLuaPath"
+}
+$groupLua = Get-Content -LiteralPath $groupLuaPath -Raw
+$groupFragments = @(
+    "CreateGroup()",
+    "GroupAddUnit(self._handle, value)",
+    "GroupRemoveUnit(self._handle, value)",
+    "GroupClear(self._handle)",
+    "BlzGroupGetSize(self._handle)",
+    "FirstOfGroup(self._handle)",
+    "ForGroup(self._handle, callback)",
+    "function UnitGroup:Dispose()",
+    "DestroyGroup(self._handle)",
+    "function()",
+    "GetEnumUnit()"
+)
+foreach ($fragment in $groupFragments) {
+    if (-not $groupLua.Contains($fragment)) {
+        throw "Generated group Lua is missing expected fragment: $fragment"
+    }
+}
+if ($groupLua.Contains("function UnitGroup.__gc") -or $groupLua.Contains("newproxy")) {
+    throw "Group disposal must remain explicit and must not use Lua garbage collection."
+}
+
+
+Write-Host "[19/25] Verifying unit ability wrapper, cooldowns, and typed ability fields..."
+$abilityLibrary = Join-Path $repoRoot "standard-library/Abilities.w3js"
+$abilityFixture = Join-Path $PSScriptRoot "fixtures/AbilitySmoke.w3js"
+
+dotnet run --configuration Release --no-build --project $project -- check $abilityLibrary
+if ($LASTEXITCODE -ne 0) {
+    throw "Abilities standard-library check failed with exit code $LASTEXITCODE"
+}
+
+$abilityBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $abilityFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Ability fixture failed to compile: $($abilityBuildOutput -join [Environment]::NewLine)"
+}
+$abilityLuaPath = Join-Path $PSScriptRoot "fixtures/bin/AbilitySmoke.lua"
+if (-not (Test-Path $abilityLuaPath)) {
+    throw "Expected generated ability Lua file was not created: $abilityLuaPath"
+}
+$abilityLua = Get-Content -LiteralPath $abilityLuaPath -Raw
+$abilityFragments = @(
+    "AbilityId(",
+    "GetUnitAbilityLevel(self._owner, self._rawcode)",
+    "UnitAddAbility(self._owner, self._rawcode)",
+    "UnitRemoveAbility(self._owner, self._rawcode)",
+    "SetUnitAbilityLevel(self._owner, self._rawcode, level)",
+    "IncUnitAbilityLevel(self._owner, self._rawcode)",
+    "DecUnitAbilityLevel(self._owner, self._rawcode)",
+    "UnitMakeAbilityPermanent(self._owner, permanent, self._rawcode)",
+    "BlzUnitDisableAbility(self._owner, self._rawcode",
+    "BlzGetUnitAbilityCooldown(self._owner, self._rawcode, level)",
+    "level < 0",
+    "BlzGetUnitAbilityCooldownRemaining(self._owner, self._rawcode)",
+    "BlzStartUnitAbilityCooldown(self._owner, self._rawcode",
+    "BlzEndUnitAbilityCooldown(self._owner, self._rawcode)",
+    "BlzGetUnitAbilityManaCost(self._owner, self._rawcode, level)",
+    "BlzGetUnitAbility(self._owner, self._rawcode)",
+    "BlzGetAbilityBooleanField(self:Handle(), field)",
+    "BlzSetAbilityBooleanField(self:Handle(), field, value)",
+    "BlzGetAbilityIntegerField(self:Handle(), field)",
+    "BlzSetAbilityIntegerField(self:Handle(), field, value)",
+    "BlzGetAbilityRealField(self:Handle(), field)",
+    "BlzSetAbilityRealField(self:Handle(), field, value)",
+    "BlzGetAbilityStringField(self:Handle(), field)",
+    "BlzSetAbilityStringField(self:Handle(), field, value)",
+    "BlzGetAbilityBooleanLevelField(self:Handle(), field, level)",
+    "BlzSetAbilityBooleanLevelField(self:Handle(), field, level, value)",
+    "BlzGetAbilityBooleanLevelArrayField(self:Handle(), field, level, index)",
+    "BlzSetAbilityBooleanLevelArrayField(self:Handle(), field, level, index, value)",
+    "BlzAddAbilityBooleanLevelArrayField(self:Handle(), field, level, value)",
+    "BlzRemoveAbilityBooleanLevelArrayField(self:Handle(), field, level, value)",
+    "BlzGetAbilityIntegerLevelField(self:Handle(), field, level)",
+    "BlzSetAbilityIntegerLevelField(self:Handle(), field, level, value)",
+    "BlzGetAbilityIntegerLevelArrayField(self:Handle(), field, level, index)",
+    "BlzSetAbilityIntegerLevelArrayField(self:Handle(), field, level, index, value)",
+    "BlzAddAbilityIntegerLevelArrayField(self:Handle(), field, level, value)",
+    "BlzRemoveAbilityIntegerLevelArrayField(self:Handle(), field, level, value)",
+    "BlzGetAbilityRealLevelField(self:Handle(), field, level)",
+    "BlzSetAbilityRealLevelField(self:Handle(), field, level, value)",
+    "BlzGetAbilityRealLevelArrayField(self:Handle(), field, level, index)",
+    "BlzSetAbilityRealLevelArrayField(self:Handle(), field, level, index, value)",
+    "BlzAddAbilityRealLevelArrayField(self:Handle(), field, level, value)",
+    "BlzRemoveAbilityRealLevelArrayField(self:Handle(), field, level, value)",
+    "BlzGetAbilityStringLevelField(self:Handle(), field, level)",
+    "BlzSetAbilityStringLevelField(self:Handle(), field, level, value)",
+    "BlzGetAbilityStringLevelArrayField(self:Handle(), field, level, index)",
+    "BlzSetAbilityStringLevelArrayField(self:Handle(), field, level, index, value)",
+    "BlzAddAbilityStringLevelArrayField(self:Handle(), field, level, value)",
+    "BlzRemoveAbilityStringLevelArrayField(self:Handle(), field, level, value)"
+)
+foreach ($fragment in $abilityFragments) {
+    if (-not $abilityLua.Contains($fragment)) {
+        throw "Generated ability Lua is missing expected fragment: $fragment"
+    }
+}
+if ($abilityLua.Contains("function UnitAbility:Dispose()") -or $abilityLua.Contains("UnitAbility.__gc")) {
+    throw "UnitAbility is a non-owning wrapper and must not generate disposal code."
+}
+
+
+Write-Host "[20/25] Verifying Warcraft III Frame API wrappers, ownership, events, and coordinates..."
+$frameFixture = Join-Path $PSScriptRoot "fixtures/FrameSmoke.w3js"
+$frameBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $frameFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Frame fixture failed to compile: $($frameBuildOutput -join [Environment]::NewLine)"
+}
+$frameLuaPath = Join-Path $PSScriptRoot "fixtures/bin/FrameSmoke.lua"
+if (-not (Test-Path $frameLuaPath)) {
+    throw "Expected generated frame Lua file was not created: $frameLuaPath"
+}
+$frameLua = Get-Content -LiteralPath $frameLuaPath -Raw
+$frameFragments = @(
+    "BlzLoadTOCFile(",
+    "BlzHideOriginFrames(",
+    "BlzGetHUDScale(",
+    "BlzGetLocalClientWidth(",
+    "BlzGetLocalClientHeight(",
+    "BlzCreateFrame(",
+    "BlzCreateSimpleFrame(",
+    "BlzCreateFrameByType(",
+    "BlzGetOriginFrame(",
+    "BlzGetFrameByName(",
+    "BlzFrameSetPoint(",
+    "BlzFrameSetAbsPoint(",
+    "BlzFrameSetAllPoints(",
+    "BlzFrameSetText(",
+    "BlzFrameSetTexture(",
+    "BlzFrameSetSize(",
+    "BlzFrameSetAlpha(",
+    "BlzFrameSetEnable(",
+    "BlzFrameSetValue(",
+    "BlzFrameGetChild(",
+    "BlzTriggerRegisterFrameEvent(",
+    "BlzGetTriggerFrame(",
+    "BlzGetTriggerFrameEvent(",
+    "BlzGetTriggerFrameValue(",
+    "BlzGetTriggerFrameText(",
+    "BlzPixelToFrameX(",
+    "BlzPixelToFrameY(",
+    "BlzFrameToPixelX(",
+    "BlzFrameToPixelY(",
+    "function Frame:Dispose()",
+    "BlzFrameClick(self._handle)",
+        "BlzFrameSetText(self._handle, value)",
+        "BlzFrameSetValue(self._handle, value)",
+        "BlzFrameSetMinMaxValue(self._handle, minimum, maximum)",
+        "BlzFrameSetFocus(self._handle, value)",
+        "BlzTriggerRegisterFrameEvent(self._trigger, frame, eventType)",
+        "TriggerAddAction(self._trigger, callback)",
+        "TriggerRemoveAction(self._trigger, self._action)",
+        "DestroyTrigger(self._trigger)",
+        "function FrameEventSubscription:Dispose()",
+        "function ButtonFrame:Dispose()",
+        "function TextFrame:Dispose()",
+        "function SliderFrame:Dispose()",
+        "function EditBoxFrame:Dispose()",
+    "BlzDestroyFrame(self._handle)"
+)
+foreach ($fragment in $frameFragments) {
+    if (-not $frameLua.Contains($fragment)) {
+        throw "Generated frame Lua is missing expected fragment: $fragment"
+    }
+}
+foreach ($className in @("ButtonFrame", "TextFrame", "SliderFrame", "EditBoxFrame", "FrameEventSubscription")) {
+    if ($frameLua.Contains("function " + $className + ".__gc")) {
+        throw "$className must use explicit disposal and must not generate Lua garbage-collection finalizers."
+    }
+}
+if ($frameLua.Contains("function Frame.__gc") -or $frameLua.Contains("newproxy")) {
+    throw "Frame disposal must remain explicit and must not use Lua garbage collection."
+}
+
+Write-Host "[21/25] Verifying Warcraft III Reforged 3.0.0 native signatures..."
+$wc300Fixture = Join-Path $PSScriptRoot "fixtures/Warcraft300ApiSmoke.w3js"
+$wc300BuildOutput = dotnet run --configuration Release --no-build --project $project -- build $wc300Fixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Warcraft III 3.0.0 API fixture failed to compile: $($wc300BuildOutput -join [Environment]::NewLine)"
+}
+$wc300LuaPath = Join-Path $PSScriptRoot "fixtures/bin/Warcraft300ApiSmoke.lua"
+if (-not (Test-Path $wc300LuaPath)) {
+    throw "Expected generated Warcraft III 3.0.0 API Lua file was not created: $wc300LuaPath"
+}
+$wc300Lua = Get-Content -LiteralPath $wc300LuaPath -Raw
+foreach ($native in @(
+    "BlzResetUnitAttack(",
+    "BlzSetSpecialEffectAnimationBlendTime(",
+    "BlzQueueSpecialEffectAnimation(",
+    "BlzSetSpecialEffectAnimation(",
+    "BlzUnitEnableAuras(",
+    "BlzGetUnitAbilityCooldownPercent(",
+    "BlzGetUnitAbilityCooldownRemaining(",
+    "BlzGetUnitAbilityCooldown(",
+    "BlzSetUnitAbilityCooldownRemaining(",
+    "BlzSetUnitAbilityCooldownPercent(",
+    "BlzAdjustUnitAbilityCooldownRemaining(",
+    "BlzAdjustUnitAbilityCooldownPercent(",
+    "BlzStartUnitAbilityCooldown(",
+    "BlzEndUnitAbilityCooldown("
+)) {
+    if (-not $wc300Lua.Contains($native)) {
+        throw "Generated Warcraft III 3.0.0 API Lua is missing native call: $native"
+    }
+}
+
+Write-Host "[22/25] Verifying Warcraft III Reforged 3.0.1 native signatures..."
+$wc301Fixture = Join-Path $PSScriptRoot "fixtures/Warcraft301ApiSmoke.w3js"
+$wc301BuildOutput = dotnet run --configuration Release --no-build --project $project -- build $wc301Fixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Warcraft III 3.0.1 API fixture failed to compile: $($wc301BuildOutput -join [Environment]::NewLine)"
+}
+$wc301LuaPath = Join-Path $PSScriptRoot "fixtures/bin/Warcraft301ApiSmoke.lua"
+if (-not (Test-Path $wc301LuaPath)) {
+    throw "Expected generated Warcraft III 3.0.1 API Lua file was not created: $wc301LuaPath"
+}
+$wc301Lua = Get-Content -LiteralPath $wc301LuaPath -Raw
+foreach ($native in @(
+    "BlzResetUnitTalents(",
+    "ChooseRandomItemExWithFilterAndIncludes(",
+    "BlzUnitHeal(",
+    "BlzRemoveEffect(",
+    "BlzGetCameraAllowsHotkeyTargetLock(",
+    "BlzSetCameraAllowsHotkeyTargetLock(",
+    "SetThematicMusicAbsoluteVolume(",
+    "BlzIsItemEquipped(",
+    "BlzIsItemInBag(",
+    "BlzUnitCanEquipItemOfEquipmentType(",
+    "BlzUnitHasAnyItemEquiped(",
+    "BlzUnitEquipItem("
+)) {
+    if (-not $wc301Lua.Contains($native)) {
+        throw "Generated Warcraft III 3.0.1 API Lua is missing native call: $native"
+    }
+}
+
+
+Write-Host "[23/25] Verifying Warcraft III object-data field constants..."
+$objectFieldsFixture = Join-Path $PSScriptRoot "fixtures/WarcraftObjectDataFieldsSmoke.w3js"
+$objectFieldsBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $objectFieldsFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Warcraft III object-data field fixture failed to compile: $($objectFieldsBuildOutput -join [Environment]::NewLine)"
+}
+$objectFieldsLuaPath = Join-Path $PSScriptRoot "fixtures/bin/WarcraftObjectDataFieldsSmoke.lua"
+if (-not (Test-Path $objectFieldsLuaPath)) {
+    throw "Expected generated object-data field Lua file was not created: $objectFieldsLuaPath"
+}
+$objectFieldsLua = Get-Content -LiteralPath $objectFieldsLuaPath -Raw
+foreach ($constant in @(
+    "ABILITY_IF_ALLOWED_TARGETS",
+    "ABILITY_RF_CAST_POINT",
+    "ABILITY_ILF_BUFFID",
+    "ITEM_IF_GOLD_COST",
+    "UNIT_IF_GOLD_COST",
+    "UNIT_RF_SPEED_MAX",
+    "UNIT_BF_REPULSE",
+    "UNIT_WEAPON_RF_MOTION_BUFFER"
+)) {
+    if (-not $objectFieldsLua.Contains($constant)) {
+        throw "Generated object-data field Lua is missing constant: $constant"
+    }
+}
+
+
+Write-Host "[24/25] Verifying Warcraft III handle inheritance, HandleId and loop control..."
+$controlFixture = Join-Path $PSScriptRoot "fixtures/ControlFlowAndHandlesSmoke.w3js"
+$controlBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $controlFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Handle hierarchy/control-flow fixture failed to compile: $($controlBuildOutput -join [Environment]::NewLine)"
+}
+$controlLuaPath = Join-Path $PSScriptRoot "fixtures/bin/ControlFlowAndHandlesSmoke.lua"
+if (-not (Test-Path $controlLuaPath)) {
+    throw "Expected generated handle/control-flow Lua file was not created: $controlLuaPath"
+}
+$controlLua = Get-Content -LiteralPath $controlLuaPath -Raw
+foreach ($fragment in @(
+    "GetHandleId(source)",
+    "GetHandleId(widgetValue)",
+    "goto __continue",
+    "::__continue",
+    "ForGroup(members"
+)) {
+    if (-not $controlLua.Contains($fragment)) {
+        throw "Generated handle/control-flow Lua is missing expected fragment: $fragment"
+    }
+}
+
+$invalidHandleFixture = Join-Path $PSScriptRoot "fixtures/InvalidHandleHierarchySmoke.w3js"
+$invalidHandleOutput = dotnet run --configuration Release --no-build --project $project -- check $invalidHandleFixture
+if ($LASTEXITCODE -eq 0) {
+    throw "Invalid handle upcast and HandleId access on int must be rejected."
+}
+$invalidHandleDiagnostics = $invalidHandleOutput | ConvertFrom-Json
+$invalidHandleErrors = @($invalidHandleDiagnostics | Where-Object { $_.severity -eq "error" })
+if ($invalidHandleErrors.Count -lt 2) {
+    throw "Expected diagnostics for invalid handle conversion and non-handle HandleId access."
+}
+
+$invalidLoopFixture = Join-Path $PSScriptRoot "fixtures/InvalidLoopControlSmoke.w3js"
+$invalidLoopOutput = dotnet run --configuration Release --no-build --project $project -- check $invalidLoopFixture
+if ($LASTEXITCODE -eq 0) {
+    throw "break/continue outside loops and bare return in a value-returning method must be rejected."
+}
+$invalidLoopDiagnostics = $invalidLoopOutput | ConvertFrom-Json
+$invalidLoopErrors = @($invalidLoopDiagnostics | Where-Object { $_.severity -eq "error" })
+if ($invalidLoopErrors.Count -lt 3) {
+    throw "Expected diagnostics for break, continue and missing return value."
+}
+
+
+Write-Host "[25/25] Verifying class inheritance and interface contracts..."
+$inheritanceFixture = Join-Path $PSScriptRoot "fixtures/InterfacesAndInheritanceSmoke.w3js"
+$inheritanceCheckOutput = dotnet run --configuration Release --no-build --project $project -- check $inheritanceFixture
+if ($LASTEXITCODE -ne 0) {
+    throw "Class/interface inheritance fixture produced semantic errors: $($inheritanceCheckOutput -join [Environment]::NewLine)"
+}
+$inheritanceCheckText = $inheritanceCheckOutput -join "`n"
+$inheritanceDiagnostics = @(ConvertFrom-Json -InputObject $inheritanceCheckText)
+$inheritanceWarnings = @($inheritanceDiagnostics | Where-Object { $_.severity -eq "warning" })
+if ($inheritanceWarnings.Count -gt 0) {
+    throw "Valid class/interface inheritance produced warnings: $($inheritanceWarnings | ConvertTo-Json -Depth 5 -Compress)"
+}
+
+$inheritanceBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $inheritanceFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Class/interface inheritance fixture failed to compile: $($inheritanceBuildOutput -join [Environment]::NewLine)"
+}
+$inheritanceLuaPath = Join-Path $PSScriptRoot "fixtures/bin/InterfacesAndInheritanceSmoke.lua"
+if (-not (Test-Path $inheritanceLuaPath)) {
+    throw "Expected generated inheritance Lua file was not created: $inheritanceLuaPath"
+}
+$inheritanceLua = Get-Content -LiteralPath $inheritanceLuaPath -Raw
+foreach ($fragment in @(
+    "setmetatable(UnitActor, { __index = __jasssharp_type_29_InterfacesAndInheritanceSmoke_10_EntityBase })",
+    "function EntityBase.__init(self)",
+    "function UnitActor.__init(self)",
+    "EntityBase.__init(self)",
+    "__jasssharp_type_29_InterfacesAndInheritanceSmoke_9_UnitActor.new()",
+    "actorContract:Act(3)",
+    "actorContract:Id()",
+    "actorContract:Trace()",
+    "function UnitActor:Add(left, right)",
+    "return (left + right)"
+)) {
+    if (-not $inheritanceLua.Contains($fragment)) {
+        throw "Generated inheritance Lua is missing expected fragment: $fragment"
+    }
+}
+
+$invalidInterfaceFixture = Join-Path $PSScriptRoot "fixtures/InvalidInterfaceImplementationSmoke.w3js"
+$invalidInterfaceOutput = dotnet run --configuration Release --no-build --project $project -- check $invalidInterfaceFixture
+if ($LASTEXITCODE -eq 0) {
+    throw "A class that omits an interface method must be rejected."
+}
+$invalidInterfaceDiagnostics = $invalidInterfaceOutput | ConvertFrom-Json
+$invalidInterfaceErrors = @($invalidInterfaceDiagnostics | Where-Object { $_.severity -eq "error" })
+$invalidInterfaceText = $invalidInterfaceErrors | ForEach-Object { $_.message }
+if ($invalidInterfaceErrors.Count -lt 2 -or
+    -not (($invalidInterfaceText -join "`n").Contains("does not implement IRequired.Execute")) -or
+    -not (($invalidInterfaceText -join "`n").Contains("conflicting signatures for method Value"))) {
+    throw "Expected diagnostics for a missing interface implementation and conflicting inherited interface signatures."
+}
+
+Write-Host "[26/26] Verifying from-end index semantics and type safety..."
+$fromEndFixture = Join-Path $PSScriptRoot "fixtures/FromEndIndexSmoke.w3js"
+$fromEndCheckOutput = dotnet run --configuration Release --no-build --project $project -- check $fromEndFixture
+if ($LASTEXITCODE -ne 0) {
+    throw "Valid from-end indexing fixture failed semantic analysis: $($fromEndCheckOutput -join [Environment]::NewLine)"
+}
+$fromEndBuildOutput = dotnet run --configuration Release --no-build --project $project -- build $fromEndFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Valid from-end indexing fixture failed to compile: $($fromEndBuildOutput -join [Environment]::NewLine)"
+}
+$fromEndLuaPath = Join-Path $PSScriptRoot "fixtures/bin/FromEndIndexSmoke.lua"
+if (-not (Test-Path $fromEndLuaPath)) {
+    throw "Expected generated from-end indexing Lua file was not created: $fromEndLuaPath"
+}
+$fromEndLua = Get-Content -LiteralPath $fromEndLuaPath -Raw
+foreach ($fragment in @(
+    "values[#values - 1 + 1]",
+    "__collection_load(items[#items - 1 + 1])",
+    "string.sub(text, -1, -1)"
+)) {
+    if (-not $fromEndLua.Contains($fragment)) {
+        throw "Generated from-end Lua is missing expected fragment: $fragment"
+    }
+}
+
+$invalidFromEndFixture = Join-Path $PSScriptRoot "fixtures/InvalidFromEndIndexSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $invalidFromEndOutput = dotnet run --configuration Release --no-build --project $project -- check $invalidFromEndFixture 2>&1
+    $invalidFromEndExitCode = $LASTEXITCODE
+    $invalidFromEndText = $invalidFromEndOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $invalidFromEndDiagnostics = ConvertFrom-Json -InputObject $invalidFromEndText
+}
+catch {
+    throw "Could not parse from-end indexing diagnostics as JSON. Exit code: $invalidFromEndExitCode. Output: $invalidFromEndText"
+}
+$invalidFromEndErrors = @($invalidFromEndDiagnostics | Where-Object { $_.severity -eq "error" })
+$invalidFromEndMessages = @($invalidFromEndErrors | ForEach-Object { $_.message }) -join "`n"
+if ($invalidFromEndExitCode -eq 0 -or
+    -not $invalidFromEndMessages.Contains("индексация с конца не поддерживается для типа Dictionary<string,int>") -or
+    -not $invalidFromEndMessages.Contains("индексация с конца не поддерживается для типа Queue<int>") -or
+    -not $invalidFromEndMessages.Contains("индекс с конца требует смещение типа int")) {
+    throw "From-end indexing must reject Dictionary/Queue receivers and non-int offsets. Output: $invalidFromEndText"
+}
+
+Write-Host "[27/27] Verifying parameterized base constructors are rejected..."
+$baseConstructorFixture = Join-Path $PSScriptRoot "fixtures/InvalidBaseConstructorSmoke.w3js"
+$baseConstructorOutput = dotnet run --configuration Release --no-build --project $project -- check $baseConstructorFixture
+if ($LASTEXITCODE -eq 0) {
+    throw "A derived class must not silently call a parameterized base constructor without arguments."
+}
+$baseConstructorText = $baseConstructorOutput -join "`n"
+if (-not $baseConstructorText.Contains("base class Entity must have a parameterless constructor")) {
+    throw "Expected a diagnostic explaining the parameterless base-constructor requirement."
+}
+
+Write-Host "[28/28] Verifying function hook signatures, original calls, and deterministic chaining..."
+$functionHooksFixture = Join-Path $PSScriptRoot "fixtures/FunctionHooksSmoke.w3js"
+$functionHooksCheck = dotnet run --configuration Release --no-build --project $project -- check $functionHooksFixture
+if ($LASTEXITCODE -ne 0) {
+    throw "Valid function hooks fixture failed semantic analysis: $($functionHooksCheck -join [Environment]::NewLine)"
+}
+$functionHooksBuild = dotnet run --configuration Release --no-build --project $project -- build $functionHooksFixture --target lua
+if ($LASTEXITCODE -ne 0) {
+    throw "Valid function hooks fixture failed to compile: $($functionHooksBuild -join [Environment]::NewLine)"
+}
+$functionHooksLuaPath = Join-Path $PSScriptRoot "fixtures/bin/FunctionHooksSmoke.lua"
+if (-not (Test-Path $functionHooksLuaPath)) {
+    throw "Expected generated function hooks Lua file was not created: $functionHooksLuaPath"
+}
+$functionHooksLua = Get-Content -LiteralPath $functionHooksLuaPath -Raw
+$firstComputeWrapper = $functionHooksLua.IndexOf('__jasssharp_register_hook("Compute"')
+$secondComputeWrapper = $functionHooksLua.IndexOf('__jasssharp_register_hook("Compute"', $firstComputeWrapper + 1)
+$nativeWrapper = $functionHooksLua.IndexOf('__jasssharp_register_hook("GetUnitAbilityLevel"')
+$replaceValueWrapper = $functionHooksLua.IndexOf('__jasssharp_register_hook("ReplaceValue"')
+$secondHookBody = $functionHooksLua.IndexOf("return (original(value) * 2)")
+$firstHookBody = $functionHooksLua.IndexOf("if (value < 0)")
+$firstHookReturn = -1
+$firstOriginalCall = -1
+if ($firstHookBody -ge 0) {
+    $firstHookReturn = $functionHooksLua.IndexOf("return 0", $firstHookBody)
+    $firstOriginalCall = $functionHooksLua.IndexOf("original(value)", $firstHookBody)
+}
+$replaceValueBody = -1
+$replaceValueOriginalCall = -1
+if ($replaceValueWrapper -ge 0) {
+    $replaceValueBody = $functionHooksLua.IndexOf("return 42", $replaceValueWrapper)
+    $replaceValueOriginalCall = $functionHooksLua.IndexOf("original(", $replaceValueWrapper)
+}
+foreach ($fragment in @(
+    '__jasssharp_register_hook("Compute", function(__jasssharp_original)',
+    '__jasssharp_register_hook("GetUnitAbilityLevel", function(__jasssharp_original)',
+    '__jasssharp_register_hook("ReplaceValue", function(__jasssharp_original)',
+    "local original = __jasssharp_original",
+    "return original(whichUnit, abilityId)",
+    "function __jasssharp_apply_hooks()",
+    'if __jasssharp_hooks_applied then error("JASS# hook registered after finalization: " .. name) end',
+    "local replacements = {}",
+    "replacements[name] = current",
+    "for name, replacement in pairs(replacements) do _G[name] = replacement end",
+    "__jasssharp_hooks_applied = true",
+    "for i = #chain, 1, -1 do current = chain[i](current) end"
+)) {
+    if (-not $functionHooksLua.Contains($fragment)) {
+        throw "Generated function hooks Lua is missing expected fragment: $fragment"
+    }
+}
+if ($firstComputeWrapper -lt 0 -or $secondComputeWrapper -le $firstComputeWrapper -or
+    $nativeWrapper -le $secondComputeWrapper -or $replaceValueWrapper -le $nativeWrapper -or
+    $firstHookBody -lt 0 -or $firstHookReturn -le $firstHookBody -or
+    $firstOriginalCall -le $firstHookReturn -or $secondHookBody -le $firstHookBody -or
+    $replaceValueBody -le $replaceValueWrapper -or $replaceValueOriginalCall -ge 0 -or
+    $functionHooksLua.IndexOf("if __jasssharp_apply_hooks then __jasssharp_apply_hooks() end") -lt $replaceValueWrapper) {
+    throw "Function hooks must preserve declaration order, allow early return without original(), and finalize after registration."
+}
+
+$invalidFunctionHooksFixture = Join-Path $PSScriptRoot "fixtures/InvalidFunctionHooksSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $invalidFunctionHooksOutput = dotnet run --configuration Release --no-build --project $project -- check $invalidFunctionHooksFixture 2>&1
+    $invalidFunctionHooksExitCode = $LASTEXITCODE
+    $invalidFunctionHooksText = $invalidFunctionHooksOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    $invalidFunctionHooksDiagnostics = ConvertFrom-Json -InputObject $invalidFunctionHooksText
+}
+catch {
+    throw "Could not parse function hooks diagnostics as JSON. Exit code: $invalidFunctionHooksExitCode. Output: $invalidFunctionHooksText"
+}
+$invalidFunctionHooksMessages = @($invalidFunctionHooksDiagnostics | Where-Object { $_.severity -eq "error" } | ForEach-Object { $_.message }) -join "`n"
+if ($invalidFunctionHooksExitCode -eq 0 -or
+    -not $invalidFunctionHooksMessages.Contains("сигнатура hook не совпадает") -or
+    -not $invalidFunctionHooksMessages.Contains("аргумент 1: ожидался тип int, получен float") -or
+    -not $invalidFunctionHooksMessages.Contains("переменная invalidReturnType: ожидался тип bool, получен int") -or
+    -not $invalidFunctionHooksMessages.Contains("original доступен только внутри hook") -or
+    -not $invalidFunctionHooksMessages.Contains("нельзя объявить hook для неизвестной функции Missing") -or
+    -not $invalidFunctionHooksMessages.Contains("нельзя перехватывать main") -or
+    -not $invalidFunctionHooksMessages.Contains("нельзя перехватывать config")) {
+    throw "Function hooks must reject mismatched signatures, invalid original arguments, and unknown targets. Output: $invalidFunctionHooksText"
+}
+
+Write-Host "[29/29] Verifying inline-hook rejection and cross-module hook ordering..."
+$inlineFixture = Join-Path $PSScriptRoot "fixtures/InvalidInlineFunctionHookSmoke.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $inlineOutput = dotnet run --configuration Release --no-build --project $project -- check $inlineFixture 2>&1
+    $inlineExitCode = $LASTEXITCODE
+    $inlineText = $inlineOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+try {
+    # The CLI serializes diagnostics as JSON and escapes non-ASCII characters.
+    # Decode the JSON before checking the Russian diagnostic message.
+    $inlineDiagnostics = @(ConvertFrom-Json -InputObject $inlineText)
+}
+catch {
+    throw "Could not parse inline-hook diagnostics as JSON. Exit code: $inlineExitCode. Output: $inlineText"
+}
+$inlineErrors = @($inlineDiagnostics | Where-Object {
+    $_.Severity -eq "error" -and $_.Message -like "*inline*Fast*"
+})
+if ($inlineExitCode -eq 0 -or $inlineErrors.Count -ne 1) {
+    throw "Hooks targeting [Inline] functions must be rejected. Exit code: $inlineExitCode. Output: $inlineText"
+}
+
+$multiModuleProject = Join-Path $PSScriptRoot "fixtures/FunctionHooksModules"
+$multiModuleOutput = dotnet run --configuration Release --no-build --project $project -- map --project $multiModuleProject
+if ($LASTEXITCODE -ne 0) {
+    throw "Cross-module function hooks project failed to build: $($multiModuleOutput -join [Environment]::NewLine)"
+}
+$multiModuleLuaPath = Join-Path $multiModuleProject "bin/FunctionHooksModules.lua"
+if (-not (Test-Path $multiModuleLuaPath)) {
+    throw "Expected cross-module hook Lua output was not created: $multiModuleLuaPath"
+}
+$multiModuleLua = Get-Content -LiteralPath $multiModuleLuaPath -Raw
+$baseHookRegistration = $multiModuleLua.IndexOf('__jasssharp_register_hook("Compute"')
+$rootHookRegistration = $multiModuleLua.IndexOf('__jasssharp_register_hook("Compute"', $baseHookRegistration + 1)
+$hookFinalizer = $multiModuleLua.IndexOf("if __jasssharp_apply_hooks then __jasssharp_apply_hooks() end")
+# Binary expressions are emitted with explicit parentheses by the Lua code generator.
+$baseHookBody = $multiModuleLua.IndexOf("return (original(value) + 10)")
+$rootHookBody = $multiModuleLua.IndexOf("return (original(value) * 2)")
+$registrationCount = ([regex]::Matches($multiModuleLua, [regex]::Escape('__jasssharp_register_hook("Compute"'))).Count
+if ($baseHookRegistration -lt 0 -or $rootHookRegistration -le $baseHookRegistration -or
+    $baseHookBody -lt 0 -or $rootHookBody -le $baseHookBody -or
+    $hookFinalizer -le $rootHookRegistration -or $hookFinalizer -le $rootHookBody -or
+    $registrationCount -ne 2) {
+    throw "Cross-module hooks must register exactly twice in dependency/declaration order and apply only after all module chunks. Registration count: $registrationCount. Base registration: $baseHookRegistration. Root registration: $rootHookRegistration. Base body: $baseHookBody. Root body: $rootHookBody. Finalizer: $hookFinalizer. Generated Lua: $multiModuleLua"
+}
+
+Write-Host "[30/30] Verifying Lua global collision diagnostics..."
+$globalCollisionProject = Join-Path $PSScriptRoot "fixtures/LuaGlobalCollisionProject"
+$globalCollisionSource = Join-Path $globalCollisionProject "src/Alpha.w3js"
+$previousErrorActionPreference = $ErrorActionPreference
+try {
+    $ErrorActionPreference = "Continue"
+    $globalCollisionCheckOutput = dotnet run --configuration Release --no-build --project $project -- check $globalCollisionSource 2>&1
+    $globalCollisionCheckExitCode = $LASTEXITCODE
+    $globalCollisionCheckText = $globalCollisionCheckOutput -join "`n"
+    try {
+        $globalCollisionDiagnostics = $globalCollisionCheckText | ConvertFrom-Json -ErrorAction Stop
+        if ($globalCollisionDiagnostics -is [array]) {
+            $globalCollisionCheckText = ($globalCollisionDiagnostics | ForEach-Object { $_.Message }) -join "`n"
+        }
+    }
+    catch {
+        # Preserve plain-text output for diagnostics emitted by older CLI paths.
+    }
+    $globalCollisionOutput = dotnet run --configuration Release --no-build --project $project -- map --project $globalCollisionProject 2>&1
+    $globalCollisionExitCode = $LASTEXITCODE
+    $globalCollisionText = $globalCollisionOutput -join "`n"
+}
+finally {
+    $ErrorActionPreference = $previousErrorActionPreference
+}
+if ($globalCollisionCheckExitCode -eq 0 -or
+    -not $globalCollisionCheckText.Contains("Lua identifier 'SharedName'") -or
+    -not $globalCollisionCheckText.Contains("Lua identifier 'ShadowedName'") -or
+    -not $globalCollisionCheckText.Contains("Lua identifier 'Color_ToString'") -or
+    -not $globalCollisionCheckText.Contains("Lua identifier 'Color_Red'") -or
+    -not $globalCollisionCheckText.Contains("Lua identifier 'Palette_ToString'")) {
+    throw "The check command must report imported Lua global collisions. Exit code: $globalCollisionCheckExitCode. Output: $globalCollisionCheckText"
+}
+if ($globalCollisionExitCode -eq 0 -or
+    -not $globalCollisionText.Contains("Lua identifier 'SharedName'") -or
+    -not $globalCollisionText.Contains("Lua identifier 'ShadowedName'") -or
+    -not $globalCollisionText.Contains("Lua identifier 'Color_ToString'") -or
+    -not $globalCollisionText.Contains("Lua identifier 'Color_Red'") -or
+    -not $globalCollisionText.Contains("Lua identifier 'Palette_ToString'") -or
+    -not $globalCollisionText.Contains("Lua global symbol collision validation failed")) {
+    throw "Map build must reject cross-namespace collisions in generated Lua globals, including enum helpers. Exit code: $globalCollisionExitCode. Output: $globalCollisionText"
+}
+
+$global:LASTEXITCODE = 0
+Write-Host "All JASS# compiler smoke checks passed."

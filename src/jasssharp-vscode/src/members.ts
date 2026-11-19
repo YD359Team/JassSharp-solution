@@ -1,3 +1,32 @@
+export const HANDLE_TYPES = new Set([
+  "handle", "agent", "event", "player", "widget", "unit", "destructable", "item",
+  "ability", "buff", "force", "group", "trigger", "triggercondition", "triggeraction",
+  "timer", "location", "region", "rect", "boolexpr", "sound", "conditionfunc", "filterfunc",
+  "unitpool", "itempool", "race", "alliancetype", "racepreference", "gamestate", "igamestate",
+  "fgamestate", "fogstyle", "metakeytype", "playerstate", "playerscore", "playergameresult", "unitstate", "aidifficulty",
+  "eventid", "gameevent", "playerevent", "playerunitevent", "unitevent", "limitop",
+  "widgetevent", "dialogevent", "unittype", "gamespeed", "gamedifficulty", "gametype",
+  "mapflag", "mapvisibility", "mapsetting", "mapdensity", "mapcontrol", "minimapicon",
+  "playerslotstate", "volumegroup", "camerafield", "camerasetup", "playercolor", "placement",
+  "startlocprio", "raritycontrol", "blendmode", "texmapflags", "effect", "effecttype",
+  "weathereffect", "terraindeformation", "fogstate", "fogmodifier", "dialog", "button",
+  "quest", "questitem", "defeatcondition", "timerdialog", "leaderboard", "multiboard",
+  "multiboarditem", "trackable", "gamecache", "version", "itemtype", "texttag", "attacktype",
+  "attackflags", "damagetype", "damagetypes", "weapontype", "soundtype", "lightning",
+  "pathingtype", "mousebuttontype", "animtype", "subanimtype", "image", "ubersplat",
+  "hashtable", "framehandle", "originframetype", "framepointtype", "textaligntype",
+  "frameeventtype", "oskeytype", "abilityintegerfield", "abilityrealfield", "abilitybooleanfield",
+  "abilitystringfield", "abilityintegerlevelfield", "abilityreallevelfield", "abilitybooleanlevelfield",
+  "abilitystringlevelfield", "abilityintegerlevelarrayfield", "abilityreallevelarrayfield",
+  "abilitybooleanlevelarrayfield", "abilitystringlevelarrayfield", "unitintegerfield",
+  "unitrealfield", "unitbooleanfield", "unitstringfield", "unitweaponintegerfield",
+  "unitweaponrealfield", "unitweaponbooleanfield", "unitweaponstringfield", "itemintegerfield",
+  "itemrealfield", "itembooleanfield", "itemstringfield", "movetype", "targetflag", "armortype",
+  "heroattribute", "defensetype", "regentype", "unitcategory", "pathingflag",
+  "commandbuttoneffect", "modelhandle", "layerstyleflag", "controlstyleflag", "inputmode",
+  "mousestate", "backdropborderflag", "framealphamode", "itemtag", "equipmenttype", "loadoutslot"
+]);
+
 export const MEMBERS: { type: string; name: string; kind: string; ret: string }[] = [
   { type: "unit", name: "Life", kind: "GetSet", ret: "float" },
   { type: "unit", name: "Mana", kind: "GetSet", ret: "float" },

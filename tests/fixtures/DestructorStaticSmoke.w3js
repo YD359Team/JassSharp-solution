@@ -1,0 +1,9 @@
+namespace DestructorStaticSmoke
+{
+    public class Resource
+    {
+        static ~Resource()
+        {
+        }
+    }
+}

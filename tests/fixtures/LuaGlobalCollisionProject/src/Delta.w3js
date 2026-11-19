@@ -1,0 +1,15 @@
+namespace Delta
+{
+    void Color_ToString(int value)
+    {
+    }
+
+    enum Palette
+    {
+        Red
+    }
+
+    void Palette_ToString(int value)
+    {
+    }
+}

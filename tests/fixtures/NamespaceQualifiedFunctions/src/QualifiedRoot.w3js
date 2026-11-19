@@ -1,0 +1,47 @@
+namespace QualifiedRoot
+{
+    using MathTools;
+    using MathTools.Nested;
+
+    int Verify()
+    {
+        return MathTools.Add(2, 3);
+    }
+
+    bool VerifyEnum()
+    {
+        return MathTools.Colors.Red == MathTools.Colors.Blue;
+    }
+
+    int VerifyGlobals()
+    {
+        MathTools.Offset = 7;
+        return MathTools.BaseValue + MathTools.Offset;
+    }
+
+    int VerifyQualifiedTypes()
+    {
+        MathTools.Counter counter = new MathTools.Counter(5);
+        return MathTools.Counter.GetSeed() + counter.Value;
+    }
+
+    int VerifyNestedQualifiedTypes()
+    {
+        MathTools.Nested.NestedGauge gauge = new MathTools.Nested.NestedGauge(9);
+        return MathTools.Nested.NestedGauge.GetDefault() + gauge.Value;
+    }
+
+    class DerivedEntity : MathTools.BaseEntity, MathTools.Nested.IAdvancedEntity
+    {
+        int GetLevel()
+        {
+            return 3;
+        }
+    }
+
+    int VerifyQualifiedInheritance()
+    {
+        DerivedEntity entity = new DerivedEntity();
+        return entity.GetId() + entity.GetLevel();
+    }
+}

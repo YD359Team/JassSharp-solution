@@ -1,0 +1,8 @@
+namespace HeadlessWarcraftMissingUsing
+{
+    public void Test()
+    {
+        group groupValue = CreateGroup();
+        DestroyGroup(groupValue);
+    }
+}

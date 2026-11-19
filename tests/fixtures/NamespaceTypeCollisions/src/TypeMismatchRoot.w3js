@@ -1,0 +1,12 @@
+namespace TypeMismatchRoot
+{
+    using Alpha;
+    using Beta;
+
+    void Verify()
+    {
+        Alpha.Player first = new Alpha.Player();
+        Beta.Player second = new Beta.Player();
+        first = second;
+    }
+}

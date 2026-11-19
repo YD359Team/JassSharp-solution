@@ -1,0 +1,13 @@
+namespace Beta
+{
+    class SharedName
+    {
+    }
+
+    const int ShadowedName = 1;
+
+    enum Color
+    {
+        Red
+    }
+}

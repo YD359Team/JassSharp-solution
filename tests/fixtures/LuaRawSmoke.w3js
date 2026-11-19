@@ -1,0 +1,10 @@
+namespace LuaRawSmoke
+{
+    void Run()
+    {
+        Lua.Raw("""
+            local rawValue = 42
+            assert(rawValue == 42)
+        """);
+    }
+}

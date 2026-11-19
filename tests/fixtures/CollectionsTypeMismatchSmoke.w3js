@@ -1,0 +1,20 @@
+namespace CollectionsTypeMismatchSmoke
+{
+    public void InvalidQueueValue()
+    {
+        Queue<int> queue = new Queue<int>();
+        queue.Enqueue("wrong");
+    }
+
+    public void InvalidDictionaryEntry()
+    {
+        Dictionary<string, int> scores = new Dictionary<string, int>();
+        scores.Add(10, "wrong");
+    }
+
+    public void InvalidDictionaryIndexerValue()
+    {
+        Dictionary<string, int> scores = new Dictionary<string, int>();
+        scores["Player1"] = "wrong";
+    }
+}

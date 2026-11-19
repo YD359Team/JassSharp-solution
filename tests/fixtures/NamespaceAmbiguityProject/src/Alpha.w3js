@@ -1,0 +1,7 @@
+namespace Alpha
+{
+    int Shared(int value)
+    {
+        return value + 1;
+    }
+}

@@ -18,7 +18,13 @@
   ],
   "main": "./out/extension.js",
   "activationEvents": [
-    "onLanguage:jasssharp"
+    "onLanguage:jasssharp",
+    "onCommand:jasssharp.build",
+    "onCommand:jasssharp.buildLua",
+    "onCommand:jasssharp.buildMap",
+    "onCommand:jasssharp.runMap",
+    "onCommand:jasssharp.openEditor",
+    "onCommand:jasssharp.packMap"
   ],
   "contributes": {
     "languages": [
@@ -97,7 +103,8 @@
       },
       {
         "command": "jasssharp.buildLua",
-        "title": "JASS#: Build Lua"
+        "title": "JASS#: Build Lua",
+        "icon": "$(tools)"
       },
       {
         "command": "jasssharp.buildMap",
@@ -123,44 +130,70 @@
     "menus": {
       "editor/context": [
         {
-          "command": "jasssharp.build",
-          "when": "editorLangId == jasssharp",
-          "group": "navigation"
-        },
-        {
-          "command": "jasssharp.runMap",
-          "when": "editorLangId == jasssharp",
-          "group": "navigation"
-        },
-        {
-          "command": "jasssharp.openEditor",
-          "when": "editorLangId == jasssharp",
-          "group": "navigation"
-        }
-      ],
-      "editor/title": [
-        {
-          "command": "jasssharp.runMap",
+          "command": "jasssharp.buildLua",
           "when": "editorLangId == jasssharp",
           "group": "navigation@1"
         },
         {
           "command": "jasssharp.buildMap",
+          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
+          "group": "navigation@2"
+        },
+        {
+          "command": "jasssharp.runMap",
+          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
+          "group": "navigation@3"
+        },
+        {
+          "command": "jasssharp.openEditor",
+          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
+          "group": "navigation@4"
+        },
+        {
+          "command": "jasssharp.packMap",
+          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
+          "group": "navigation@5"
+        }
+      ],
+      "editor/title": [
+        {
+          "command": "jasssharp.buildLua",
           "when": "editorLangId == jasssharp",
+          "group": "navigation@0"
+        },
+        {
+          "command": "jasssharp.buildMap",
+          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
+          "group": "navigation@1"
+        },
+        {
+          "command": "jasssharp.runMap",
+          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
           "group": "navigation@2"
         },
         {
           "command": "jasssharp.openEditor",
-          "when": "editorLangId == jasssharp",
+          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
           "group": "navigation@3"
+        },
+        {
+          "command": "jasssharp.packMap",
+          "when": "editorLangId == jasssharp && jasssharp.mode != headless",
+          "group": "navigation@4"
         }
       ]
     }
   },
   "scripts": {
+    "sync-version": "node scripts/sync-version.cjs",
+    "precompile": "npm run sync-version",
     "compile": "tsc -p .",
     "watch": "tsc -p . -w",
-    "package": "npm run compile && vsce package"
+    "prepackage": "npm run sync-version",
+    "package": "vsce package",
+    "pretest": "npm run sync-version",
+    "test": "npm run compile && node --test tests/*.test.cjs",
+    "vscode:prepublish": "npm run compile"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

@@ -1,0 +1,15 @@
+namespace InvalidFromEndIndexSmoke
+{
+    public void Verify()
+    {
+        Dictionary<string, int> scores = new Dictionary<string, int>();
+        int invalidDictionaryIndex = scores[^1];
+
+        Queue<int> queue = new Queue<int>();
+        int invalidQueueIndex = queue[^1];
+
+        int[] values = new int[];
+        float offset = 1.0;
+        int invalidOffset = values[^offset];
+    }
+}

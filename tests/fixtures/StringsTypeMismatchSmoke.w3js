@@ -1,0 +1,8 @@
+namespace StringsTypeMismatchSmoke
+{
+    public void InvalidInterpolationAssignment()
+    {
+        int value = 42;
+        int invalid = $"Value: {value}";
+    }
+}

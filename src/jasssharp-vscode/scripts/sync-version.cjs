@@ -1,0 +1,21 @@
+const fs = require("node:fs");
+const path = require("node:path");
+const extensionDirectory = path.resolve(__dirname, "..");
+const repositoryRoot = path.resolve(extensionDirectory, "../..");
+const versionSource = fs.readFileSync(path.join(repositoryRoot, "Version.props"), "utf8");
+const match = versionSource.match(/<Version>\s*([^<]+?)\s*<\/Version>/);
+if (!match) throw new Error("Version.props must contain <Version>...</Version>.");
+const version = match[1].trim();
+if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(version))
+    throw new Error(`Invalid semantic version: ${version}`);
+const manifestPath = path.join(extensionDirectory, "package.json");
+const lockPath = path.join(extensionDirectory, "package-lock.json");
+const manifest = JSON.parse(fs.readFileSync(manifestPath, "utf8"));
+const lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+manifest.version = version;
+lock.version = version;
+if (!lock.packages?.[""]) throw new Error("package-lock.json has no root package entry.");
+lock.packages[""].version = version;
+fs.writeFileSync(manifestPath, JSON.stringify(manifest, null, 2) + "\n");
+fs.writeFileSync(lockPath, JSON.stringify(lock, null, 2) + "\n");
+console.log(`JASS# version synchronized: ${version}`);

@@ -1,3 +1,4 @@
+using JassSharp;
 using System.Text;
 using System.Text.Json;
 using JassSharp.Emit;
@@ -11,8 +12,8 @@ if (args.Length == 0 ||
     (args[0] != "map" && args.Length < 2))
 {
     Console.Error.WriteLine("usage:");
-    Console.Error.WriteLine("  jasssharp build <file.w3js> [--target lua]");
-    Console.Error.WriteLine("  jasssharp check <file.w3js>");
+    Console.Error.WriteLine("  jasssharp build <file.w3js> [--target lua] [--config file.json]");
+    Console.Error.WriteLine("  jasssharp check <file.w3js> [--config file.json]");
     Console.Error.WriteLine("  jasssharp map [--project dir] [--config file.json] [--run]");
     Console.Error.WriteLine("  jasssharp symbols <file.w3js> [--project dir]");
     return 1;
@@ -29,16 +30,39 @@ if (cmd == "check")
         return 1;
     }
 
+    string? checkConfig = null;
+    for (var i = 2; i < args.Length; i++)
+    {
+        if (args[i] == "--config" && i + 1 < args.Length)
+            checkConfig = args[++i];
+        else
+        {
+            Console.Error.WriteLine($"unknown or incomplete check option: {args[i]}");
+            return 1;
+        }
+    }
+
     var diagnostics = new List<JassSharp.Diagnostic>();
 
     try
     {
         var unit = new Parser(new Lexer(File.ReadAllText(path)).Lex()).ParseNamespace();
         var projectDirectory = FindProjectDirectory(path);
+        var mode = ReadProjectMode(projectDirectory, checkConfig);
+        if (mode is not ("wc3" or "headless"))
+            throw new InvalidDataException($"unsupported project mode '{mode}'.");
         var allUnits = MapBuild.LoadProject(projectDirectory);
         var imports = MapBuild.ResolveImports(unit, allUnits);
 
-        diagnostics.AddRange(JassSharp.Checker.Check(unit, path, imports));
+        diagnostics.AddRange(MapBuild.FindLuaGlobalSymbolCollisions(imports.Append(unit))
+            .Select(message => new JassSharp.Diagnostic(1, 1, "error", message, path)));
+
+        diagnostics.AddRange(JassSharp.Checker.Check(
+            unit,
+            path,
+            imports,
+            implicitWarcraft3: mode == "wc3",
+            strictUnknownCalls: ReadStrictUnknownCalls(projectDirectory, checkConfig)));
     }
     catch (ParseException ex)
     {
@@ -115,6 +139,7 @@ if (cmd == "symbols")
                 kv => new
                 {
                     classes = kv.Value.Classes.Select(c => c.Name),
+                    interfaces = (kv.Value.Interfaces ?? []).Select(i => i.Name),
                     functions = kv.Value.Functions.Select(f => f.Name),
                     consts = kv.Value.Consts.Select(c => c.Name),
                     fields = kv.Value.Fields.Select(f => f.Name)
@@ -140,10 +165,13 @@ if (!File.Exists(file))
 }
 
 var target = "lua";
+string? buildConfig = null;
 for (var i = 2; i < args.Length; i++)
 {
     if (args[i] == "--target" && i + 1 < args.Length)
         target = args[++i].Trim().ToLowerInvariant();
+    else if (args[i] == "--config" && i + 1 < args.Length)
+        buildConfig = args[++i];
     else
     {
         Console.Error.WriteLine($"unknown or incomplete build option: {args[i]}");
@@ -160,6 +188,35 @@ if (target != "lua")
 try
 {
     var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
+    var projectDirectory = FindProjectDirectory(file);
+    var mode = ReadProjectMode(projectDirectory, buildConfig);
+    if (mode is not ("wc3" or "headless"))
+        throw new InvalidDataException($"unsupported project mode '{mode}'. Supported modes are 'wc3' and 'headless'.");
+    var allUnits = MapBuild.LoadProject(projectDirectory);
+    var imports = MapBuild.ResolveImports(unit, allUnits);
+    var globalSymbolCollisions = MapBuild.FindLuaGlobalSymbolCollisions(imports.Append(unit));
+    if (globalSymbolCollisions.Count > 0)
+    {
+        foreach (string collision in globalSymbolCollisions)
+            Console.Error.WriteLine("error: " + collision);
+        return 1;
+    }
+
+    foreach (var sourceUnit in imports.Append(unit))
+    {
+        var sourceImports = imports.Where(dependency => dependency.Name != sourceUnit.Name);
+        var diagnostics = Checker.Check(
+            sourceUnit,
+            sourceUnit.Name == unit.Name ? file : null,
+            sourceImports,
+            implicitWarcraft3: mode == "wc3",
+            strictUnknownCalls: ReadStrictUnknownCalls(projectDirectory, buildConfig));
+        foreach (var diagnostic in diagnostics)
+            Console.Error.WriteLine($"{sourceUnit.Name}:{diagnostic.Line}:{diagnostic.Col}: {diagnostic.Severity}: {diagnostic.Message}");
+        if (diagnostics.Any(diagnostic => diagnostic.Severity == "error"))
+            return 1;
+    }
+
     var sourceDirectory = Path.GetDirectoryName(file) ?? Directory.GetCurrentDirectory();
     var outputDirectory = Path.Combine(sourceDirectory, "bin");
     Directory.CreateDirectory(outputDirectory);
@@ -168,7 +225,17 @@ try
         outputDirectory,
         Path.GetFileNameWithoutExtension(file) + ".lua");
 
-    File.WriteAllText(outputPath, new LuaEmitter().Emit(unit), new UTF8Encoding(false));
+    var generatedParts = new List<string>();
+    foreach (var imported in imports)
+        generatedParts.Add(new LuaEmitter().Emit(
+            imported,
+            imports.Where(dependency => dependency.Name != imported.Name),
+            headless: mode == "headless",
+            finalizeHooks: false));
+    generatedParts.Add(new LuaEmitter().Emit(
+        unit, imports, headless: mode == "headless", finalizeHooks: false));
+    generatedParts.Add(LuaEmitter.EmitHookFinalizer());
+    File.WriteAllText(outputPath, string.Join("\n", generatedParts), new UTF8Encoding(false));
     Console.WriteLine(outputPath);
 }
 catch (ParseException ex)
@@ -183,6 +250,46 @@ catch (Exception ex)
 }
 
 return 0;
+
+
+static string ReadProjectMode(string projectDirectory, string? configName = null)
+{
+    string configPath = string.IsNullOrWhiteSpace(configName)
+        ? Path.Combine(projectDirectory, "jasssharp.json")
+        : Path.GetFullPath(Path.IsPathRooted(configName) ? configName : Path.Combine(projectDirectory, configName));
+    if (!File.Exists(configPath))
+        return "wc3";
+
+    using var document = JsonDocument.Parse(File.ReadAllText(configPath));
+    var root = document.RootElement;
+    if (!root.TryGetProperty("mode", out var modeElement) || modeElement.ValueKind == JsonValueKind.Null)
+        return "wc3";
+    if (modeElement.ValueKind != JsonValueKind.String)
+        throw new InvalidDataException("project configuration property 'mode' must be a string");
+
+    return modeElement.GetString()?.Trim().ToLowerInvariant() ?? "wc3";
+}
+
+
+static bool ReadStrictUnknownCalls(string projectDirectory, string? configName = null)
+{
+    string configPath = string.IsNullOrWhiteSpace(configName)
+        ? Path.Combine(projectDirectory, "jasssharp.json")
+        : Path.GetFullPath(Path.IsPathRooted(configName)
+            ? configName
+            : Path.Combine(projectDirectory, configName));
+    if (!File.Exists(configPath))
+        return false;
+
+    using var document = JsonDocument.Parse(File.ReadAllText(configPath));
+    var root = document.RootElement;
+    if (!root.TryGetProperty("strictUnknownCalls", out var strictElement))
+        return false;
+    if (strictElement.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+        throw new InvalidDataException("project configuration property 'strictUnknownCalls' must be a boolean");
+
+    return strictElement.GetBoolean();
+}
 
 static string FindProjectDirectory(string sourceFile)
 {

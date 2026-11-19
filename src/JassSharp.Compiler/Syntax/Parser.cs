@@ -13,7 +13,8 @@ public sealed class Parser(List<Token> tokens)
         Expect("{");
         var usings = new List<string>();
         var fields = new List<FieldDecl>();
-        var ns = new NsUnit(name, usings, [], [], [], fields, []);
+        var interfaces = new List<InterfaceDecl>();
+        var ns = new NsUnit(name, usings, [], [], [], fields, [], interfaces);
         while (!Accept("}"))
         {
             if (Peek.Kind == TokKind.Eof) throw new ParseException("незакрытый namespace", Peek.Line, Peek.Col);
@@ -28,6 +29,9 @@ public sealed class Parser(List<Token> tokens)
             }
             var attrs = ParseAttributes();
             SkipVis();
+            bool isHook = AcceptId("hook");
+            if (isHook && (CheckId("const") || CheckId("class") || CheckId("interface") || CheckId("enum")))
+                throw new ParseException("модификатор hook применим только к глобальным функциям", Peek.Line, Peek.Col);
             if (CheckId("const"))
             {
                 Eat(TokKind.Id);
@@ -38,6 +42,11 @@ public sealed class Parser(List<Token> tokens)
                 Eat(TokKind.Id);
                 ns.Classes.Add(ParseClass(attrs));
             }
+            else if (CheckId("interface"))
+            {
+                Eat(TokKind.Id);
+                interfaces.Add(ParseInterface());
+            }
             else if (CheckId("enum"))
             {
                 Eat(TokKind.Id);
@@ -45,31 +54,32 @@ public sealed class Parser(List<Token> tokens)
             }
             else
             {
-                var typeTok = Eat(TokKind.Id);
-                string typeName = typeTok.Text;
-                if (typeName == "List" && Accept("<"))
-                {
-                    Eat(TokKind.Id);
-                    Expect(">");
-                    typeName = "List";
-                }
-                var isArray = Accept("[") && Accept("]");
+                string typeName = ParseTypeName();
+                var isArray = typeName.EndsWith("[]", StringComparison.Ordinal);
                 var id = Eat(TokKind.Id).Text;
                 if (Accept("("))
                 {
                     var ps = ParseParams();
                     Expect(")");
-                    Expect("{");
-                    ns.Functions.Add(new FnDecl(typeName, id, ps, ParseBlock(), attrs));
+                    ns.Functions.Add(new FnDecl(typeName, id, ps, ParseMethodBody(typeName), attrs, IsHook: isHook));
                 }
                 else
                 {
+                    if (isHook)
+                        throw new ParseException("модификатор hook применим только к глобальным функциям", Peek.Line, Peek.Col);
                     Accept(";");
                     fields.Add(new FieldDecl(typeName, id, isArray));
                 }
             }
         }
         return ns;
+    }
+
+    private bool AcceptId(string id)
+    {
+        if (!CheckId(id)) return false;
+        Eat(TokKind.Id);
+        return true;
     }
 
     private HashSet<string> ParseAttributes()
@@ -95,6 +105,15 @@ public sealed class Parser(List<Token> tokens)
     private ClassDecl ParseClass(HashSet<string> classAttrs)
     {
         var name = Eat(TokKind.Id).Text;
+        var baseTypes = new List<string>();
+        if (Accept(":"))
+        {
+            do
+            {
+                baseTypes.Add(ParseTypeName());
+            }
+            while (Accept(","));
+        }
         Expect("{");
         var fields = new List<FieldDecl>();
         var methods = new List<FnDecl>();
@@ -103,8 +122,15 @@ public sealed class Parser(List<Token> tokens)
         {
             if (Peek.Kind == TokKind.Eof) throw new ParseException($"незакрытый class {name}", Peek.Line, Peek.Col);
             var attrs = ParseAttributes();
+            bool hasVisibilityModifier = CheckId("public") || CheckId("private");
             SkipVis();
-            if (CheckId(name) && tokens[_i + 1].Text == "(")
+            bool isStatic = false;
+            if (CheckId("static"))
+            {
+                Eat(TokKind.Id);
+                isStatic = true;
+            }
+            if (CheckId(name) && _i + 1 < tokens.Count && tokens[_i + 1].Text == "(")
             {
                 Eat(TokKind.Id);
                 Expect("(");
@@ -114,21 +140,46 @@ public sealed class Parser(List<Token> tokens)
                 ctor = new FnDecl(name, "create", ps, ParseBlock(), attrs);
                 continue;
             }
-            var type = Eat(TokKind.Id).Text;
-            if (type == "List" && Accept("<"))
+            if (Accept("~"))
+            {
+                var destructorName = Eat(TokKind.Id);
+                if (destructorName.Text != name)
+                    throw new ParseException($"деструктор должен называться ~{name}", destructorName.Line, destructorName.Col);
+                if (isStatic)
+                    throw new ParseException("деструктор не может быть static", destructorName.Line, destructorName.Col);
+                if (hasVisibilityModifier)
+                    throw new ParseException("деструктор не может иметь модификатор доступа", destructorName.Line, destructorName.Col);
+                Expect("(");
+                Expect(")");
+                Expect("{");
+                if (methods.Any(method => method.Name == "Dispose" && method.Operator is null))
+                    throw new ParseException($"класс {name} уже объявляет Dispose()", destructorName.Line, destructorName.Col);
+                methods.Add(new FnDecl("void", "Dispose", [], ParseBlock(), attrs));
+                continue;
+            }
+            var type = ParseTypeName();
+            var isArray = type.EndsWith("[]", StringComparison.Ordinal);
+            if (CheckId("operator"))
             {
                 Eat(TokKind.Id);
-                Expect(">");
-                type = "List";
+                var opToken = Eat(TokKind.Sym);
+                if (opToken.Text is not ("+" or "-" or "*" or "/" or "%" or "==" or "!=" or "<" or ">" or "<=" or ">="))
+                    throw new ParseException($"оператор {opToken.Text} нельзя перегрузить", opToken.Line, opToken.Col);
+                Expect("(");
+                var operatorParams = ParseParams();
+                Expect(")");
+                methods.Add(new FnDecl(type, "__operator_" + OperatorIdentifier(opToken.Text), operatorParams, ParseMethodBody(type), attrs, isStatic, opToken.Text));
+                continue;
             }
-            var isArray = Accept("[") && Accept("]");
-            var id = Eat(TokKind.Id).Text;
+            var memberToken = Eat(TokKind.Id);
+            var id = memberToken.Text;
+            if (id == "Dispose" && methods.Any(method => method.Name == "Dispose" && method.Operator is null))
+                throw new ParseException($"класс {name} уже объявляет Dispose()", memberToken.Line, memberToken.Col);
             if (Accept("("))
             {
                 var ps = ParseParams();
                 Expect(")");
-                Expect("{");
-                methods.Add(new FnDecl(type, id, ps, ParseBlock(), attrs));
+                methods.Add(new FnDecl(type, id, ps, ParseMethodBody(type), attrs, isStatic));
             }
             else
             {
@@ -136,8 +187,64 @@ public sealed class Parser(List<Token> tokens)
                 fields.Add(new FieldDecl(type, id, isArray));
             }
         }
-        return new ClassDecl(name, fields, ctor, methods);
+        return new ClassDecl(name, fields, ctor, methods, baseTypes);
     }
+
+    private List<Stmt> ParseMethodBody(string returnType)
+    {
+        if (Accept("=>"))
+        {
+            var expression = ParseExpr();
+            Expect(";");
+            return returnType == "void"
+                ? [new ExprStmt(expression)]
+                : [new ReturnStmt(expression)];
+        }
+
+        Expect("{");
+        return ParseBlock();
+    }
+
+    private InterfaceDecl ParseInterface()
+    {
+        var name = Eat(TokKind.Id).Text;
+        var baseInterfaces = new List<string>();
+        if (Accept(":"))
+        {
+            do
+            {
+                baseInterfaces.Add(ParseTypeName());
+            }
+            while (Accept(","));
+        }
+
+        Expect("{");
+        var methods = new List<FnDecl>();
+        while (!Accept("}"))
+        {
+            if (Peek.Kind == TokKind.Eof)
+                throw new ParseException($"незакрытый interface {name}", Peek.Line, Peek.Col);
+
+            SkipVis();
+            string returnType = ParseTypeName();
+            string methodName = Eat(TokKind.Id).Text;
+            Expect("(");
+            var parameters = ParseParams();
+            Expect(")");
+            Expect(";");
+            methods.Add(new FnDecl(returnType, methodName, parameters, []));
+        }
+
+        return new InterfaceDecl(name, baseInterfaces, methods);
+    }
+
+    private static string OperatorIdentifier(string op) => op switch
+    {
+        "+" => "Add", "-" => "Subtract", "*" => "Multiply", "/" => "Divide", "%" => "Modulo",
+        "==" => "Equal", "!=" => "NotEqual", "<" => "LessThan", ">" => "GreaterThan",
+        "<=" => "LessThanOrEqual", ">=" => "GreaterThanOrEqual",
+        _ => throw new ArgumentOutOfRangeException(nameof(op))
+    };
 
     private EnumDecl ParseEnum()
     {
@@ -156,11 +263,54 @@ public sealed class Parser(List<Token> tokens)
         return new EnumDecl(name, members);
     }
 
+    private string ParseTypeName()
+    {
+        string typeName = Eat(TokKind.Id).Text;
+        while (Accept("."))
+            typeName += "." + Eat(TokKind.Id).Text;
+        if (Accept("<"))
+        {
+            var arguments = new List<string>();
+            do
+            {
+                arguments.Add(ParseTypeName());
+            }
+            while (Accept(","));
+            Expect(">");
+
+            int expectedArity = typeName switch
+            {
+                "List" or "Queue" or "Stack" => 1,
+                "Dictionary" or "KeyValuePair" => 2,
+                _ => -1
+            };
+            if (expectedArity < 0)
+                throw new ParseException($"тип {typeName} не поддерживает параметры типа", Peek.Line, Peek.Col);
+            if (arguments.Count != expectedArity)
+                throw new ParseException($"{typeName} ожидает {expectedArity} параметр(а) типа, получено {arguments.Count}", Peek.Line, Peek.Col);
+
+            typeName += "<" + string.Join(",", arguments) + ">";
+        }
+
+        while (Accept("["))
+        {
+            Expect("]");
+            typeName += "[]";
+        }
+
+        return typeName;
+    }
+
     private List<ParamDecl> ParseParams()
     {
         var list = new List<ParamDecl>();
         if (Check(")")) return list;
-        do list.Add(new ParamDecl(Eat(TokKind.Id).Text, Eat(TokKind.Id).Text));
+        do
+        {
+            string type = ParseTypeName();
+            string name = Eat(TokKind.Id).Text;
+            list.Add(new ParamDecl(type, name));
+        }
         while (Accept(","));
         return list;
     }
@@ -180,9 +330,9 @@ public sealed class Parser(List<Token> tokens)
     private static readonly HashSet<string> TypeNames = new(StringComparer.Ordinal)
     {
         // common types
-        "int", "float", "bool", "void", "string",
+        "int", "float", "bool", "void", "string", "var",
         // extended types
-        "List",
+        "List", "Queue", "Stack", "Dictionary", "KeyValuePair",
         // warctaft 3 types
         "ability", "abilitybooleanfield", "abilitybooleanlevelarrayfield", "abilitybooleanlevelfield", "abilityintegerfield",
         "abilityintegerlevelarrayfield", "abilityintegerlevelfield", "abilityrealfield", "abilityreallevelarrayfield",
@@ -196,7 +346,7 @@ public sealed class Parser(List<Token> tokens)
         "itemstringfield", "itemTag", "itemtype", "leaderboard", "lightning", "limitop", "loadoutslot", "location",
         "mapcontrol", "mapdensity", "mapflag", "mapsetting", "mapvisibility", "metakeytype", "minimapicon", "mousebuttontype",
         "movetype", "multiboard", "multiboarditem", "nothing", "originframetype", "oskeytype", "pathingflag", "pathingtype",
-        "placement", "player", "playercolor", "playergameresult", "playerevent", "playerscore", "playerslotstate", "playerstate",
+        "placement", "player", "playercolor", "equipmentType", "playergameresult", "playerevent", "playerscore", "playerslotstate", "playerstate",
         "playerunitevent", "quest", "questitem", "race", "racepreference", "raritycontrol", "real", "rect", "regentype", "region",
         "sound", "soundtype", "startlocprio", "string", "subanimtype", "targetflag", "terraindeformation", "texmapflags",
         "textaligntype", "texttag", "timerdialog", "timer", "trackable", "trigger", "triggeraction", "triggercondition",
@@ -208,41 +358,50 @@ public sealed class Parser(List<Token> tokens)
     private bool LooksLikeDecl()
     {
         if (Peek.Kind != TokKind.Id || _i + 1 >= tokens.Count) return false;
-        var next = tokens[_i + 1];
-        if (next.Kind == TokKind.Sym && next.Text == "[")
+
+        int nameIndex = _i + 1;
+        bool isQualifiedType = false;
+        while (nameIndex + 1 < tokens.Count &&
+               tokens[nameIndex].Kind == TokKind.Sym && tokens[nameIndex].Text == "." &&
+               tokens[nameIndex + 1].Kind == TokKind.Id)
         {
-            if (_i + 3 < tokens.Count && tokens[_i + 2].Text == "]" && tokens[_i + 3].Kind == TokKind.Id)
-                return true;
-            return false;
+            isQualifiedType = true;
+            nameIndex += 2;
         }
-        if (next.Kind != TokKind.Id) return false;
-        var after = tokens[_i + 2];
-        if (after.Kind == TokKind.Sym && after.Text == "(") return false;
-        return TypeNames.Contains(Peek.Text) || char.IsUpper(Peek.Text[0]);
+
+        if (nameIndex < tokens.Count && tokens[nameIndex].Text == "<")
+        {
+            int depth = 0;
+            do
+            {
+                if (tokens[nameIndex].Text == "<") depth++;
+                else if (tokens[nameIndex].Text == ">") depth--;
+                nameIndex++;
+                if (nameIndex >= tokens.Count && depth > 0)
+                    return false;
+            }
+            while (depth > 0);
+        }
+
+        while (nameIndex + 1 < tokens.Count &&
+               tokens[nameIndex].Kind == TokKind.Sym && tokens[nameIndex].Text == "[" &&
+               tokens[nameIndex + 1].Kind == TokKind.Sym && tokens[nameIndex + 1].Text == "]")
+        {
+            nameIndex += 2;
+        }
+
+        if (nameIndex >= tokens.Count || tokens[nameIndex].Kind != TokKind.Id)
+            return false;
+
+        if (nameIndex + 1 < tokens.Count &&
+            tokens[nameIndex + 1].Kind == TokKind.Sym && tokens[nameIndex + 1].Text == "(")
+            return false;
+
+        return isQualifiedType || TypeNames.Contains(Peek.Text) || char.IsUpper(Peek.Text[0]);
     }
 
     private Stmt ParseStmt()
     {
-        if (Check("#"))
-        {
-            Eat(TokKind.Sym);
-            if (CheckId("if"))
-            {
-                Eat(TokKind.Id);
-                var target = Eat(TokKind.Id).Text;
-                Expect("{");
-                var then = ParseBlock();
-                List<Stmt>? els = null;
-                if (CheckId("else"))
-                {
-                    Eat(TokKind.Id);
-                    Expect("{");
-                    els = ParseBlock();
-                }
-                return new CondStmt(target, then, els);
-            }
-            throw new ParseException("неизвестная директива", Peek.Line, Peek.Col);
-        }
         if (CheckId("if"))
         {
             Eat(TokKind.Id);
@@ -255,6 +414,18 @@ public sealed class Parser(List<Token> tokens)
             if (CheckId("else")) { Eat(TokKind.Id); Expect("{"); els = ParseBlock(); }
             return new IfStmt(c, then, els);
         }
+        if (CheckId("do"))
+        {
+            var token = Eat(TokKind.Id);
+            Expect("{");
+            var body = ParseBlock();
+            EatId("while");
+            Expect("(");
+            var condition = ParseExpr();
+            Expect(")");
+            Accept(";");
+            return new DoWhileStmt(body, condition, token.Line, token.Col);
+        }
         if (CheckId("while"))
         {
             Eat(TokKind.Id);
@@ -263,6 +434,18 @@ public sealed class Parser(List<Token> tokens)
             Expect(")");
             Expect("{");
             return new WhileStmt(c, ParseBlock());
+        }
+        if (CheckId("foreach"))
+        {
+            var foreachToken = Eat(TokKind.Id);
+            Expect("(");
+            string itemType = ParseTypeName();
+            string itemName = Eat(TokKind.Id).Text;
+            EatId("in");
+            var collection = ParseExpr();
+            Expect(")");
+            Expect("{");
+            return new ForeachStmt(itemType, itemName, collection, ParseBlock(), foreachToken.Line, foreachToken.Col);
         }
         if (CheckId("for"))
         {
@@ -280,6 +463,18 @@ public sealed class Parser(List<Token> tokens)
             Expect("{");
             return new ForStmt(init, cond, step, ParseBlock());
         }
+        if (CheckId("break"))
+        {
+            var breakToken = Eat(TokKind.Id);
+            Accept(";");
+            return new BreakStmt(breakToken.Line, breakToken.Col);
+        }
+        if (CheckId("continue"))
+        {
+            var continueToken = Eat(TokKind.Id);
+            Accept(";");
+            return new ContinueStmt(continueToken.Line, continueToken.Col);
+        }
         if (CheckId("return"))
         {
             Eat(TokKind.Id);
@@ -290,15 +485,8 @@ public sealed class Parser(List<Token> tokens)
         }
         if (LooksLikeDecl())
         {
-            var typeTok = Eat(TokKind.Id);
-            string typeName = typeTok.Text;
-            if (typeName == "List" && Accept("<"))
-            {
-                Eat(TokKind.Id);
-                Expect(">");
-                typeName = "List";
-            }
-            Accept("["); Accept("]");
+            var typeTok = Peek;
+            string typeName = ParseTypeName();
             var id = Eat(TokKind.Id).Text;
             Expr? init = null;
             if (Accept("=")) init = ParseExpr();
@@ -306,6 +494,18 @@ public sealed class Parser(List<Token> tokens)
             return new VarStmt(typeName, id, init, typeTok.Line, typeTok.Col);
         }
         var expr = ParseExpr();
+        if (expr is CallExpr
+            {
+                Callee: MemberExpr { Object: NameExpr { Name: "Lua" }, Name: "Raw" }
+            } rawCall)
+        {
+            if (rawCall.Args.Count != 1)
+                throw new ParseException("Lua.Raw ожидает ровно один аргумент", rawCall.Line, rawCall.Col);
+            if (rawCall.Args[0] is not StrExpr rawCode)
+                throw new ParseException("Lua.Raw ожидает строковый или многострочный raw-литерал", rawCall.Line, rawCall.Col);
+            Accept(";");
+            return new RawLuaStmt(rawCode.Text, rawCall.Line, rawCall.Col);
+        }
         if (Accept("="))
         {
             var v = ParseExpr();
@@ -324,6 +524,40 @@ public sealed class Parser(List<Token> tokens)
             Accept(";");
             return new AssignStmt(expr, new BinaryExpr("-", expr, v));
         }
+        if (Accept("*="))
+        {
+            var v = ParseExpr();
+            Accept(";");
+            return new AssignStmt(expr, new BinaryExpr("*", expr, v));
+        }
+        if (Accept("/="))
+        {
+            var v = ParseExpr();
+            Accept(";");
+            return new AssignStmt(expr, new BinaryExpr("/", expr, v));
+        }
+        if (Accept("%="))
+        {
+            var v = ParseExpr();
+            Accept(";");
+            return new AssignStmt(expr, new BinaryExpr("%", expr, v));
+        }
+        foreach (var (assignmentOperator, binaryOperator) in new[]
+        {
+            ("<<=", "<<"),
+            (">>=", ">>"),
+            ("|=", "|"),
+            ("&=", "&"),
+            ("^=", "^")
+        })
+        {
+            if (!Accept(assignmentOperator))
+                continue;
+
+            var value = ParseExpr();
+            Accept(";");
+            return new AssignStmt(expr, new BinaryExpr(binaryOperator, expr, value));
+        }
         if (Accept("++"))
             return new AssignStmt(expr, new BinaryExpr("+", expr, new NumExpr("1")));
         if (Accept("--"))
@@ -333,14 +567,218 @@ public sealed class Parser(List<Token> tokens)
     }
 
     // Full remaining methods (ParseExpr through Eat) are identical to the version in /tmp/Parser.cs
+    public Expr ParseExpressionOnly()
+    {
+        var expression = ParseExpr();
+        if (Peek.Kind != TokKind.Eof)
+            throw new ParseException($"лишний токен в выражении: {Peek.Text}", Peek.Line, Peek.Col);
+        return expression;
+    }
+
     private Expr ParseExpr() => ParseOr();
-    private Expr ParseOr() { var l = ParseAnd(); while (Accept("||")) l = new BinaryExpr("||", l, ParseAnd()); return l; }
-    private Expr ParseAnd() { var l = ParseEq(); while (Accept("&&")) l = new BinaryExpr("&&", l, ParseEq()); return l; }
-    private Expr ParseEq() { var l = ParseRel(); while (true) { if (Accept("==")) l = new BinaryExpr("==", l, ParseRel()); else if (Accept("!=")) l = new BinaryExpr("!=", l, ParseRel()); else break; } return l; }
-    private Expr ParseRel() { var l = ParseAdd(); while (Check("<") || Check(">") || Check("<=") || Check(">=")) { var op = Eat(TokKind.Sym).Text; l = new BinaryExpr(op, l, ParseAdd()); } return l; }
-    private Expr ParseAdd() { var l = ParseMul(); while (true) { if (Accept("+")) l = new BinaryExpr("+", l, ParseMul()); else if (Accept("-")) l = new BinaryExpr("-", l, ParseMul()); else break; } return l; }
-    private Expr ParseMul() { var l = ParseUnary(); while (true) { if (Accept("*")) l = new BinaryExpr("*", l, ParseUnary()); else if (Accept("/")) l = new BinaryExpr("/", l, ParseUnary()); else break; } return l; }
-    private Expr ParseUnary() { if (Accept("!")) return new UnaryExpr("!", ParseUnary()); if (Accept("-")) return new UnaryExpr("-", ParseUnary()); return ParsePost(); }
+
+    private InterpolatedExpr ParseInterpolatedString(Token token)
+    {
+        var parts = new List<InterpolatedPart>();
+        var literal = new System.Text.StringBuilder();
+        string text = token.Text;
+
+        void FlushLiteral()
+        {
+            if (literal.Length == 0) return;
+            parts.Add(InterpolatedPart.Literal(literal.ToString()));
+            literal.Clear();
+        }
+
+        for (int i = 0; i < text.Length;)
+        {
+            if (text[i] == '{' && i + 1 < text.Length && text[i + 1] == '{')
+            {
+                literal.Append('{');
+                i += 2;
+                continue;
+            }
+
+            if (text[i] == '}' && i + 1 < text.Length && text[i + 1] == '}')
+            {
+                literal.Append('}');
+                i += 2;
+                continue;
+            }
+
+            if (text[i] == '}')
+                throw new ParseException("одиночная закрывающая фигурная скобка в интерполируемой строке", token.Line, token.Col);
+
+            if (text[i] != '{')
+            {
+                literal.Append(text[i++]);
+                continue;
+            }
+
+            FlushLiteral();
+            int expressionStart = ++i;
+            int depth = 1;
+            char quote = '\0';
+            bool escaped = false;
+
+            while (i < text.Length && depth > 0)
+            {
+                char current = text[i];
+                if (quote != '\0')
+                {
+                    if (escaped) escaped = false;
+                    else if (current == '\\') escaped = true;
+                    else if (current == quote) quote = '\0';
+                    i++;
+                    continue;
+                }
+
+                if (current is '"' or '\'')
+                {
+                    quote = current;
+                    i++;
+                    continue;
+                }
+
+                if (current == '{') depth++;
+                else if (current == '}') depth--;
+                i++;
+            }
+
+            if (depth != 0)
+                throw new ParseException("незакрытое выражение интерполяции", token.Line, token.Col);
+
+            string expressionText = text[expressionStart..(i - 1)].Trim();
+            if (expressionText.Length == 0)
+                throw new ParseException("пустое выражение интерполяции", token.Line, token.Col);
+
+            var expression = new Parser(new Lexer(expressionText).Lex()).ParseExpressionOnly();
+            parts.Add(InterpolatedPart.Value(expression));
+        }
+
+        FlushLiteral();
+        return new InterpolatedExpr(parts, token.Line, token.Col);
+    }
+    private Expr ParseOr()
+    {
+        var left = ParseAnd();
+        while (Check("||"))
+        {
+            var op = Eat(TokKind.Sym);
+            left = new BinaryExpr(op.Text, left, ParseAnd(), op.Line, op.Col);
+        }
+        return left;
+    }
+
+    private Expr ParseAnd()
+    {
+        var left = ParseBitOr();
+        while (Check("&&"))
+        {
+            var op = Eat(TokKind.Sym);
+            left = new BinaryExpr(op.Text, left, ParseBitOr(), op.Line, op.Col);
+        }
+        return left;
+    }
+
+    private Expr ParseBitOr()
+    {
+        var left = ParseBitXor();
+        while (Check("|"))
+        {
+            var op = Eat(TokKind.Sym);
+            left = new BinaryExpr(op.Text, left, ParseBitXor(), op.Line, op.Col);
+        }
+        return left;
+    }
+
+    private Expr ParseBitXor()
+    {
+        var left = ParseBitAnd();
+        while (Check("^"))
+        {
+            var op = Eat(TokKind.Sym);
+            left = new BinaryExpr(op.Text, left, ParseBitAnd(), op.Line, op.Col);
+        }
+        return left;
+    }
+
+    private Expr ParseBitAnd()
+    {
+        var left = ParseEq();
+        while (Check("&"))
+        {
+            var op = Eat(TokKind.Sym);
+            left = new BinaryExpr(op.Text, left, ParseEq(), op.Line, op.Col);
+        }
+        return left;
+    }
+
+    private Expr ParseEq()
+    {
+        var left = ParseRel();
+        while (Check("==") || Check("!="))
+        {
+            var op = Eat(TokKind.Sym);
+            left = new BinaryExpr(op.Text, left, ParseRel(), op.Line, op.Col);
+        }
+        return left;
+    }
+
+    private Expr ParseRel()
+    {
+        var left = ParseShift();
+        while (Check("<") || Check(">") || Check("<=") || Check(">="))
+        {
+            var op = Eat(TokKind.Sym);
+            left = new BinaryExpr(op.Text, left, ParseShift(), op.Line, op.Col);
+        }
+        return left;
+    }
+
+    private Expr ParseShift()
+    {
+        var left = ParseAdd();
+        while (Check("<<") || Check(">>"))
+        {
+            var op = Eat(TokKind.Sym);
+            left = new BinaryExpr(op.Text, left, ParseAdd(), op.Line, op.Col);
+        }
+        return left;
+    }
+
+    private Expr ParseAdd()
+    {
+        var left = ParseMul();
+        while (Check("+") || Check("-"))
+        {
+            var op = Eat(TokKind.Sym);
+            left = new BinaryExpr(op.Text, left, ParseMul(), op.Line, op.Col);
+        }
+        return left;
+    }
+
+    private Expr ParseMul()
+    {
+        var left = ParseUnary();
+        while (Check("*") || Check("/") || Check("%"))
+        {
+            var op = Eat(TokKind.Sym);
+            left = new BinaryExpr(op.Text, left, ParseUnary(), op.Line, op.Col);
+        }
+        return left;
+    }
+
+    private Expr ParseUnary()
+    {
+        if (Check("!") || Check("-"))
+        {
+            var op = Eat(TokKind.Sym);
+            return new UnaryExpr(op.Text, ParseUnary(), op.Line, op.Col);
+        }
+
+        return ParsePost();
+    }
     private Expr ParsePost() 
     { 
         var e = ParsePrimary(); 
@@ -407,17 +845,25 @@ public sealed class Parser(List<Token> tokens)
     {
         var lambda = TryParseLambda();
         if (lambda is not null) return lambda;
+        if (Accept("("))
+        {
+            var grouped = ParseExpr();
+            Expect(")");
+            return grouped;
+        }
+        if (Peek.Kind == TokKind.Interpolated)
+        {
+            var interpolated = tokens[_i++];
+            return ParseInterpolatedString(interpolated);
+        }
         if (CheckId("new")) 
         { 
-            var newTok = Eat(TokKind.Id); 
-            string type = Eat(TokKind.Id).Text;
-            if (type == "List" && Accept("<"))
-            {
-                Eat(TokKind.Id); // T
-                Expect(">");
-                type = "List";
-            }
-            Expect("("); 
+            var newTok = Eat(TokKind.Id);
+            string type = ParseTypeName();
+            if (type.EndsWith("[]", StringComparison.Ordinal) && !Check("("))
+                return new NewExpr(type, [], newTok.Line, newTok.Col);
+
+            Expect("(");
             var args = new List<Expr>(); 
             if (!Check(")")) 
             { 

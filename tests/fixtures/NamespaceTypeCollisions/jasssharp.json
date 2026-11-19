@@ -1,0 +1,5 @@
+{
+  "mode": "headless",
+  "entry": "src/Root.w3js",
+  "output": "bin/NamespaceTypeCollisions.lua"
+}

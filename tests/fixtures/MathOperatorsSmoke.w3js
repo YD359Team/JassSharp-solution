@@ -1,0 +1,130 @@
+namespace MathOperatorsSmoke
+{
+    using Math;
+
+    public class Score
+    {
+        public float Value;
+
+        public Score(float value)
+        {
+            this.Value = value;
+        }
+
+        public static Score FromValue(float value)
+        {
+            return new Score(value);
+        }
+
+        public float GetValue()
+        {
+            return Value;
+        }
+
+        public static Score operator +(Score left, Score right)
+        {
+            return new Score(left.Value + right.Value);
+        }
+
+        public static Score operator %(Score left, Score right)
+        {
+            return new Score(left.Value % right.Value);
+        }
+    }
+
+    public class ScoreHolder
+    {
+        public Score Stored;
+
+        public ScoreHolder(float value)
+        {
+            Stored = new Score(value);
+        }
+
+        public float ReadStored()
+        {
+            return Stored.GetValue();
+        }
+    }
+
+    public class Priority
+    {
+        public int Value;
+
+        public Priority(int value)
+        {
+            this.Value = value;
+        }
+
+        public static bool operator <(Priority left, Priority right)
+        {
+            return left.Value < right.Value;
+        }
+    }
+
+    public void OnInit()
+    {
+        Score firstScore = Score.FromValue(10.0);
+        Score secondScore = new Score(5.0);
+        Score totalScore = firstScore + secondScore;
+
+        ScoreHolder holder = new ScoreHolder(42.0);
+        float storedValue = holder.ReadStored();
+
+        Priority low = new Priority(1);
+        Priority high = new Priority(2);
+        bool isLower = low < high;
+
+        Vector2 left = new Vector2(3.0, 4.0);
+        Vector2 right = new Vector2(1.0, 2.0);
+
+        Vector2 sum = left + right;
+        Vector2 difference = left - right;
+        Vector2 scaled = 2.0 * sum;
+        Vector2 normalized = scaled.Normalized();
+
+        float length = left.Length();
+        float distance = left.Distance(right);
+        float dot = left.Dot(right);
+        Vector2 interpolated = left.Lerp(right, 0.5);
+
+        bool equal = left == right;
+        bool notEqual = left != right;
+
+        Vector3 axisX = new Vector3(1.0, 0.0, 0.0);
+        Vector3 axisY = new Vector3(0.0, 1.0, 0.0);
+        Vector3 cross = axisX.Cross(axisY);
+        Vector3 normalized3 = cross.Normalized();
+
+        float clamped = Math.Clamp(distance, 0.0, 10.0);
+        float interpolatedScalar = Math.Lerp(0.0, 100.0, 0.25);
+        float rounded = Math.Round(2.5);
+        float floored = Math.Floor(2.9);
+        float ceiled = Math.Ceil(2.1);
+        float power = Math.Pow(2.0, 3.0);
+        float root = Math.Sqrt(16.0);
+        float absolute = Math.Abs(-5.0);
+
+        float pi = Math.Pi();
+        float radians = Math.DegToRad(180.0);
+        float degrees = Math.RadToDeg(pi);
+        float inverse = Math.InverseLerp(0.0, 10.0, 5.0);
+        float smooth = Math.SmoothStep(0.0, 1.0, 0.5);
+        float moved = Math.MoveTowards(0.0, 10.0, 2.0);
+        float repeated = Math.Repeat(-1.0, 360.0);
+        float angle = Math.LerpAngle(350.0, 10.0, 0.5);
+
+        var inferredInt = 42;
+        var inferredFloat = 2.5;
+        var inferredScore = Score.FromValue(7.0);
+        int explicitInt = 4;
+        float explicitFloat = explicitInt;
+        int remainder = 17 % 5;
+        float fractionalRemainder = 7.5 % 2.0;
+        remainder %= 3;
+        Score overloadedRemainder = firstScore % secondScore;
+        float sine = Math.Sin(1.0);
+        float cosine = Math.Cos(1.0);
+        float tangent = Math.Tan(1.0);
+    }
+}

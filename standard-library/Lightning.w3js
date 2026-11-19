@@ -1,0 +1,59 @@
+namespace Lightning
+{
+    using Warcraft3;
+    using Math;
+    using Colors;
+
+    // Owns one native lightning handle.
+    public class LightningEffect
+    {
+        private lightning _handle;
+        private bool _disposed;
+        public LightningEffect(string codeName, bool checkVisibility, Vector3 start, Vector3 end)
+        {
+            _handle = AddLightningEx(
+                codeName,
+                checkVisibility,
+                start.X, start.Y, start.Z,
+                end.X, end.Y, end.Z);
+            _disposed = _handle == null;
+        }
+
+        public bool IsDisposed()
+        {
+            return _disposed;
+        }
+
+        public lightning Handle()
+        {
+            if (_disposed) { return null; }
+            return _handle;
+        }
+
+        public bool Move(Vector3 start, Vector3 end, bool checkVisibility)
+        {
+            if (_disposed) { return false; }
+            return MoveLightningEx(
+                _handle,
+                checkVisibility,
+                start.X, start.Y, start.Z,
+                end.X, end.Y, end.Z);
+        }
+
+        public bool SetColor(Color value)
+        {
+            if (_disposed || value == null) { return false; }
+            return value.ApplyToLightning(_handle);
+        }
+
+        // JASS# compiles this destructor into an explicit Dispose() method.
+        // Lua garbage collection does not invoke it automatically.
+        ~LightningEffect()
+        {
+            if (_disposed) { return; }
+            DestroyLightning(_handle);
+            _handle = null;
+            _disposed = true;
+        }
+    }
+}

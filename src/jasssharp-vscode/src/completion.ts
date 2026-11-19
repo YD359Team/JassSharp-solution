@@ -48,10 +48,11 @@ async function fetchSymbols(projectDir: string, currentFile: string): Promise<Sy
 
 const KEYWORDS = [
     "namespace", "using", "class", "void", "int", "float", "bool", "string", "const",
-    "new", "this", "if", "else", "while", "return", "true", "false", "null",
+    "new", "this", "if", "else", "do", "while", "for", "foreach", "return", "break", "true", "false", "null", "var",
 ];
 
 const TYPES = [
+    "List", "Queue", "Stack", "Dictionary", "KeyValuePair",
     "ability", "abilitybooleanfield", "abilitybooleanlevelarrayfield", "abilitybooleanlevelfield", "abilityintegerfield",
     "abilityintegerlevelarrayfield", "abilityintegerlevelfield", "abilityrealfield", "abilityreallevelarrayfield",
     "abilityreallevelfield", "abilitystringfield", "abilitystringlevelarrayfield", "abilitystringlevelfield", "agent",
@@ -61,7 +62,7 @@ const TYPES = [
     "fogmodifier", "fogstate", "fogstyle", "force", "frameeventtype", "framehandle", "framepointtype", "gamecache",
     "gamedifficulty", "gameevent", "gamespeed", "gamestate", "gametype", "group", "handle", "hashtable", "heroattribute",
     "igamestate", "image", "integer", "item", "itembooleanfield", "itemintegerfield", "itempool", "itemrealfield",
-    "itemstringfield", "itemTag", "itemtype", "leaderboard", "lightning", "limitop", "loadoutslot", "location",
+    "itemstringfield", "itemTag", "itemtype", "equipmentType", "leaderboard", "lightning", "limitop", "loadoutslot", "location",
     "mapcontrol", "mapdensity", "mapflag", "mapsetting", "mapvisibility", "metakeytype", "minimapicon", "mousebuttontype",
     "movetype", "multiboard", "multiboarditem", "nothing", "originframetype", "oskeytype", "pathingflag", "pathingtype",
     "placement", "player", "playercolor", "playergameresult", "playerevent", "playerscore", "playerslotstate", "playerstate",
@@ -666,6 +667,7 @@ export const NATIVES: { name: string; sig: string; doc: string }[] = [
     { name: "BlzUnitHasLoadoutSlotEmpty", sig: "BlzUnitHasLoadoutSlotEmpty(unit, loadoutslot)", doc: "" },
     { name: "UnitHasAnyItemEquiped", sig: "UnitHasAnyItemEquiped(unit)", doc: "" },
     { name: "BlzUnitHasAnyItemEquipped", sig: "BlzUnitHasAnyItemEquipped(unit)", doc: "" },
+    { name: "BlzUnitHasAnyItemEquiped", sig: "BlzUnitHasAnyItemEquiped(unit)", doc: "Exact Warcraft III 3.0.1 native spelling; note the single p in Equiped." },
     { name: "UnitHasItemEquipmentOfType", sig: "UnitHasItemEquipmentOfType(unit, equipmentType)", doc: "" },
     { name: "BlzUnitHasItemEquipmentOfType", sig: "BlzUnitHasItemEquipmentOfType(unit, equipmentType)", doc: "" },
     { name: "UnitCanEquipItemOfEquipmentType", sig: "UnitCanEquipItemOfEquipmentType(unit, equipmentType)", doc: "" },
@@ -1312,8 +1314,9 @@ export const NATIVES: { name: string; sig: string; doc: string }[] = [
     { name: "EndThematicMusic", sig: "EndThematicMusic()", doc: "" },
     { name: "SetMusicVolume", sig: "SetMusicVolume(int)", doc: "" },
     { name: "SetMusicPlayPosition", sig: "SetMusicPlayPosition(int)", doc: "" },
+    { name: "SetThematicMusicAbsoluteVolume", sig: "SetThematicMusicAbsoluteVolume(int)", doc: "Sets the absolute thematic music volume (Warcraft III 3.0.1)." },
     { name: "SetThematicMusicVolume", sig: "SetThematicMusicVolume(int)", doc: "" },
-    { name: "BlzSetThematicMusicAbsoluteVolume", sig: "BlzSetThematicMusicAbsoluteVolume(int)", doc: "" },
+    { name: "SetThematicMusicAbsoluteVolume", sig: "SetThematicMusicAbsoluteVolume(int)", doc: "Sets the absolute thematic music volume." },
     { name: "SetThematicMusicPlayPosition", sig: "SetThematicMusicPlayPosition(int)", doc: "" },
     { name: "SetSoundDuration", sig: "SetSoundDuration(sound, int)", doc: "" },
     { name: "GetSoundDuration", sig: "GetSoundDuration(sound)", doc: "" },
@@ -1850,6 +1853,62 @@ export function registerCompletions(context: vscode.ExtensionContext) {
             const afterDot = /(\w+)\.\w*$/.exec(line);
             if (afterDot) {
                 const recv = afterDot[1];
+                const declarationPattern = new RegExp(
+                    `\\b(List|Queue|Stack|Dictionary)\\s*<([^>]+)>\\s+${recv}\\b`,
+                    "g"
+                );
+                const textBeforeCursor = doc.getText(new vscode.Range(new vscode.Position(0, 0), pos));
+                const declarations = [...textBeforeCursor.matchAll(declarationPattern)];
+                const collectionDeclaration = declarations.length > 0 ? declarations[declarations.length - 1] : null;
+                if (collectionDeclaration) {
+                    const collectionType = collectionDeclaration[1];
+                    const typeArguments = collectionDeclaration[2].split(",").map(value => value.trim());
+                    const collectionMembers: Record<string, { name: string; kind: "Method" | "Property"; ret: string; args?: string[] }[]> = {
+                        List: [
+                            { name: "Add", kind: "Method", ret: "void", args: [typeArguments[0]] },
+                            { name: "Remove", kind: "Method", ret: "bool", args: [typeArguments[0]] },
+                            { name: "IndexOf", kind: "Method", ret: "int", args: [typeArguments[0]] },
+                            { name: "Clear", kind: "Method", ret: "void", args: [] },
+                            { name: "Count", kind: "Property", ret: "int" },
+                        ],
+                        Queue: [
+                            { name: "Enqueue", kind: "Method", ret: "void", args: [typeArguments[0]] },
+                            { name: "Dequeue", kind: "Method", ret: typeArguments[0], args: [] },
+                            { name: "Peek", kind: "Method", ret: typeArguments[0], args: [] },
+                            { name: "Count", kind: "Property", ret: "int" },
+                        ],
+                        Stack: [
+                            { name: "Push", kind: "Method", ret: "void", args: [typeArguments[0]] },
+                            { name: "Pop", kind: "Method", ret: typeArguments[0], args: [] },
+                            { name: "Peek", kind: "Method", ret: typeArguments[0], args: [] },
+                            { name: "Count", kind: "Property", ret: "int" },
+                        ],
+                        Dictionary: [
+                            { name: "Add", kind: "Method", ret: "void", args: typeArguments },
+                            { name: "Remove", kind: "Method", ret: "bool", args: [typeArguments[0]] },
+                            { name: "TryAdd", kind: "Method", ret: "bool", args: typeArguments },
+                            { name: "TryRemove", kind: "Method", ret: "bool", args: [typeArguments[0]] },
+                            { name: "ContainsKey", kind: "Method", ret: "bool", args: [typeArguments[0]] },
+                            { name: "Count", kind: "Property", ret: "int" },
+                        ],
+                    };
+                    for (const member of collectionMembers[collectionType] ?? []) {
+                        const item = new vscode.CompletionItem(
+                            member.name,
+                            member.kind === "Method" ? vscode.CompletionItemKind.Method : vscode.CompletionItemKind.Property
+                        );
+                        item.range = range;
+                        item.detail = `${collectionType}.${member.name} (${member.kind}) → ${member.ret}`;
+                        if (member.kind === "Method") {
+                            const args = member.args ?? [];
+                            item.insertText = new vscode.SnippetString(
+                                `${member.name}(${args.map((_, index) => `${index + 1}`).join(", ")}$0)`
+                            );
+                        }
+                        items.push(item);
+                    }
+                    return items;
+                }
                 for (const m of MEMBERS.filter(x => x.type === recv || recv === "self" || recv === "this")) {
                     const i = new vscode.CompletionItem(m.name, m.kind === "Method" ? vscode.CompletionItemKind.Method : vscode.CompletionItemKind.Property);
                     i.range = range;
@@ -1868,7 +1927,9 @@ export function registerCompletions(context: vscode.ExtensionContext) {
             for (const t of TYPES) {
                 const i = new vscode.CompletionItem(t, vscode.CompletionItemKind.Class);
                 i.range = range;
-                i.detail = "handle type";
+                i.detail = ["List", "Queue", "Stack", "Dictionary", "KeyValuePair"].includes(t)
+                    ? "generic collection type"
+                    : "Warcraft III handle type";
                 items.push(i);
             }
             for (const c of CONSTANTS) {

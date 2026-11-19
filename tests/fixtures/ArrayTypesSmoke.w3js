@@ -1,0 +1,27 @@
+namespace ArrayTypesSmoke
+{
+    int[][] GlobalMatrix;
+
+    class ArrayHolder
+    {
+        int[][] Matrix;
+    }
+
+    public void Verify(int[][] source)
+    {
+        int[][] matrix = new int[][];
+        matrix[0] = new int[];
+        matrix[0][1] = 42;
+
+        int[] row = matrix[0];
+        row[0] = 10;
+        source[0] = row;
+
+        var inferredMatrix = new int[][];
+        var inferredRow = inferredMatrix[0];
+
+        float[][] weights;
+        weights[0] = new float[];
+        weights[0][0] = 2.5;
+    }
+}

@@ -1,0 +1,74 @@
+namespace InterfacesAndInheritanceSmoke
+{
+    interface IEntity
+    {
+        int Id();
+    }
+
+    interface IReadable : IEntity
+    {
+    }
+
+    interface ISerializable : IEntity
+    {
+    }
+
+    interface ITraceable
+    {
+        string Trace();
+    }
+
+    interface IActor : IReadable, ISerializable, ITraceable
+    {
+        void Act(int amount);
+    }
+
+    class EntityBase
+    {
+        public int _id;
+
+        EntityBase()
+        {
+            _id = 17;
+        }
+
+        public int Id()
+        {
+            return _id;
+        }
+    }
+
+    class UnitActor : EntityBase, IActor
+    {
+        UnitActor()
+        {
+        }
+
+        public void Act(int amount)
+        {
+            _id = _id + amount;
+        }
+
+        public string Trace()
+        {
+            return "unit-actor";
+        }
+
+        public int Add(int left, int right) => left + right;
+    }
+
+    public void Verify()
+    {
+        UnitActor actor = new UnitActor();
+        EntityBase baseObject = actor;
+        IActor actorContract = actor;
+        IEntity entityContract = actor;
+
+        int id = baseObject.Id();
+        actorContract.Act(3);
+        var inheritedId = actorContract.Id();
+        string trace = actorContract.Trace();
+        int sum = actor.Add(2, 3);
+        return;
+    }
+}

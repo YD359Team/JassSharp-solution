@@ -1,0 +1,194 @@
+namespace Inventory
+{
+    using Warcraft3;
+
+    // Non-owning facade over a unit's extended bag and equipment loadout.
+    public class UnitInventory
+    {
+        private unit _owner;
+
+        public UnitInventory(unit owner)
+        {
+            _owner = owner;
+        }
+
+        public unit Owner()
+        {
+            return _owner;
+        }
+
+        // Number of extended bag slots exposed by the game runtime.
+        public int BagSize()
+        {
+            if (_owner == null) { return 0; }
+            return BlzUnitExtendedInventorySize(_owner);
+        }
+
+        // Bag slots use the native zero-based slot index.
+        public item BagItem(int slot)
+        {
+            if (_owner == null) { return null; }
+            if (slot < 0 || slot >= BagSize()) { return null; }
+            return BlzUnitItemInBagSlot(_owner, slot);
+        }
+
+        public item EquipmentItem(loadoutslot slot)
+        {
+            if (_owner == null || slot == null) { return null; }
+            return BlzUnitItemInEquipmentSlot(_owner, slot);
+        }
+
+        public bool IsInBag(item value)
+        {
+            if (_owner == null || value == null) { return false; }
+            return BlzUnitHasItemBagged(_owner, value);
+        }
+
+        public bool IsEquipped(item value)
+        {
+            if (_owner == null || value == null) { return false; }
+            return BlzUnitHasItemEquipped(_owner, value);
+        }
+
+        public bool HasAnyEquippedItem()
+        {
+            if (_owner == null) { return false; }
+            return BlzUnitHasAnyItemEquipped(_owner);
+        }
+
+        public bool HasEquipmentType(equipmentType value)
+        {
+            if (_owner == null || value == null) { return false; }
+            return BlzUnitHasItemEquipmentOfType(_owner, value);
+        }
+
+        public bool CanEquip(equipmentType value)
+        {
+            if (_owner == null || value == null) { return false; }
+            return BlzUnitCanEquipItemOfEquipmentType(_owner, value);
+        }
+
+        public bool HasEmptySlot(loadoutslot slot)
+        {
+            if (_owner == null || slot == null) { return false; }
+            return BlzUnitHasLoadoutSlotEmpty(_owner, slot);
+        }
+
+        public bool Equip(item value)
+        {
+            if (_owner == null || value == null) { return false; }
+            return BlzUnitEquipItem(_owner, value);
+        }
+
+        public void Unequip(item value)
+        {
+            if (_owner == null || value == null) { return; }
+            BlzUnitUnequipItem(_owner, value);
+        }
+
+        public item UnequipSlot(loadoutslot slot)
+        {
+            if (_owner == null || slot == null) { return null; }
+            return BlzUnitUnequipItemFromSlot(_owner, slot);
+        }
+
+        // The item argument is an item handle, not a bag/equipment slot index.
+        public equipmentType ItemEquipmentType(item value)
+        {
+            if (value == null) { return null; }
+            return BlzGetItemEquipmentType(value);
+        }
+
+        public itemTag ItemTag(item value)
+        {
+            if (value == null) { return null; }
+            return BlzGetItemTag(value);
+        }
+    }
+
+    public class Talents
+    {
+        // Resets the unit's talent allocation using the Warcraft III 3.0 native.
+        public static void Reset(unit target)
+        {
+            if (target == null) { return; }
+            BlzResetUnitTalents(target);
+        }
+
+        // In Warcraft III, authored talent choices are commonly represented by abilities.
+        public static bool GrantAbility(unit target, int abilityRawcode)
+        {
+            if (target == null) { return false; }
+            return UnitAddAbility(target, abilityRawcode);
+        }
+
+        public static bool RemoveAbility(unit target, int abilityRawcode)
+        {
+            if (target == null) { return false; }
+            return UnitRemoveAbility(target, abilityRawcode);
+        }
+
+        public static int AbilityRank(unit target, int abilityRawcode)
+        {
+            if (target == null) { return 0; }
+            return GetUnitAbilityLevel(target, abilityRawcode);
+        }
+
+        public static bool SetAbilityRank(unit target, int abilityRawcode, int rank)
+        {
+            if (target == null || rank < 1) { return false; }
+            if (GetUnitAbilityLevel(target, abilityRawcode) == 0)
+            {
+                if (!UnitAddAbility(target, abilityRawcode)) { return false; }
+            }
+            return SetUnitAbilityLevel(target, abilityRawcode, rank) == rank;
+        }
+
+        public static bool SetAbilityPermanent(unit target, int abilityRawcode, bool permanent)
+        {
+            if (target == null) { return false; }
+            return UnitMakeAbilityPermanent(target, permanent, abilityRawcode);
+        }
+    }
+
+    public class RpgCombat
+    {
+        // applyStatBonuses lets the engine include supported RPG stat bonuses in healing.
+        public static float Heal(unit target, unit source, float amount, bool isItem, bool applyStatBonuses)
+        {
+            if (target == null) { return 0.0; }
+            return BlzUnitHeal(target, source, amount, isItem, applyStatBonuses);
+        }
+    }
+
+    public class ItemSelection
+    {
+        // Returns an item rawcode, not an item handle. Pass the result to CreateItem.
+        public static int ChooseRandomRawcode(
+            itemtype type,
+            int level,
+            equipmentType equipment,
+            itemTag tag,
+            bool includeInvalidMorphs,
+            bool includeNonPickRandom)
+        {
+            return ChooseRandomItemExWithFilterAndIncludes(
+                type, level, equipment, tag,
+                includeInvalidMorphs, includeNonPickRandom);
+        }
+    }
+
+    public class InventoryEvents
+    {
+        // Valid only while handling the corresponding native inventory event.
+        public static item EquippedItem()
+        {
+            return BlzGetEquippedItem();
+        }
+
+        public static item UnequippedItem()
+        {
+            return BlzGetUnequippedItem();
+        }
+    }
+}

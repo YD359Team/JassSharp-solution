@@ -1,0 +1,5 @@
+{
+  "mode": "headless",
+  "entry": "src/AmbiguousRoot.w3js",
+  "output": "bin/NamespaceAmbiguityProject.lua"
+}

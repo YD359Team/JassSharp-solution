@@ -1,0 +1,20 @@
+namespace WarcraftObjectDataFieldsSmoke
+{
+    using Warcraft3;
+
+    public void OnInit()
+    {
+        unit target = GetTriggerUnit();
+        ability abilityHandle = BlzGetUnitAbility(target, AbilityId("AHbz"));
+        item itemHandle = null;
+
+        int allowedTargets = BlzGetAbilityIntegerField(abilityHandle, ABILITY_IF_ALLOWED_TARGETS);
+        float castPoint = BlzGetAbilityRealField(abilityHandle, ABILITY_RF_CAST_POINT);
+        int buffId = BlzGetAbilityIntegerLevelField(abilityHandle, ABILITY_ILF_BUFFID, 0);
+        int itemGoldCost = BlzGetItemIntegerField(itemHandle, ITEM_IF_GOLD_COST);
+        int unitGoldCost = BlzGetUnitIntegerField(target, UNIT_IF_GOLD_COST);
+        float maxSpeed = BlzGetUnitRealField(target, UNIT_RF_SPEED_MAX);
+        bool repulse = BlzGetUnitBooleanField(target, UNIT_BF_REPULSE);
+        float motionBuffer = BlzGetUnitWeaponRealField(target, UNIT_WEAPON_RF_MOTION_BUFFER, 0);
+    }
+}

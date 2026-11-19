@@ -1,0 +1,173 @@
+namespace Geometry
+{
+    using Math;
+
+    // A circle in the XY gameplay plane.
+    public class Circle
+    {
+        public Vector2 Center;
+        public float Radius;
+
+        public Circle(Vector2 center, float radius)
+        {
+            this.Center = center;
+            this.Radius = Math.Abs(radius);
+        }
+
+        public bool Contains(Vector2 point)
+        {
+            return Center.Distance(point) <= Math.Abs(Radius);
+        }
+
+        public Vector2 ClosestPoint(Vector2 point)
+        {
+            Vector2 offset = point - Center;
+            float distance = offset.Length();
+            float radius = Math.Abs(Radius);
+
+            if (distance <= radius || distance == 0.0)
+            {
+                return point;
+            }
+
+            return Center + offset * (radius / distance);
+        }
+
+        public float Area()
+        {
+            float radius = Math.Abs(Radius);
+            return Math.Pi() * radius * radius;
+        }
+
+        public float Circumference()
+        {
+            return 2.0 * Math.Pi() * Math.Abs(Radius);
+        }
+
+        public bool Intersects(Circle other)
+        {
+            float combinedRadius = Math.Abs(Radius) + Math.Abs(other.Radius);
+            return Center.Distance(other.Center) <= combinedRadius;
+        }
+    }
+
+    // Axis-aligned rectangle. Negative width/height are normalized by all queries.
+    public class Rect2
+    {
+        public float X;
+        public float Y;
+        public float Width;
+        public float Height;
+
+        public Rect2(float x, float y, float width, float height)
+        {
+            this.X = x;
+            this.Y = y;
+            this.Width = width;
+            this.Height = height;
+        }
+
+        public float Left()
+        {
+            return Math.Min(X, X + Width);
+        }
+
+        public float Right()
+        {
+            return Math.Max(X, X + Width);
+        }
+
+        public float Bottom()
+        {
+            return Math.Min(Y, Y + Height);
+        }
+
+        public float Top()
+        {
+            return Math.Max(Y, Y + Height);
+        }
+
+        public Vector2 Center()
+        {
+            return new Vector2((Left() + Right()) * 0.5, (Bottom() + Top()) * 0.5);
+        }
+
+        public bool Contains(Vector2 point)
+        {
+            return point.X >= Left() && point.X <= Right()
+                && point.Y >= Bottom() && point.Y <= Top();
+        }
+
+        public Vector2 ClosestPoint(Vector2 point)
+        {
+            return new Vector2(
+                Math.Clamp(point.X, Left(), Right()),
+                Math.Clamp(point.Y, Bottom(), Top()));
+        }
+
+        public float Area()
+        {
+            return (Right() - Left()) * (Top() - Bottom());
+        }
+
+        public float Perimeter()
+        {
+            return 2.0 * ((Right() - Left()) + (Top() - Bottom()));
+        }
+
+        public bool Intersects(Rect2 other)
+        {
+            return Left() <= other.Right() && Right() >= other.Left()
+                && Bottom() <= other.Top() && Top() >= other.Bottom();
+        }
+
+        public bool IntersectsCircle(Circle circle)
+        {
+            Vector2 closest = ClosestPoint(circle.Center);
+            return closest.Distance(circle.Center) <= Math.Abs(circle.Radius);
+        }
+    }
+
+    // Finite line segment between A and B.
+    public class LineSegment2
+    {
+        public Vector2 A;
+        public Vector2 B;
+
+        public LineSegment2(Vector2 a, Vector2 b)
+        {
+            this.A = a;
+            this.B = b;
+        }
+
+        public float Length()
+        {
+            return A.Distance(B);
+        }
+
+        public Vector2 ClosestPoint(Vector2 point)
+        {
+            Vector2 direction = B - A;
+            float lengthSquared = direction.Dot(direction);
+
+            if (lengthSquared == 0.0)
+            {
+                return A;
+            }
+
+            float t = (point - A).Dot(direction) / lengthSquared;
+            t = Math.Clamp(t, 0.0, 1.0);
+            return A + direction * t;
+        }
+
+        public float DistanceToPoint(Vector2 point)
+        {
+            return point.Distance(ClosestPoint(point));
+        }
+
+        public bool ContainsPoint(Vector2 point)
+        {
+            return DistanceToPoint(point) <= 0.0001;
+        }
+    }
+}

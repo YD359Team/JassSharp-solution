@@ -1,0 +1,9 @@
+namespace DestructorVisibilitySmoke
+{
+    public class Resource
+    {
+        public ~Resource()
+        {
+        }
+    }
+}

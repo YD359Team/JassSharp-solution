@@ -1,0 +1,76 @@
+namespace CollectionsSmoke
+{
+    public void QueueScenario()
+    {
+        Queue<int> queue = new Queue<int>();
+        queue.Enqueue(10);
+        queue.Enqueue(20);
+        int first = queue.Peek();
+        int removed = queue.Dequeue();
+        int queueCount = queue.Count;
+
+        foreach (var item in queue)
+        {
+            int copy = item;
+        }
+    }
+
+    public void StackScenario()
+    {
+        Stack<string> stack = new Stack<string>();
+        stack.Push("first");
+        stack.Push("second");
+        string top = stack.Peek();
+        string popped = stack.Pop();
+        int stackCount = stack.Count;
+
+        foreach (var item in stack)
+        {
+            string copy = item;
+        }
+    }
+
+    public void DictionaryScenario()
+    {
+        Dictionary<string, int> scores = new Dictionary<string, int>();
+        scores.Add("Player1", 100);
+        scores["Player1"] = 150;
+
+        bool added = scores.TryAdd("Player2", 200);
+        bool contains = scores.ContainsKey("Player1");
+        int score = scores["Player1"];
+        int count = scores.Count;
+        bool removed = scores.TryRemove("Player2");
+
+        foreach (var pair in scores)
+        {
+            string key = pair.Key;
+            int value = pair.Value;
+        }
+
+        foreach (KeyValuePair<string, int> pair in scores)
+        {
+            string key = pair.Key;
+            int value = pair.Value;
+        }
+    }
+
+    public void ListScenario()
+    {
+        List<int> values = new List<int>();
+        values.Add(10);
+        values.Add(20);
+        int count = values.Count;
+        int first = values[0];
+        int last = values[^1];
+
+        foreach (var value in values)
+        {
+            int copy = value;
+        }
+
+        List<string> nullableValues = new List<string>();
+        nullableValues.Add(null);
+        string nullValue = nullableValues[0];
+    }
+}

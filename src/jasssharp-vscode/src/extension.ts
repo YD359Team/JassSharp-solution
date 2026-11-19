@@ -3,6 +3,7 @@ import { spawn, ChildProcessWithoutNullStreams } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { registerLanguageFeatures } from "./languageFeatures";
+import { registerFormatting } from "./formatting";
 
 let log: vscode.OutputChannel;
 const checkTimers = new Map<string, NodeJS.Timeout>();
@@ -15,6 +16,13 @@ export function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(diagnostics);
 
     registerLanguageFeatures(context);
+    registerFormatting(context);
+
+    const buildButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 101);
+    buildButton.command = "jasssharp.buildLua";
+    buildButton.text = "$(tools) Build Lua";
+    buildButton.tooltip = "JASS#: собрать Lua";
+    context.subscriptions.push(buildButton);
 
     const runButton = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
     runButton.command = "jasssharp.runMap";
@@ -30,7 +38,12 @@ export function activate(context: vscode.ExtensionContext) {
 
     const updateButtons = () => {
         const editor = vscode.window.activeTextEditor;
-        if (editor?.document.languageId === "jasssharp") {
+        const mode = readProject(editor?.document)?.mode ?? "wc3";
+        void vscode.commands.executeCommand("setContext", "jasssharp.mode", mode);
+        if (editor?.document.languageId === "jasssharp") buildButton.show();
+        else buildButton.hide();
+
+        if (editor?.document.languageId === "jasssharp" && mode !== "headless") {
             runButton.show();
             editorButton.show();
         } else {
@@ -39,7 +52,14 @@ export function activate(context: vscode.ExtensionContext) {
         }
     };
     updateButtons();
-    context.subscriptions.push(vscode.window.onDidChangeActiveTextEditor(updateButtons));
+    context.subscriptions.push(
+        vscode.window.onDidChangeActiveTextEditor(updateButtons),
+        vscode.workspace.onDidChangeWorkspaceFolders(updateButtons),
+        vscode.workspace.onDidChangeConfiguration(event => {
+            if (event.affectsConfiguration("jasssharp.projectFile")) updateButtons();
+        }),
+        vscode.workspace.onDidSaveTextDocument(() => updateButtons())
+    );
 
     context.subscriptions.push(
         vscode.commands.registerCommand("jasssharp.build", () => build("")),
@@ -104,6 +124,12 @@ function runCompiler(args: string[], cwd: string): Promise<{ code: number; out: 
     });
 }
 
+function projectConfigPath(document: vscode.TextDocument): string {
+    const root = vscode.workspace.getWorkspaceFolder(document.uri)?.uri.fsPath ?? path.dirname(document.uri.fsPath);
+    const configured = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile")?.trim() || "jasssharp.json";
+    return path.isAbsolute(configured) ? configured : path.join(root, configured);
+}
+
 function scheduleCheck(document: vscode.TextDocument, diagnostics: vscode.DiagnosticCollection): void {
     if (document.languageId !== "jasssharp" || document.uri.scheme !== "file") return;
     const key = document.uri.toString();
@@ -119,7 +145,9 @@ function scheduleCheck(document: vscode.TextDocument, diagnostics: vscode.Diagno
 async function check(document: vscode.TextDocument, diagnostics: vscode.DiagnosticCollection): Promise<void> {
     if (document.languageId !== "jasssharp" || document.uri.scheme !== "file" || document.isDirty) return;
     const version = document.version;
-    const result = await runCompiler(["check", document.fileName], path.dirname(document.fileName));
+    const result = await runCompiler(
+        ["check", document.fileName, "--config", projectConfigPath(document)],
+        path.dirname(document.fileName));
     if (document.isClosed || document.version !== version || document.isDirty) return;
 
     if (result.code === -1) {
@@ -162,7 +190,9 @@ async function build(forcedTarget: string): Promise<void> {
     await vscode.window.withProgress(
         { location: vscode.ProgressLocation.Notification, title: `JASS# → ${target}` },
         async () => {
-            const result = await runCompiler(["build", document.fileName, "--target", target], path.dirname(document.fileName));
+            const result = await runCompiler(
+                ["build", document.fileName, "--target", target, "--config", projectConfigPath(document)],
+                path.dirname(document.fileName));
             if (result.code === -1) {
                 vscode.window.showErrorMessage(`Не удалось запустить компилятор (${compilerPath()}). Укажите jasssharp.compilerPath. ${result.err}`);
             } else if (result.code === 0) {
@@ -175,23 +205,26 @@ async function build(forcedTarget: string): Promise<void> {
     );
 }
 
-function projectRoot(): string | undefined {
-    return vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+function projectRoot(document?: vscode.TextDocument): string | undefined {
+    const documentFolder = document
+        ? vscode.workspace.getWorkspaceFolder(document.uri)
+        : undefined;
+    return document ? documentFolder?.uri.fsPath : vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 }
 
-function readProject(): { map?: string; game?: string } | undefined {
-    const root = projectRoot();
+function readProject(document?: vscode.TextDocument): { map?: string; game?: string; mode?: "wc3" | "headless" } | undefined {
+    const root = projectRoot(document);
     if (!root) return undefined;
     const fileName = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile") || "jasssharp.json";
     const filePath = path.isAbsolute(fileName) ? fileName : path.join(root, fileName);
     if (!fs.existsSync(filePath)) return undefined;
-    try { return JSON.parse(fs.readFileSync(filePath, "utf8")) as { map?: string; game?: string }; }
+    try { return JSON.parse(fs.readFileSync(filePath, "utf8")) as { map?: string; game?: string; mode?: "wc3" | "headless" }; }
     catch { return undefined; }
 }
 
-function mapPath(): string | undefined {
-    const root = projectRoot();
-    const project = readProject();
+function mapPath(document?: vscode.TextDocument): string | undefined {
+    const root = projectRoot(document);
+    const project = readProject(document);
     if (!root || !project?.map) return undefined;
     return path.isAbsolute(project.map) ? project.map : path.join(root, project.map);
 }
@@ -217,7 +250,7 @@ function findEditor(): string | undefined {
 async function openEditor(): Promise<void> {
     log.show(true);
     info("=== Open Editor ===");
-    const map = mapPath();
+    const map = mapPath(vscode.window.activeTextEditor?.document);
     info(`map: ${map ?? "(not found)"}`);
     if (!map) { vscode.window.showErrorMessage("Не найдена карта в jasssharp.json"); return; }
     const editor = findEditor();
@@ -235,7 +268,7 @@ async function openEditor(): Promise<void> {
 async function packMap(): Promise<void> {
     log.show(true);
     info("=== Pack Map ===");
-    const map = mapPath();
+    const map = mapPath(vscode.window.activeTextEditor?.document);
     info(`map: ${map ?? "(none)"}`);
     if (!map || !fs.existsSync(map) || !fs.statSync(map).isDirectory()) {
         vscode.window.showErrorMessage("Карта должна быть папкой");
@@ -271,35 +304,42 @@ async function packMap(): Promise<void> {
 async function mapBuild(run: boolean): Promise<void> {
     log.show(true);
     info(`=== ${run ? "Run Map" : "Build Map"} ===`);
-    const folder = vscode.workspace.workspaceFolders?.[0];
-    if (!folder) {
+    const activeDocument = vscode.window.activeTextEditor?.document;
+    const root = projectRoot(activeDocument);
+    if (!root) {
         info("no workspace folder");
         vscode.window.showWarningMessage("Откройте папку проекта с jasssharp.json");
         return;
     }
 
-    const root = folder.uri.fsPath;
     info(`project: ${root}`);
     const configName = vscode.workspace.getConfiguration("jasssharp").get<string>("projectFile") || "jasssharp.json";
     const configPath = path.isAbsolute(configName) ? configName : path.join(root, configName);
     info(`config: ${configPath} exists=${fs.existsSync(configPath)}`);
+    const projectConfig = readProject(activeDocument);
+    if (run && projectConfig?.mode === "headless") {
+        vscode.window.showWarningMessage("Run Map недоступен в режиме headless. Используйте Build Lua.");
+        return;
+    }
     if (!fs.existsSync(configPath)) { vscode.window.showErrorMessage(`Нет ${configName} в корне рабочей папки`); return; }
 
     const args = ["map", "--project", root, "--config", configName];
     if (run) args.push("--run");
     const config = vscode.workspace.getConfiguration("jasssharp");
-    const game = config.get<string>("gamePath")?.trim();
-    const mpq = config.get<string>("mpqToolPath")?.trim();
     const env: NodeJS.ProcessEnv = { ...process.env };
-    if (game) { env.JASSSHARP_GAME = game; info(`gamePath: ${game} exists=${fs.existsSync(game)}`); }
-    else info("gamePath: (not set, from jasssharp.json)");
-    if (mpq) { env.JASSSHARP_MPQ = mpq; info(`mpqTool: ${mpq} exists=${fs.existsSync(mpq)}`); }
-    else info("mpqTool: (not set)");
+    if (projectConfig?.mode !== "headless") {
+        const game = config.get<string>("gamePath")?.trim();
+        const mpq = config.get<string>("mpqToolPath")?.trim();
+        if (game) { env.JASSSHARP_GAME = game; info(`gamePath: ${game} exists=${fs.existsSync(game)}`); }
+        else info("gamePath: (not set, from jasssharp.json)");
+        if (mpq) { env.JASSSHARP_MPQ = mpq; info(`mpqTool: ${mpq} exists=${fs.existsSync(mpq)}`); }
+        else info("mpqTool: (not set)");
+    }
     info(`cmd: ${compilerPath()} ${args.join(" ")}`);
     info(`cwd: ${root}`);
 
     await vscode.window.withProgress(
-        { location: vscode.ProgressLocation.Notification, title: run ? "JASS#: Run Map" : "JASS#: Build Map" },
+        { location: vscode.ProgressLocation.Notification, title: run ? "JASS#: Run Map" : projectConfig?.mode === "headless" ? "JASS#: Build Lua" : "JASS#: Build Map" },
         () => new Promise<void>(resolve => {
             const child = spawnCompiler(args, { cwd: root, env });
             child.stdout.on("data", data => info(data.toString().trimEnd()));
@@ -311,7 +351,7 @@ async function mapBuild(run: boolean): Promise<void> {
             });
             child.on("close", code => {
                 info(`exit: ${code}`);
-                if (code === 0) vscode.window.showInformationMessage("Done");
+                if (code === 0) vscode.window.showInformationMessage(projectConfig?.mode === "headless" ? "Lua generated" : "Done");
                 else vscode.window.showErrorMessage(`Компилятор завершился с кодом ${code}`);
                 resolve();
             });

@@ -1,0 +1,10 @@
+namespace HeadlessWarcraftUsing
+{
+    using Warcraft3;
+
+    public void OnInit()
+    {
+        group groupValue = CreateGroup();
+        DestroyGroup(groupValue);
+    }
+}

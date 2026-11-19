@@ -6,6 +6,7 @@ using System.Linq;
 using System.Buffers.Binary;
 using System.Text;
 using System.Text.Json;
+using JassSharp;
 using JassSharp.Emit;
 using JassSharp.Syntax;
 
@@ -13,6 +14,10 @@ static class MapBuild
 {
     private const int ProcessTimeoutMs = 120_000;
     private static readonly UTF8Encoding Utf8NoBom = new(false);
+    private static readonly HashSet<string> ExcludedSourceDirectories = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "bin", "obj", ".git", ".vs", "node_modules", "packages", "artifacts", "dist", "coverage"
+    };
 
     public static int Run(string project, bool launch, string? configName = null)
     {
@@ -34,6 +39,14 @@ static class MapBuild
 
             using JsonDocument doc = JsonDocument.Parse(File.ReadAllText(cfgPath));
             JsonElement root = doc.RootElement;
+
+            string mode = GetString(root, "mode")?.Trim().ToLowerInvariant() ?? "wc3";
+            bool strictUnknownCalls = GetBoolean(root, "strictUnknownCalls");
+            if (mode is not ("wc3" or "headless"))
+                return Fail($"unsupported mode '{mode}'. Supported modes are 'wc3' and 'headless'.");
+
+            if (mode == "headless")
+                return BuildHeadless(project, root, workRoot, launch);
 
             string mapValue = root.GetProperty("map").GetString() ?? "map";
             string target = root.TryGetProperty("target", out JsonElement targetElement)
@@ -83,10 +96,15 @@ static class MapBuild
             if (files.Count == 0)
                 return Fail("no .w3js source files found");
 
+            string standardLibraryDirectory = Path.Combine(workRoot, "stdlib");
+            Directory.CreateDirectory(standardLibraryDirectory);
+            foreach (var standardSource in StandardLibrary.LoadSources())
+                File.WriteAllText(Path.Combine(standardLibraryDirectory, standardSource.FileName), standardSource.Source, Utf8NoBom);
+
             List<string> ordered;
             try
             {
-                ordered = ResolveUsings(files, src);
+                ordered = ResolveUsings(files, src, standardLibraryDirectory);
             }
             catch (InvalidDataException ex)
             {
@@ -98,6 +116,23 @@ static class MapBuild
             }
 
             Console.WriteLine("files: " + string.Join(", ", ordered.Select(Path.GetFileName)));
+            Dictionary<string, NsUnit> allUnits;
+            try
+            {
+                allUnits = LoadProject(project);
+            }
+            catch (InvalidDataException ex)
+            {
+                return Fail("source catalog loading failed: " + ex.Message);
+            }
+
+            List<string> globalSymbolCollisions = FindLuaGlobalSymbolCollisions(ordered, allUnits);
+            if (globalSymbolCollisions.Count > 0)
+            {
+                foreach (string collision in globalSymbolCollisions)
+                    Console.Error.WriteLine("error: " + collision);
+                return Fail("Lua global symbol collision validation failed");
+            }
 
             List<string> chunks = new();
             List<string> onInits = new();
@@ -108,7 +143,22 @@ static class MapBuild
                 try
                 {
                     var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
-                    string emitted = new LuaEmitter().Emit(unit);
+                    var imports = ResolveImports(unit, allUnits);
+                    var diagnostics = Checker.Check(
+                        unit,
+                        file,
+                        imports,
+                        strictUnknownCalls: strictUnknownCalls);
+                    foreach (var diagnostic in diagnostics)
+                    {
+                        Console.Error.WriteLine(
+                            $"{file}:{diagnostic.Line}:{diagnostic.Col}: {diagnostic.Severity}: {diagnostic.Message}");
+                    }
+
+                    if (diagnostics.Any(diagnostic => diagnostic.Severity == "error"))
+                        return Fail($"semantic analysis failed for '{file}'");
+
+                    string emitted = new LuaEmitter().Emit(unit, imports, finalizeHooks: false);
 
                     if (target == "lua" && unit.Functions.Any(fn => fn.Name == "OnInit"))
                     {
@@ -129,6 +179,7 @@ static class MapBuild
                 }
             }
 
+            chunks.Add(LuaEmitter.EmitHookFinalizer());
             string generatedScript = string.Join("\n", chunks);
             const string scriptName = "war3map.lua";
 
@@ -212,6 +263,115 @@ static class MapBuild
         {
             TryDeleteDirectory(workRoot);
         }
+    }
+
+    private static int BuildHeadless(string project, JsonElement root, string workRoot, bool launch)
+    {
+        if (launch)
+            return Fail("headless mode only generates Lua and cannot run a Warcraft III map");
+
+        string target = GetString(root, "target")?.Trim().ToLowerInvariant() ?? "lua";
+        bool strictUnknownCalls = GetBoolean(root, "strictUnknownCalls");
+        if (target != "lua")
+            return Fail($"unsupported target '{target}'. Headless mode supports only Lua.");
+
+        string? entry = GetString(root, "entry");
+        string? output = GetString(root, "output");
+        string sourceDirectory = Path.Combine(project, "src");
+        List<string> rootFiles = new();
+
+        if (!string.IsNullOrWhiteSpace(entry))
+        {
+            string entryPath = NormalizePath(project, entry);
+            if (!File.Exists(entryPath))
+                return Fail($"entry file does not exist: {entryPath}");
+            rootFiles.Add(entryPath);
+        }
+        else if (Directory.Exists(sourceDirectory))
+        {
+            rootFiles.AddRange(Directory.GetFiles(sourceDirectory, "*.w3js", SearchOption.AllDirectories));
+        }
+
+        if (rootFiles.Count == 0)
+            return Fail("headless mode: no .w3js source files found");
+
+        string standardLibraryDirectory = Path.Combine(workRoot, "stdlib");
+        Directory.CreateDirectory(standardLibraryDirectory);
+        foreach (var standardSource in StandardLibrary.LoadSources())
+            File.WriteAllText(Path.Combine(standardLibraryDirectory, standardSource.FileName),
+                standardSource.Source, Utf8NoBom);
+
+        List<string> ordered;
+        try
+        {
+            ordered = ResolveUsings(rootFiles, sourceDirectory, standardLibraryDirectory);
+        }
+        catch (Exception ex)
+        {
+            return Fail("headless source dependency resolution failed: " + ex.Message);
+        }
+
+        Dictionary<string, NsUnit> allUnits;
+        try
+        {
+            allUnits = LoadProject(project);
+        }
+        catch (Exception ex)
+        {
+            return Fail("headless source catalog loading failed: " + ex.Message);
+        }
+
+        List<string> globalSymbolCollisions = FindLuaGlobalSymbolCollisions(ordered, allUnits);
+        if (globalSymbolCollisions.Count > 0)
+        {
+            foreach (string collision in globalSymbolCollisions)
+                Console.Error.WriteLine("error: " + collision);
+            return Fail("Lua global symbol collision validation failed");
+        }
+
+        List<string> chunks = new();
+        foreach (string file in ordered)
+        {
+            try
+            {
+                var unit = new Parser(new Lexer(File.ReadAllText(file)).Lex()).ParseNamespace();
+                var imports = ResolveImports(unit, allUnits);
+                var diagnostics = Checker.Check(
+                    unit,
+                    file,
+                    imports,
+                    implicitWarcraft3: false,
+                    strictUnknownCalls: strictUnknownCalls);
+                foreach (var diagnostic in diagnostics)
+                    Console.Error.WriteLine(
+                        $"{file}:{diagnostic.Line}:{diagnostic.Col}: {diagnostic.Severity}: {diagnostic.Message}");
+
+                if (diagnostics.Any(diagnostic => diagnostic.Severity == "error"))
+                    return Fail($"headless semantic analysis failed for '{file}'");
+
+                chunks.Add(new LuaEmitter().Emit(unit, imports, headless: true, finalizeHooks: false));
+            }
+            catch (ParseException ex)
+            {
+                return Fail($"{file}:{ex.Line}:{ex.Col}: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return Fail($"headless compilation failed for '{file}': {ex.Message}");
+            }
+        }
+
+        string outputPath = string.IsNullOrWhiteSpace(output)
+            ? Path.Combine(project, "bin", Path.GetFileName(project.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)) + ".lua")
+            : NormalizePath(project, output);
+        string? outputDirectory = Path.GetDirectoryName(outputPath);
+        if (!string.IsNullOrWhiteSpace(outputDirectory))
+            Directory.CreateDirectory(outputDirectory);
+
+        chunks.Add(LuaEmitter.EmitHookFinalizer());
+        File.WriteAllText(outputPath, string.Join("\n", chunks), Utf8NoBom);
+        Console.WriteLine(outputPath);
+        return 0;
     }
 
     private static int BuildFromArchive(
@@ -1379,6 +1539,16 @@ static class MapBuild
         return Path.GetFullPath(Path.IsPathRooted(path) ? path : Path.Combine(project, path));
     }
 
+
+    private static bool GetBoolean(JsonElement root, string propertyName)
+    {
+        if (!root.TryGetProperty(propertyName, out JsonElement element))
+            return false;
+        if (element.ValueKind is not (JsonValueKind.True or JsonValueKind.False))
+            throw new InvalidDataException($"project configuration property '{propertyName}' must be a boolean");
+        return element.GetBoolean();
+    }
+
     private static string? GetString(JsonElement root, string propertyName)
     {
         return root.TryGetProperty(propertyName, out JsonElement element) && element.ValueKind != JsonValueKind.Null
@@ -1431,7 +1601,8 @@ static class MapBuild
 
     private static List<string> ResolveUsings(
         IReadOnlyCollection<string> rootFiles,
-        string sourceDirectory)
+        string sourceDirectory,
+        string standardLibraryDirectory)
     {
         if (rootFiles.Count == 0)
             throw new InvalidDataException("no root source files were provided");
@@ -1443,12 +1614,12 @@ static class MapBuild
         // Entry builds still need the complete source catalog to resolve imports.
         // Only rootFiles determine which namespaces are emitted; imported units are
         // added recursively in dependency-first order.
-        IEnumerable<string> discoveredFiles = Directory.Exists(sourceDirectory)
-            ? Directory.EnumerateFiles(
-                sourceDirectory,
-                "*.w3js",
-                SearchOption.AllDirectories)
-            : Enumerable.Empty<string>();
+        IEnumerable<string> discoveredFiles = (Directory.Exists(sourceDirectory)
+                ? Directory.EnumerateFiles(sourceDirectory, "*.w3js", SearchOption.AllDirectories)
+                : Enumerable.Empty<string>())
+            .Concat(Directory.Exists(standardLibraryDirectory)
+                ? Directory.EnumerateFiles(standardLibraryDirectory, "*.w3js", SearchOption.AllDirectories)
+                : Enumerable.Empty<string>());
 
         List<string> candidates = rootFiles
             .Concat(discoveredFiles)
@@ -1458,8 +1629,21 @@ static class MapBuild
             .ThenBy(path => path, StringComparer.Ordinal)
             .ToList();
 
-        Dictionary<string, NsUnit> unitsByName = new(StringComparer.Ordinal);
-        Dictionary<string, string> fileByName = new(StringComparer.Ordinal);
+        StringComparison pathComparison = OperatingSystem.IsWindows()
+            ? StringComparison.OrdinalIgnoreCase
+            : StringComparison.Ordinal;
+
+        bool IsStandardLibraryFile(string file)
+        {
+            string relativePath = Path.GetRelativePath(standardLibraryDirectory, file);
+            return !Path.IsPathRooted(relativePath) &&
+                   relativePath != ".." &&
+                   !relativePath.StartsWith(".." + Path.DirectorySeparatorChar, pathComparison) &&
+                   !relativePath.StartsWith(".." + Path.AltDirectorySeparatorChar, pathComparison);
+        }
+
+        Dictionary<string, List<(string File, NsUnit Unit, bool IsStandardLibrary)>> groupedUnits =
+            new(StringComparer.Ordinal);
         Dictionary<string, NsUnit> unitsByFile = new(pathComparer);
 
         foreach (string file in candidates)
@@ -1484,16 +1668,39 @@ static class MapBuild
                     ex);
             }
 
-            if (unitsByName.TryGetValue(unit.Name, out _))
+            bool isStandardLibrary = IsStandardLibraryFile(file);
+            if (!groupedUnits.TryGetValue(unit.Name, out var entries))
             {
-                string previousFile = fileByName[unit.Name];
-                throw new InvalidDataException(
-                    $"duplicate namespace '{unit.Name}' in '{previousFile}' and '{file}'");
+                entries = new List<(string File, NsUnit Unit, bool IsStandardLibrary)>();
+                groupedUnits.Add(unit.Name, entries);
             }
 
-            unitsByName.Add(unit.Name, unit);
-            fileByName.Add(unit.Name, file);
+            entries.Add((file, unit, isStandardLibrary));
             unitsByFile.Add(file, unit);
+        }
+
+        Dictionary<string, NsUnit> unitsByName = new(StringComparer.Ordinal);
+        Dictionary<string, List<string>> filesByName = new(StringComparer.Ordinal);
+
+        foreach (var (namespaceName, entries) in groupedUnits)
+        {
+            var projectEntries = entries.Where(entry => !entry.IsStandardLibrary).ToList();
+            var standardEntries = entries.Where(entry => entry.IsStandardLibrary).ToList();
+
+            if (projectEntries.Count > 1)
+            {
+                throw new InvalidDataException(
+                    $"duplicate namespace '{namespaceName}' in '{projectEntries[0].File}' and '{projectEntries[1].File}'");
+            }
+
+            if (projectEntries.Count > 0 && standardEntries.Count > 0)
+            {
+                throw new InvalidDataException(
+                    $"project namespace '{namespaceName}' in '{projectEntries[0].File}' conflicts with a built-in standard-library namespace");
+            }
+
+            unitsByName.Add(namespaceName, StandardLibrary.MergeUnits(entries.Select(entry => entry.Unit)));
+            filesByName.Add(namespaceName, entries.Select(entry => entry.File).ToList());
         }
 
         List<string> ordered = new();
@@ -1502,6 +1709,9 @@ static class MapBuild
 
         void Visit(string namespaceName, string? importedBy)
         {
+            if (namespaceName == "Warcraft3")
+                return;
+
             if (!unitsByName.TryGetValue(namespaceName, out NsUnit unit))
             {
                 string source = importedBy is null
@@ -1537,7 +1747,8 @@ static class MapBuild
 
             importStack.RemoveAt(importStack.Count - 1);
             visitState[namespaceName] = 2;
-            ordered.Add(fileByName[namespaceName]);
+            foreach (string file in filesByName[namespaceName])
+                ordered.Add(file);
         }
 
         foreach (string fullPath in rootFiles
@@ -1562,13 +1773,13 @@ static class MapBuild
     {
         string sourceDirectory = Path.Combine(projectDir, "src");
         Dictionary<string, NsUnit> units = new(StringComparer.Ordinal);
-        if (!Directory.Exists(sourceDirectory))
-            return units;
+        Dictionary<string, string> unitSources = new(StringComparer.Ordinal);
 
-        IEnumerable<string> files = Directory
-            .EnumerateFiles(sourceDirectory, "*.w3js", SearchOption.AllDirectories)
-            .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
-            .ThenBy(path => path, StringComparer.Ordinal);
+        IEnumerable<string> files = Directory.Exists(sourceDirectory)
+            ? EnumerateProjectSources(sourceDirectory)
+                .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(path => path, StringComparer.Ordinal)
+            : Enumerable.Empty<string>();
 
         foreach (string file in files)
         {
@@ -1596,9 +1807,127 @@ static class MapBuild
             }
 
             units.Add(parsed.Name, parsed);
+            unitSources.Add(parsed.Name, file);
         }
 
+        foreach (NsUnit standardUnit in StandardLibrary.LoadUnits())
+        {
+            if (units.TryGetValue(standardUnit.Name, out _))
+            {
+                string sourceFile = unitSources[standardUnit.Name];
+                throw new InvalidDataException(
+                    $"project source '{sourceFile}' declares namespace '{standardUnit.Name}', which conflicts with a built-in standard-library namespace");
+            }
+
+            units.Add(standardUnit.Name, standardUnit);
+        }
+
+        if (units.ContainsKey("Warcraft3"))
+            throw new InvalidDataException("namespace 'Warcraft3' is reserved for the built-in Warcraft III module");
+        units.Add("Warcraft3", new NsUnit("Warcraft3", [], [], [], [], [], []));
+
         return units;
+    }
+
+    private static IEnumerable<string> EnumerateProjectSources(string directory)
+    {
+        foreach (string file in Directory.EnumerateFiles(directory, "*.w3js", SearchOption.TopDirectoryOnly))
+            yield return file;
+
+        foreach (string childDirectory in Directory.EnumerateDirectories(directory, "*", SearchOption.TopDirectoryOnly))
+        {
+            string directoryName = Path.GetFileName(childDirectory);
+            if (ExcludedSourceDirectories.Contains(directoryName))
+                continue;
+
+            foreach (string file in EnumerateProjectSources(childDirectory))
+                yield return file;
+        }
+    }
+
+
+    private static List<string> FindLuaGlobalSymbolCollisions(
+        IReadOnlyCollection<string> orderedFiles,
+        IReadOnlyDictionary<string, NsUnit> allUnits)
+    {
+        List<NsUnit> emittedUnits = new();
+        HashSet<string> seenNamespaces = new(StringComparer.Ordinal);
+
+        foreach (string file in orderedFiles)
+        {
+            NsUnit parsedUnit = new Parser(new Lexer(File.ReadAllText(file)).Lex())
+                .ParseNamespace();
+            if (!seenNamespaces.Add(parsedUnit.Name))
+                continue;
+
+            if (allUnits.TryGetValue(parsedUnit.Name, out NsUnit? unit))
+                emittedUnits.Add(unit);
+            else
+                emittedUnits.Add(parsedUnit);
+        }
+
+        return FindLuaGlobalSymbolCollisions(emittedUnits);
+    }
+
+    public static List<string> FindLuaGlobalSymbolCollisions(IEnumerable<NsUnit> sourceUnits)
+    {
+        ArgumentNullException.ThrowIfNull(sourceUnits);
+
+        Dictionary<string, (string Namespace, string Kind)> owners =
+            new(StringComparer.Ordinal);
+        List<string> collisions = new();
+        HashSet<string> seenNamespaces = new(StringComparer.Ordinal);
+
+        void Register(string namespaceName, string symbolName, string kind)
+        {
+            if (!owners.TryGetValue(symbolName, out var owner))
+            {
+                owners.Add(symbolName, (namespaceName, kind));
+                return;
+            }
+
+            // Classes receive deterministic namespace-qualified Lua aliases in Codegen.
+            // Their legacy short identifiers may therefore coexist across namespaces.
+            if (owner.Namespace != namespaceName &&
+                owner.Kind == "class" && kind == "class")
+                return;
+
+            collisions.Add(
+                $"Lua identifier '{symbolName}' is declared by namespace '{owner.Namespace}' ({owner.Kind}) " +
+                $"and namespace '{namespaceName}' ({kind}); this creates a name collision in the generated script.");
+        }
+
+        foreach (NsUnit unit in sourceUnits)
+        {
+            if (!seenNamespaces.Add(unit.Name))
+                continue;
+
+            foreach (ClassDecl cls in unit.Classes)
+                Register(unit.Name, cls.Name, "class");
+
+            foreach (FnDecl function in unit.Functions.Where(function => !function.IsHook))
+            {
+                string emittedName = function.Name == "OnInit"
+                    ? unit.Name + "_OnInit"
+                    : function.Name;
+                Register(unit.Name, emittedName, "function");
+            }
+
+            foreach (FieldDecl field in unit.Fields)
+                Register(unit.Name, field.Name, "global field");
+
+            foreach (ConstDecl constant in unit.Consts)
+                Register(unit.Name, constant.Name, "top-level local constant");
+
+            foreach (EnumDecl enumeration in unit.Enums)
+            {
+                Register(unit.Name, enumeration.Name + "_ToString", "enum helper");
+                foreach (EnumMember member in enumeration.Members)
+                    Register(unit.Name, enumeration.Name + "_" + member.Name, "enum member");
+            }
+        }
+
+        return collisions;
     }
 
     public static List<NsUnit> ResolveImports(NsUnit unit, Dictionary<string, NsUnit> all)

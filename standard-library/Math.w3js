@@ -1,0 +1,129 @@
+namespace Math
+{
+    public class Math
+    {
+        public static float Pi()
+        {
+            return 3.141592653589793;
+        }
+
+        public static float DegToRad(float degrees)
+        {
+            return degrees * (Math.Pi() / 180.0);
+        }
+
+        public static float RadToDeg(float radians)
+        {
+            return radians * (180.0 / Math.Pi());
+        }
+
+        public static float Min(float a, float b)
+        {
+            if (a < b) { return a; }
+            return b;
+        }
+
+        public static float Max(float a, float b)
+        {
+            if (a > b) { return a; }
+            return b;
+        }
+
+        public static float Clamp(float value, float min, float max)
+        {
+            return Math.Max(min, Math.Min(value, max));
+        }
+
+        public static float Lerp(float a, float b, float t)
+        {
+            float delta = b - a;
+            return a + delta * t;
+        }
+
+        public static float InverseLerp(float a, float b, float value)
+        {
+            if (a == b) { return 0.0; }
+            return Math.Clamp((value - a) / (b - a), 0.0, 1.0);
+        }
+
+        public static float SmoothStep(float a, float b, float t)
+        {
+            float amount = Math.Clamp(t, 0.0, 1.0);
+            amount = amount * amount * (3.0 - 2.0 * amount);
+            return Math.Lerp(a, b, amount);
+        }
+
+        public static float MoveTowards(float current, float target, float maxDelta)
+        {
+            if (maxDelta <= 0.0) { return current; }
+            float delta = target - current;
+            if (Math.Abs(delta) <= maxDelta) { return target; }
+            if (delta > 0.0) { return current + maxDelta; }
+            return current - maxDelta;
+        }
+
+        public static float Repeat(float value, float length)
+        {
+            if (length <= 0.0) { return 0.0; }
+            return value - math.floor(value / length) * length;
+        }
+
+        public static float LerpAngle(float a, float b, float t)
+        {
+            float delta = Math.Repeat(b - a, 360.0);
+            if (delta > 180.0) { delta = delta - 360.0; }
+            return a + delta * t;
+        }
+
+        public static float Round(float value)
+        {
+            float lower = math.floor(value);
+            float fraction = value - lower;
+            if (fraction < 0.5) { return lower; }
+            if (fraction > 0.5) { return lower + 1.0; }
+            if (lower % 2.0 == 0.0) { return lower; }
+            return lower + 1.0;
+        }
+
+        public static float Floor(float value)
+        {
+            return math.floor(value);
+        }
+
+        public static float Ceil(float value)
+        {
+            return math.ceil(value);
+        }
+
+        public static float Pow(float value, float power)
+        {
+            return math.pow(value, power);
+        }
+
+        public static float Sqrt(float value)
+        {
+            return math.sqrt(value);
+        }
+
+        public static float Abs(float value)
+        {
+            if (value < 0.0) { return -value; }
+            return value;
+        }
+
+        public static float Sin(float value)
+        {
+            return math.sin(value);
+        }
+
+        public static float Cos(float value)
+        {
+            return math.cos(value);
+        }
+
+        public static float Tan(float value)
+        {
+            return math.tan(value);
+        }
+    }
+}

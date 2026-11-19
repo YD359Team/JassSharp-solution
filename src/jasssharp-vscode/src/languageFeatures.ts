@@ -1,12 +1,13 @@
 import * as vscode from "vscode";
 import { execFile } from "child_process";
 import * as path from "path";
-import { MEMBERS } from "./members";
+import { MEMBERS, HANDLE_TYPES } from "./members";
 import { CONSTANTS } from "./constants";
 import { NATIVES } from "./completion";
 
 interface NamespaceSymbols {
     classes: string[];
+    interfaces: string[];
     functions: string[];
     consts: string[];
     fields: string[];
@@ -24,6 +25,8 @@ interface FunctionInfo {
     signature: string;
     offset: number;
     isMethod: boolean;
+    bodyStart?: number;
+    bodyEnd?: number;
 }
 
 interface VariableInfo {
@@ -31,6 +34,8 @@ interface VariableInfo {
     type: string;
     offset: number;
     isParameter: boolean;
+    scopeStart?: number;
+    scopeEnd?: number;
 }
 
 interface ClassInfo {
@@ -47,20 +52,186 @@ interface LexToken {
     end: number;
 }
 
+const BITWISE_OPERATORS = [
+    { token: "<<", detail: "Bitwise left shift (32-bit int)", documentation: "Shifts the 32-bit integer left; vacant low bits are filled with zeroes." },
+    { token: ">>", detail: "Logical right shift (32-bit int)", documentation: "Shifts the 32-bit integer right; vacant high bits are filled with zeroes." },
+    { token: "&", detail: "Bitwise AND (int, int)", documentation: "Returns one where both operand bits are one." },
+    { token: "^", detail: "Bitwise XOR (int, int)", documentation: "Returns one where operand bits differ. Compiles to Lua's native tilde operator." },
+    { token: "|", detail: "Bitwise OR (int, int)", documentation: "Returns one where at least one operand bit is one." },
+    { token: "<<=", detail: "Compound left shift assignment", documentation: "Equivalent to value = value << amount." },
+    { token: ">>=", detail: "Compound right shift assignment", documentation: "Equivalent to value = value >> amount." },
+    { token: "&=", detail: "Compound AND assignment", documentation: "Equivalent to value = value & mask." },
+    { token: "^=", detail: "Compound XOR assignment", documentation: "Equivalent to value = value ^ mask." },
+    { token: "|=", detail: "Compound OR assignment", documentation: "Equivalent to value = value | mask." }
+] as const;
+
 const KEYWORDS = new Set([
-    "namespace", "using", "class", "enum", "const", "public", "private", "static",
+    "namespace", "using", "class", "interface", "enum", "const", "public", "private", "static",
     "void", "int", "integer", "float", "real", "bool", "boolean", "string", "code",
-    "new", "this", "if", "else", "while", "for", "return", "break", "continue",
+    "new", "this", "if", "else", "do", "while", "for", "foreach", "return", "break", "continue",
     "true", "false", "null", "var", "in", "is", "as", "get", "set"
 ]);
 
 const PRIMITIVE_TYPES = new Set(["void", "int", "integer", "float", "real", "bool", "boolean", "string", "code"]);
-const DECLARATION_STOPWORDS = new Set(["namespace", "using", "class", "enum", "const", "public", "private", "static", "new", "this", "if", "else", "while", "for", "return", "break", "continue", "true", "false", "null", "var", "in", "is", "as", "get", "set"]);
+const STANDARD_LIBRARY_MEMBERS: Record<string, Array<{ name: string; ret: string; kind: "Method" | "Property"; parameters: string[] }>> = {
+    Lua: [
+        { name: "Raw", ret: "void", kind: "Method", parameters: ["string code"] }
+    ],
+    Color: [
+        { name: "FromBytes", ret: "Color", kind: "Method", parameters: ["int red", "int green", "int blue", "int alpha"] },
+        { name: "FromRgb", ret: "Color", kind: "Method", parameters: ["int red", "int green", "int blue"] },
+        { name: "FromArgb", ret: "Color", kind: "Method", parameters: ["int argb"] },
+        { name: "FromPercent", ret: "Color", kind: "Method", parameters: ["float red", "float green", "float blue", "float alpha"] },
+        { name: "White", ret: "Color", kind: "Method", parameters: [] },
+        { name: "Black", ret: "Color", kind: "Method", parameters: [] },
+        { name: "Red", ret: "Color", kind: "Method", parameters: [] },
+        { name: "Green", ret: "Color", kind: "Method", parameters: [] },
+        { name: "Blue", ret: "Color", kind: "Method", parameters: [] },
+        { name: "Transparent", ret: "Color", kind: "Method", parameters: [] },
+        { name: "ApplyPlayerColorToUnit", ret: "void", kind: "Method", parameters: ["unit target", "playercolor color"] },
+        { name: "ApplyPlayerColorToItem", ret: "void", kind: "Method", parameters: ["item target", "playercolor color"] },
+        { name: "ApplyPlayerColorToDestructable", ret: "void", kind: "Method", parameters: ["destructable target", "playercolor color"] },
+        { name: "ApplyPlayerColorToEffect", ret: "void", kind: "Method", parameters: ["effect target", "player owner"] },
+        { name: "WithAlpha", ret: "Color", kind: "Method", parameters: ["float alpha"] },
+        { name: "Lerp", ret: "Color", kind: "Method", parameters: ["Color other", "float amount"] },
+        { name: "RedByte", ret: "int", kind: "Method", parameters: [] },
+        { name: "GreenByte", ret: "int", kind: "Method", parameters: [] },
+        { name: "BlueByte", ret: "int", kind: "Method", parameters: [] },
+        { name: "AlphaByte", ret: "int", kind: "Method", parameters: [] },
+        { name: "ToArgb", ret: "int", kind: "Method", parameters: [] },
+        { name: "ToMarkup", ret: "string", kind: "Method", parameters: [] },
+        { name: "WrapText", ret: "string", kind: "Method", parameters: ["string value"] },
+        { name: "ApplyToUnitVertexColor", ret: "void", kind: "Method", parameters: ["unit target"] },
+        { name: "ApplyToEffect", ret: "void", kind: "Method", parameters: ["effect target"] },
+        { name: "ApplyToLightning", ret: "bool", kind: "Method", parameters: ["lightning target"] },
+        { name: "ApplyToTextTag", ret: "void", kind: "Method", parameters: ["texttag target"] },
+        { name: "ApplyToFrameText", ret: "void", kind: "Method", parameters: ["framehandle target"] },
+        { name: "ApplyToFrameVertex", ret: "void", kind: "Method", parameters: ["framehandle target"] }
+    ],
+    FloatingTextTag: [
+        { name: "SetText", ret: "void", kind: "Method", parameters: ["string value", "float size"] },
+        { name: "SetPosition", ret: "void", kind: "Method", parameters: ["float x", "float y", "float z"] },
+        { name: "AttachToUnit", ret: "void", kind: "Method", parameters: ["unit target", "float zOffset"] },
+        { name: "SetVelocity", ret: "void", kind: "Method", parameters: ["float x", "float y"] },
+        { name: "SetColor", ret: "void", kind: "Method", parameters: ["Color value"] },
+        { name: "SetVisible", ret: "void", kind: "Method", parameters: ["bool visible"] },
+        { name: "SetSuspended", ret: "void", kind: "Method", parameters: ["bool suspended"] },
+        { name: "SetPermanent", ret: "void", kind: "Method", parameters: ["bool permanent"] },
+        { name: "SetLifespan", ret: "void", kind: "Method", parameters: ["float seconds", "float fadepoint"] },
+        { name: "SetAge", ret: "void", kind: "Method", parameters: ["float seconds"] },
+        { name: "Dispose", ret: "void", kind: "Method", parameters: [] }
+    ],
+    LightningEffect: [
+        { name: "Move", ret: "bool", kind: "Method", parameters: ["Vector3 start", "Vector3 end", "bool checkVisibility"] },
+        { name: "SetColor", ret: "bool", kind: "Method", parameters: ["Color value"] },
+        { name: "Dispose", ret: "void", kind: "Method", parameters: [] }
+    ],
+    UnitInventory: [
+        { name: "BagSize", ret: "int", kind: "Method", parameters: [] },
+        { name: "BagItem", ret: "item", kind: "Method", parameters: ["int slot"] },
+        { name: "EquipmentItem", ret: "item", kind: "Method", parameters: ["loadoutslot slot"] },
+        { name: "IsInBag", ret: "bool", kind: "Method", parameters: ["item value"] },
+        { name: "IsEquipped", ret: "bool", kind: "Method", parameters: ["item value"] },
+        { name: "HasAnyEquippedItem", ret: "bool", kind: "Method", parameters: [] },
+        { name: "HasEquipmentType", ret: "bool", kind: "Method", parameters: ["equipmentType value"] },
+        { name: "CanEquip", ret: "bool", kind: "Method", parameters: ["equipmentType value"] },
+        { name: "HasEmptySlot", ret: "bool", kind: "Method", parameters: ["loadoutslot slot"] },
+        { name: "Equip", ret: "bool", kind: "Method", parameters: ["item value"] },
+        { name: "Unequip", ret: "void", kind: "Method", parameters: ["item value"] },
+        { name: "UnequipSlot", ret: "item", kind: "Method", parameters: ["loadoutslot slot"] },
+        { name: "ItemEquipmentType", ret: "equipmentType", kind: "Method", parameters: ["item value"] },
+        { name: "ItemTag", ret: "itemTag", kind: "Method", parameters: ["item value"] }
+    ],
+    Talents: [
+        { name: "Reset", ret: "void", kind: "Method", parameters: ["unit target"] },
+        { name: "GrantAbility", ret: "bool", kind: "Method", parameters: ["unit target", "int abilityRawcode"] },
+        { name: "RemoveAbility", ret: "bool", kind: "Method", parameters: ["unit target", "int abilityRawcode"] },
+        { name: "AbilityRank", ret: "int", kind: "Method", parameters: ["unit target", "int abilityRawcode"] },
+        { name: "SetAbilityRank", ret: "bool", kind: "Method", parameters: ["unit target", "int abilityRawcode", "int rank"] },
+        { name: "SetAbilityPermanent", ret: "bool", kind: "Method", parameters: ["unit target", "int abilityRawcode", "bool permanent"] }
+    ],
+    RpgCombat: [
+        { name: "Heal", ret: "float", kind: "Method", parameters: ["unit target", "unit source", "float amount", "bool isItem", "bool applyStatBonuses"] }
+    ],
+    UnitCombatStats: [
+        { name: "Owner", ret: "unit", kind: "Method", parameters: [] },
+        { name: "Strength", ret: "int", kind: "Method", parameters: ["bool includeBonuses"] },
+        { name: "Agility", ret: "int", kind: "Method", parameters: ["bool includeBonuses"] },
+        { name: "Intelligence", ret: "int", kind: "Method", parameters: ["bool includeBonuses"] },
+        { name: "SetStrength", ret: "void", kind: "Method", parameters: ["int value", "bool permanent"] },
+        { name: "SetAgility", ret: "void", kind: "Method", parameters: ["int value", "bool permanent"] },
+        { name: "SetIntelligence", ret: "void", kind: "Method", parameters: ["int value", "bool permanent"] },
+        { name: "Armor", ret: "float", kind: "Method", parameters: [] },
+        { name: "SetArmor", ret: "void", kind: "Method", parameters: ["float value"] },
+        { name: "BaseDamage", ret: "int", kind: "Method", parameters: ["int weaponIndex"] },
+        { name: "SetBaseDamage", ret: "void", kind: "Method", parameters: ["int value", "int weaponIndex"] },
+        { name: "DamageDiceNumber", ret: "int", kind: "Method", parameters: ["int weaponIndex"] },
+        { name: "SetDamageDiceNumber", ret: "void", kind: "Method", parameters: ["int value", "int weaponIndex"] },
+        { name: "DamageDiceSides", ret: "int", kind: "Method", parameters: ["int weaponIndex"] },
+        { name: "SetDamageDiceSides", ret: "void", kind: "Method", parameters: ["int value", "int weaponIndex"] },
+        { name: "AttackCooldown", ret: "float", kind: "Method", parameters: ["int weaponIndex"] },
+        { name: "SetAttackCooldown", ret: "void", kind: "Method", parameters: ["float seconds", "int weaponIndex"] },
+        { name: "MoveSpeed", ret: "float", kind: "Method", parameters: [] },
+        { name: "SetMoveSpeed", ret: "void", kind: "Method", parameters: ["float value"] },
+        { name: "MaxLife", ret: "int", kind: "Method", parameters: [] },
+        { name: "SetMaxLife", ret: "void", kind: "Method", parameters: ["int value"] },
+        { name: "MaxMana", ret: "int", kind: "Method", parameters: [] },
+        { name: "SetMaxMana", ret: "void", kind: "Method", parameters: ["int value"] },
+        { name: "Life", ret: "float", kind: "Method", parameters: [] },
+        { name: "SetLife", ret: "void", kind: "Method", parameters: ["float value"] },
+        { name: "Mana", ret: "float", kind: "Method", parameters: [] },
+        { name: "SetMana", ret: "void", kind: "Method", parameters: ["float value"] },
+        { name: "AbilityCooldown", ret: "float", kind: "Method", parameters: ["int abilityRawcode", "int level"] },
+        { name: "AbilityCooldownRemaining", ret: "float", kind: "Method", parameters: ["int abilityRawcode"] },
+        { name: "SetAbilityCooldownRemaining", ret: "void", kind: "Method", parameters: ["int abilityRawcode", "float seconds"] },
+        { name: "AbilityCooldownPercent", ret: "float", kind: "Method", parameters: ["int abilityRawcode"] },
+        { name: "SetAbilityCooldownPercent", ret: "void", kind: "Method", parameters: ["int abilityRawcode", "float percent"] },
+        { name: "AdjustAbilityCooldownPercent", ret: "void", kind: "Method", parameters: ["int abilityRawcode", "float deltaPercent"] },
+        { name: "AdjustAbilityCooldownRemaining", ret: "void", kind: "Method", parameters: ["int abilityRawcode", "float deltaSeconds"] },
+        { name: "EndAbilityCooldown", ret: "void", kind: "Method", parameters: ["int abilityRawcode"] },
+        { name: "StartAbilityCooldown", ret: "void", kind: "Method", parameters: ["int abilityRawcode", "float seconds"] }
+    ],
+
+    ItemSelection: [
+        { name: "ChooseRandomRawcode", ret: "int", kind: "Method", parameters: ["itemtype type", "int level", "equipmentType equipment", "itemTag tag", "bool includeInvalidMorphs", "bool includeNonPickRandom"] }
+    ],
+    SpecialEffects: [
+        { name: "Remove", ret: "void", kind: "Method", parameters: ["effect value"] }
+    ],
+    CameraSettings: [
+        { name: "SetHotkeyTargetLockAllowed", ret: "void", kind: "Method", parameters: ["bool allowed"] },
+        { name: "IsHotkeyTargetLockAllowed", ret: "bool", kind: "Method", parameters: [] }
+    ],
+    AudioSettings: [
+        { name: "SetThematicMusicVolume", ret: "void", kind: "Method", parameters: ["int volume"] }
+    ],
+    InventoryEvents: [
+        { name: "EquippedItem", ret: "item", kind: "Method", parameters: [] },
+        { name: "UnequippedItem", ret: "item", kind: "Method", parameters: [] }
+    ],
+    Strings: [
+        { name: "Length", ret: "int", kind: "Method", parameters: ["string value"] },
+        { name: "Substring", ret: "string", kind: "Method", parameters: ["string value", "int startIndex", "int length"] },
+        { name: "Replace", ret: "string", kind: "Method", parameters: ["string value", "string oldValue", "string newValue"] },
+        { name: "IndexOf", ret: "int", kind: "Method", parameters: ["string value", "string searchValue"] },
+        { name: "LastIndexOf", ret: "int", kind: "Method", parameters: ["string value", "string searchValue"] },
+        { name: "Contains", ret: "bool", kind: "Method", parameters: ["string value", "string searchValue"] },
+        { name: "Trim", ret: "string", kind: "Method", parameters: ["string value"] },
+        { name: "TrimStart", ret: "string", kind: "Method", parameters: ["string value"] },
+        { name: "TrimEnd", ret: "string", kind: "Method", parameters: ["string value"] },
+        { name: "ToLower", ret: "string", kind: "Method", parameters: ["string value"] },
+        { name: "ToUpper", ret: "string", kind: "Method", parameters: ["string value"] },
+        { name: "Split", ret: "string[]", kind: "Method", parameters: ["string value", "string separator"] },
+        { name: "Join", ret: "string", kind: "Method", parameters: ["string separator", "string[] values"] }
+    ]
+};
+
+const DECLARATION_STOPWORDS = new Set(["namespace", "using", "class", "enum", "const", "public", "private", "static", "new", "this", "if", "else", "do", "while", "for", "return", "break", "true", "false", "null", "var", "in", "is", "as", "get", "set"]);
 
 const BUILTIN_TYPES = new Set((`
 ability abilitybooleanfield abilitybooleanlevelarrayfield abilitybooleanlevelfield abilityintegerfield
 abilityintegerlevelarrayfield abilityintegerlevelfield abilityrealfield abilityreallevelarrayfield
-abilityreallevelfield abilitystringfield abilitystringlevelarrayfield abilitystringlevelfield agent aidifficulty
+abilityreallevelfield abilitystringfield abilitystringlevelarrayfield abilitystringlevelfield agent aidifficulty equipmenttype equipmentType itemTag
 alliancetype animtype armortype attacktype boolexpr buff button camerafield camerasetup code commandbuttoneffect
 conditionfunc damagetype defeatcondition defensetype destructable dialog dialogevent effect effecttype event eventid
 fgamestate filterfunc fogmodifier fogstate fogstyle force frameeventtype framehandle framepointtype gamecache
@@ -242,48 +413,263 @@ function readFunctions(text: string, classes = readClasses(text)): FunctionInfo[
         const nameOffset = start + match[0].lastIndexOf(name);
         const parameters = splitParameters(match[3]);
         const owner = classes.find(c => nameOffset >= c.bodyStart && nameOffset <= c.bodyEnd);
+        const signatureEnd = start + match[0].length;
+        const openingBrace = source.indexOf("{", signatureEnd);
+        const hasBody = openingBrace >= 0 && source.slice(signatureEnd, openingBrace).trim() === "";
         result.push({
             name,
             returnType,
             parameters,
             signature: `${returnType} ${name}(${parameters.join(", ")})`,
             offset: nameOffset,
-            isMethod: !!owner
+            isMethod: !!owner,
+            bodyStart: hasBody ? openingBrace + 1 : undefined,
+            bodyEnd: hasBody ? findMatchingBrace(text, openingBrace) : undefined
         });
     }
 
     return result;
 }
 
+function findInnermostBlockScope(
+    text: string,
+    fn: FunctionInfo,
+    offset: number
+): { start: number; end: number } {
+    const bodyStart = fn.bodyStart!;
+    const bodyEnd = fn.bodyEnd!;
+    const source = maskNonCode(text.slice(bodyStart, bodyEnd));
+    const stack: number[] = [];
+    let best = { start: bodyStart, end: bodyEnd };
+
+    for (let i = 0; i < source.length; i++) {
+        const absolute = bodyStart + i;
+        if (source[i] === "{") {
+            stack.push(absolute);
+            continue;
+        }
+
+        if (source[i] !== "}") continue;
+        const open = stack.pop();
+        if (open === undefined || offset <= open || offset >= absolute) continue;
+
+        if (absolute - open < best.end - best.start) {
+            best = { start: open + 1, end: absolute - 1 };
+        }
+    }
+
+    const loopPattern = /\b(?:for|foreach)\s*\(/g;
+    for (const match of source.matchAll(loopPattern)) {
+        const loopStart = bodyStart + (match.index ?? 0);
+        const openParen = loopStart + match[0].lastIndexOf("(");
+        let depth = 0;
+        let closeParen = -1;
+        for (let i = openParen; i < source.length; i++) {
+            if (source[i] === "(") depth++;
+            else if (source[i] === ")" && --depth === 0) {
+                closeParen = bodyStart + i;
+                break;
+            }
+        }
+        if (closeParen < 0 || offset < loopStart || offset > closeParen) continue;
+
+        const blockOpen = source.indexOf("{", closeParen - bodyStart);
+        if (blockOpen < 0) continue;
+        const absoluteBlockOpen = bodyStart + blockOpen;
+        const blockClose = findMatchingBrace(text, absoluteBlockOpen);
+        if (blockClose < 0) continue;
+
+        if (blockClose - loopStart < best.end - best.start)
+            best = { start: loopStart, end: blockClose - 1 };
+    }
+
+    return best;
+}
+
 function readVariables(text: string, classes = readClasses(text), functions = readFunctions(text, classes)): VariableInfo[] {
     const result: VariableInfo[] = [];
     const source = maskNonCode(text);
     const classNames = new Set(classes.map(c => c.name));
-    const typePattern = /\b([A-Za-z_]\w*)\s+([A-Za-z_]\w*)\s*(?==|;|,|\))/g;
+    const typePattern = /\b([A-Za-z_]\w*(?:\[\])*)\s+([A-Za-z_]\w*)\s*(?==|;|,|\)|\bin\b)/g;
 
     for (const match of source.matchAll(typePattern)) {
         const type = match[1];
         const name = match[2];
         const offset = (match.index ?? 0) + match[0].lastIndexOf(name);
         if (DECLARATION_STOPWORDS.has(type) || name === "this" || name === "true" || name === "false") continue;
-        if (!PRIMITIVE_TYPES.has(type.toLowerCase()) && !BUILTIN_TYPES.has(type.toLowerCase()) && !classNames.has(type) && !/^[A-Z]/.test(type)) continue;
+        const baseType = type.replace(/(?:\[\])+$/, "");
+        if (!PRIMITIVE_TYPES.has(baseType.toLowerCase()) &&
+            !(hasWarcraft3Using(text) && BUILTIN_TYPES.has(baseType.toLowerCase())) &&
+            !classNames.has(baseType) && !/^[A-Z]/.test(baseType)) continue;
         result.push({ name, type, offset, isParameter: false });
     }
 
-    for (const match of source.matchAll(/\bvar\s+([A-Za-z_]\w*)\s*=\s*new\s+([A-Za-z_]\w*)/g)) {
-        result.push({ name: match[1], type: match[2], offset: (match.index ?? 0) + match[0].indexOf(match[1]), isParameter: false });
-    }
-
+    const parameterVariables: VariableInfo[] = [];
     for (const fn of functions) {
+        if (fn.bodyStart === undefined || fn.bodyEnd === undefined) continue;
         for (const parameter of fn.parameters) {
-            const match = /^\s*([A-Za-z_]\w*)\s+([A-Za-z_]\w*)/.exec(parameter);
+            const match = /^\s*([A-Za-z_]\w*(?:\[\])*)\s+([A-Za-z_]\w*)/.exec(parameter);
             if (!match) continue;
             const fnText = text.slice(fn.offset);
             const paren = fnText.indexOf("(");
-            const paramOffset = fn.offset + paren + 1 + fnText.slice(paren + 1).indexOf(parameter) + parameter.indexOf(match[2]);
-            result.push({ name: match[2], type: match[1], offset: paramOffset, isParameter: true });
+            const parameterTextOffset = fnText.slice(paren + 1).indexOf(parameter);
+            if (paren < 0 || parameterTextOffset < 0) continue;
+            const paramOffset = fn.offset + paren + 1 + parameterTextOffset + parameter.indexOf(match[2]);
+            parameterVariables.push({
+                name: match[2], type: match[1], offset: paramOffset, isParameter: true,
+                scopeStart: fn.bodyStart, scopeEnd: fn.bodyEnd
+            });
         }
     }
+
+    const parameterOffsets = new Set(parameterVariables.map(variable => variable.offset));
+    for (let i = result.length - 1; i >= 0; i--) {
+        if (parameterOffsets.has(result[i].offset)) result.splice(i, 1);
+    }
+    for (const variable of result) {
+        if (parameterOffsets.has(variable.offset)) continue;
+        const ownerFunction = functions.find(fn => fn.bodyStart !== undefined &&
+            fn.bodyEnd !== undefined && variable.offset >= fn.bodyStart && variable.offset <= fn.bodyEnd);
+        const ownerClass = classes.find(cls => variable.offset >= cls.bodyStart && variable.offset <= cls.bodyEnd);
+        if (ownerFunction) {
+            const scope = findInnermostBlockScope(text, ownerFunction, variable.offset);
+            variable.scopeStart = scope.start;
+            variable.scopeEnd = scope.end;
+        } else if (ownerClass) {
+            variable.scopeStart = ownerClass.bodyStart;
+            variable.scopeEnd = ownerClass.bodyEnd;
+        }
+    }
+
+    const varDeclarations = Array.from(source.matchAll(/\bvar\s+([A-Za-z_]\w*)\s*=\s*([^;\r\n]+)/g))
+        .map(match => ({
+            name: match[1],
+            initializer: match[2].trim(),
+            offset: (match.index ?? 0) + match[0].indexOf(match[1])
+        }))
+        .sort((a, b) => a.offset - b.offset);
+
+    const priorDeclarations = [...result.filter(variable => !parameterOffsets.has(variable.offset)), ...parameterVariables]
+        .sort((a, b) => a.offset - b.offset);
+
+    const foreachVarPattern = /\bforeach\s*\(\s*var\s+([A-Za-z_]\w*)\s+in\s+([A-Za-z_]\w*(?:\s*\[[^\]]+\])*)\s*\)/g;
+    for (const match of source.matchAll(foreachVarPattern)) {
+        const name = match[1];
+        const collectionExpression = match[2].trim();
+        const offset = (match.index ?? 0) + match[0].indexOf(name);
+        const ownerFunction = functions.find(fn => fn.bodyStart !== undefined &&
+            fn.bodyEnd !== undefined && offset >= fn.bodyStart && offset <= fn.bodyEnd);
+        if (!ownerFunction) continue;
+
+        const collection = priorDeclarations
+            .filter(variable => variable.name === (/^([A-Za-z_]\w*)/.exec(collectionExpression)?.[1] ?? "") && variable.offset < offset &&
+                (variable.scopeStart === undefined || (variable.scopeStart <= offset && offset <= variable.scopeEnd!)))
+            .sort((a, b) => b.offset - a.offset)[0];
+        let collectionType: string | undefined = collection?.type;
+        const collectionIndexCount = (collectionExpression.match(/\[/g) ?? []).length;
+        for (let i = 0; i < collectionIndexCount && collectionType; i++) {
+            if (collectionType.endsWith("[]")) collectionType = collectionType.slice(0, -2);
+            else collectionType = undefined;
+        }
+        if (!collection) continue;
+
+        let elementType: string | undefined;
+        if (collectionType?.endsWith("[]")) elementType = collectionType.slice(0, -2);
+        else if (collectionType === "group" && hasWarcraft3Using(text)) elementType = "unit";
+        if (!elementType) continue;
+
+        const scope = findInnermostBlockScope(text, ownerFunction, offset);
+        const variable: VariableInfo = {
+            name, type: elementType, offset, isParameter: false,
+            scopeStart: scope.start, scopeEnd: scope.end
+        };
+        result.push(variable);
+        priorDeclarations.push(variable);
+        priorDeclarations.sort((a, b) => a.offset - b.offset);
+    }
+
+    for (const declaration of varDeclarations) {
+        const ownerFunction = functions.find(fn => fn.bodyStart !== undefined &&
+            fn.bodyEnd !== undefined && declaration.offset >= fn.bodyStart && declaration.offset <= fn.bodyEnd);
+        const ownerClass = classes.find(cls => declaration.offset >= cls.bodyStart && declaration.offset <= cls.bodyEnd);
+        const scope = ownerFunction
+            ? findInnermostBlockScope(text, ownerFunction, declaration.offset)
+            : ownerClass
+                ? { start: ownerClass.bodyStart, end: ownerClass.bodyEnd }
+                : undefined;
+        const scopeStart = scope?.start;
+        const scopeEnd = scope?.end;
+        const visibleDeclarations = priorDeclarations.filter(prior => {
+            if (prior.offset >= declaration.offset) return false;
+            if (prior.scopeStart === undefined) return true;
+            if (ownerFunction) {
+                const priorFunction = functions.find(fn => fn.bodyStart !== undefined &&
+                    fn.bodyEnd !== undefined && prior.offset >= fn.bodyStart && prior.offset <= fn.bodyEnd);
+                return priorFunction === ownerFunction &&
+                    prior.scopeStart <= declaration.offset && declaration.offset <= prior.scopeEnd!;
+            }
+            return !!ownerClass && prior.scopeStart <= declaration.offset &&
+                declaration.offset <= prior.scopeEnd! &&
+                prior.offset >= ownerClass.bodyStart && prior.offset <= ownerClass.bodyEnd;
+        });
+        const knownTypes = new Map<string, string>();
+        for (const prior of visibleDeclarations) knownTypes.set(prior.name, prior.type);
+
+        const initializer = declaration.initializer;
+        let inferred: string | undefined;
+        const creation = /^new\s+([A-Za-z_]\w*(?:\[\])*)/.exec(initializer);
+        if (creation) inferred = creation[1];
+        else if (/^(?:true|false)$/.test(initializer)) inferred = "bool";
+        else if (/^null$/.test(initializer)) inferred = undefined;
+        else if (/^["']/.test(initializer)) inferred = "string";
+        else if (/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(initializer))
+            inferred = /[.eE]/.test(initializer) ? "float" : "int";
+        else {
+            const indexed = /^([A-Za-z_]\w*)((?:\s*\[[^\]]+\])+)$/.exec(initializer);
+            if (indexed) {
+                inferred = knownTypes.get(indexed[1]);
+                const indexCount = (indexed[2].match(/\[/g) ?? []).length;
+                for (let i = 0; i < indexCount && inferred; i++) {
+                    if (inferred === "string") continue;
+                    if (inferred.endsWith("[]")) inferred = inferred.slice(0, -2);
+                    else inferred = undefined;
+                }
+            }
+
+            const identifier = /^([A-Za-z_]\w*)$/.exec(initializer);
+            if (identifier) inferred = knownTypes.get(identifier[1]);
+
+            if (!inferred) {
+                const call = /^([A-Za-z_]\w*)\s*\(/.exec(initializer);
+                if (call) inferred = functions.find(fn => fn.name === call[1])?.returnType ?? nativeReturnType(call[1], text);
+            }
+
+            if (!inferred && /[+*/%-]/.test(initializer)) {
+                const operands = initializer.split(/[+*/%-]/).map(part => part.trim()).filter(Boolean);
+                const operandTypes = operands.map(part => {
+                    if (/^\d+(?:\.\d+)?(?:[eE][+-]?\d+)?$/.test(part))
+                        return /[.eE]/.test(part) ? "float" : "int";
+                    return knownTypes.get(part);
+                });
+                if (operandTypes.length && operandTypes.every(Boolean) && operandTypes.some(type => type === "float"))
+                    inferred = "float";
+                else if (operandTypes.length && operandTypes.every(type => type === "int"))
+                    inferred = "int";
+            }
+        }
+
+        if (inferred) {
+            const inferredVariable: VariableInfo = {
+                name: declaration.name, type: inferred, offset: declaration.offset, isParameter: false,
+                scopeStart, scopeEnd
+            };
+            result.push(inferredVariable);
+            priorDeclarations.push(inferredVariable);
+            priorDeclarations.sort((a, b) => a.offset - b.offset);
+        }
+    }
+
+    result.push(...parameterVariables);
 
     // The latest declaration wins for a variable name in a simple lexical scan.
     result.sort((a, b) => a.offset - b.offset);
@@ -301,6 +687,13 @@ function readClassMembers(text: string, classInfo: ClassInfo): Array<{ name: str
     }
 
     const result: Array<{ name: string; type: string; kind: "Method" | "Property"; parameters: string[] }> = [];
+    const destructor = /~([A-Za-z_]\w*)\s*\(\s*\)/g;
+    for (const match of body.matchAll(destructor)) {
+        const matchOffset = match.index ?? 0;
+        if (depthAt[matchOffset] === 0 && match[1] === classInfo.name) {
+            result.push({ name: "Dispose", type: "void", kind: "Method", parameters: [] });
+        }
+    }
     const re = /\b(?:public\s+|private\s+|static\s+|const\s+)*([A-Za-z_]\w*)\s+([A-Za-z_]\w*)\s*(\(([^()]*)\))?/g;
     for (const match of body.matchAll(re)) {
         const matchOffset = match.index ?? 0;
@@ -319,11 +712,40 @@ function getCurrentClass(text: string, offset: number): ClassInfo | undefined {
     return readClasses(text).filter(c => c.start < offset && offset <= c.bodyEnd).sort((a, b) => b.start - a.start)[0];
 }
 
+function isVariableVisibleAt(
+    variable: VariableInfo,
+    offset: number,
+    currentFunction: FunctionInfo | undefined,
+    currentClass: ClassInfo | undefined
+): boolean {
+    if (variable.offset >= offset) return false;
+    if (variable.scopeStart === undefined) return true;
+    if (currentFunction && variable.offset >= currentFunction.bodyStart! &&
+        variable.offset <= currentFunction.bodyEnd! &&
+        variable.scopeStart >= currentFunction.bodyStart! &&
+        variable.scopeEnd! <= currentFunction.bodyEnd! &&
+        variable.scopeStart <= offset && variable.scopeEnd !== undefined && offset <= variable.scopeEnd) return true;
+    return !!currentClass && variable.scopeStart === currentClass.bodyStart &&
+        variable.scopeEnd === currentClass.bodyEnd;
+}
+
+function visibleVariables(text: string, offset: number): VariableInfo[] {
+    const classes = readClasses(text);
+    const functions = readFunctions(text, classes);
+    const currentFunction = functions
+        .filter(fn => fn.bodyStart !== undefined && fn.bodyEnd !== undefined &&
+            fn.bodyStart <= offset && offset <= fn.bodyEnd)
+        .sort((a, b) => b.offset - a.offset)[0];
+    const currentClass = classes
+        .filter(cls => cls.bodyStart <= offset && offset <= cls.bodyEnd)
+        .sort((a, b) => b.start - a.start)[0];
+
+    return readVariables(text, classes, functions).filter(variable =>
+        isVariableVisibleAt(variable, offset, currentFunction, currentClass));
+}
+
 function latestVariableType(name: string, text: string, offset: number): string | undefined {
-    const before = text.slice(0, offset);
-    const classes = readClasses(before);
-    const functions = readFunctions(before, classes);
-    const variables = readVariables(before, classes, functions).filter(v => v.name === name && v.offset < offset);
+    const variables = visibleVariables(text, offset).filter(variable => variable.name === name);
     return variables.length ? variables[variables.length - 1].type : undefined;
 }
 
@@ -331,25 +753,42 @@ function inferExpressionType(expression: string, documentText: string, offset: n
     const expr = expression.trim().replace(/^\(+|\)+$/g, "");
     if (!expr) return undefined;
     if (expr === "this") return getCurrentClass(documentText, offset)?.name;
+    const newArray = /^new\s+([A-Za-z_]\w*(?:\[\])+)$/.exec(expr);
+    if (newArray) return newArray[1];
     if (/^new\s+([A-Za-z_]\w*)/.test(expr)) return /^new\s+([A-Za-z_]\w*)/.exec(expr)?.[1];
     if (/^\d+\.\d/.test(expr)) return "float";
     if (/^\d/.test(expr)) return "int";
     if (/^"/.test(expr)) return "string";
     if (/^(true|false)$/.test(expr)) return "bool";
 
+    const indexedExpression = /^([A-Za-z_]\w*)((?:\s*\[[^\]]+\])+)$/.exec(expr);
+    if (indexedExpression) {
+        let indexedType = latestVariableType(indexedExpression[1], documentText, offset);
+        const indexCount = (indexedExpression[2].match(/\[/g) ?? []).length;
+        for (let i = 0; i < indexCount && indexedType; i++) {
+            if (indexedType === "string") continue;
+            if (indexedType.endsWith("[]")) indexedType = indexedType.slice(0, -2);
+            else return undefined;
+        }
+        return indexedType;
+    }
+
     const segments = expr.split(".");
     let type = latestVariableType(segments[0], documentText, offset);
-    if (!type && (BUILTIN_TYPES.has(segments[0].toLowerCase()) || readClasses(documentText).some(c => c.name === segments[0])))
+    if (!type && ((hasWarcraft3Using(documentText) && BUILTIN_TYPES.has(segments[0].toLowerCase())) ||
+        readClasses(documentText).some(c => c.name === segments[0]) || Object.prototype.hasOwnProperty.call(STANDARD_LIBRARY_MEMBERS, segments[0])))
         type = segments[0];
     if (!type && segments[0] === "this") type = getCurrentClass(documentText, offset)?.name;
     if (!type) {
         const callName = /^([A-Za-z_]\w*)\s*\(/.exec(segments[0])?.[1];
-        if (callName) type = readFunctions(documentText).find(f => f.name === callName)?.returnType ?? nativeReturnType(callName);
+        if (callName) type = readFunctions(documentText).find(f => f.name === callName)?.returnType ?? nativeReturnType(callName, documentText);
     }
 
     for (let i = 1; i < segments.length && type; i++) {
         const memberName = segments[i].replace(/\(.*$/, "");
-        const nativeMember = MEMBERS.find(m => m.type === type && m.name === memberName);
+        const nativeMember = hasWarcraft3Using(documentText)
+            ? MEMBERS.find(m => m.type === type && m.name === memberName)
+            : undefined;
         if (nativeMember) {
             type = nativeMember.ret;
             continue;
@@ -361,7 +800,83 @@ function inferExpressionType(expression: string, documentText: string, offset: n
     return type;
 }
 
-function nativeReturnType(name: string): string | undefined {
+function collectLiveAssignmentDiagnostics(document: vscode.TextDocument): vscode.Diagnostic[] {
+    const text = document.getText();
+    const source = maskNonCode(text);
+    const classes = readClasses(text);
+    const functions = readFunctions(text, classes);
+    const variables = readVariables(text, classes, functions);
+    const diagnostics: vscode.Diagnostic[] = [];
+    const assignmentPattern = /\b([A-Za-z_]\w*(?:\s*\[[^\]]+\])*)\s*(\+=|-=|\*=|\/=|%=|(?<![=!<>])=(?![=>=]))\s*([^;\r\n{}]+)/g;
+
+    for (const match of source.matchAll(assignmentPattern)) {
+        const targetExpression = match[1].trim();
+        const targetName = /^([A-Za-z_]\w*)/.exec(targetExpression)?.[1];
+        if (!targetName) continue;
+
+        const operator = match[2];
+        const expression = match[3].trim();
+        const targetOffset = (match.index ?? 0) + match[0].indexOf(targetName);
+        const target = variables
+            .filter(variable => variable.name === targetName && variable.offset < targetOffset &&
+                (variable.scopeStart === undefined || (variable.scopeStart <= targetOffset && targetOffset <= variable.scopeEnd!)))
+            .sort((a, b) => b.offset - a.offset)[0];
+
+        if (!target) continue;
+        if (variables.some(variable => variable.offset === targetOffset)) continue;
+
+        let expectedType: string | undefined = target.type;
+        const indexCount = (targetExpression.match(/\[/g) ?? []).length;
+        for (let i = 0; i < indexCount && expectedType; i++) {
+            if (expectedType === "string") continue;
+            if (expectedType.endsWith("[]")) expectedType = expectedType.slice(0, -2);
+            else expectedType = undefined;
+        }
+        if (!expectedType) continue;
+
+        const expressionOffset = (match.index ?? 0) + match[0].indexOf(match[3]);
+        const actualType = inferExpressionType(expression, text, expressionOffset);
+        if (!actualType || actualType === "null") continue;
+
+        let incompatible = false;
+        if (operator === "=") {
+            incompatible = !areEditorTypesCompatible(actualType, expectedType);
+        } else if (expectedType === "int" || expectedType === "float") {
+            incompatible = !["int", "float"].includes(actualType) ||
+                (expectedType === "int" && actualType === "float");
+        } else if (expectedType === "string" && operator === "+=") {
+            incompatible = actualType !== "string";
+        } else if (expectedType === "bool" || expectedType === "string") {
+            incompatible = true;
+        }
+
+        if (!incompatible) continue;
+        const startPosition = document.positionAt(expressionOffset);
+        const endPosition = document.positionAt(Math.min(text.length, expressionOffset + Math.max(1, match[3].trim().length)));
+        const diagnostic = new vscode.Diagnostic(
+            new vscode.Range(startPosition, endPosition),
+            `Несовместимое присваивание: выражение типа ${actualType} нельзя присвоить ${targetExpression} типа ${expectedType}`,
+            vscode.DiagnosticSeverity.Error
+        );
+        diagnostic.source = "JASS#";
+        diagnostic.code = "JASS001";
+        diagnostics.push(diagnostic);
+    }
+
+    return diagnostics;
+}
+
+function areEditorTypesCompatible(actual: string, expected: string): boolean {
+    if (actual === expected || actual === "null") return true;
+    return expected === "float" && actual === "int";
+}
+
+function hasWarcraft3Using(text: string): boolean {
+    return /\busing\s+Warcraft3\s*;?/i.test(text);
+}
+
+function nativeReturnType(name: string, sourceText?: string): string | undefined {
+    if (sourceText !== undefined && !hasWarcraft3Using(sourceText)) return undefined;
     const native = nativeByName.get(name);
     if (!native) return undefined;
     const arrow = /→\s*([A-Za-z_]\w*)/.exec(native.sig);
@@ -420,7 +935,7 @@ function parameterNames(parameters: string[]): string[] {
     });
 }
 
-function parseOpenCall(text: string, offset: number): { name: string; argumentIndex: number } | undefined {
+function parseOpenCall(text: string, offset: number): { name: string; owner?: string; argumentIndex: number } | undefined {
     const stack: Array<{ start: number; commas: number }> = [];
     let state: "normal" | "string" | "char" | "lineComment" | "blockComment" = "normal";
     let escaped = false;
@@ -449,7 +964,12 @@ function parseOpenCall(text: string, offset: number): { name: string; argumentIn
     const before = text.slice(0, open.start).trimEnd();
     const match = /([A-Za-z_]\w*(?:\.[A-Za-z_]\w*)*)$/.exec(before);
     if (!match) return undefined;
-    return { name: match[1].split(".").pop()!, argumentIndex: open.commas };
+    const segments = match[1].split(".");
+    return {
+        name: segments[segments.length - 1],
+        owner: segments.length > 1 ? segments[segments.length - 2] : undefined,
+        argumentIndex: open.commas
+    };
 }
 
 function buildFunctionSignatures(document: vscode.TextDocument): Map<string, FunctionInfo> {
@@ -458,6 +978,20 @@ function buildFunctionSignatures(document: vscode.TextDocument): Map<string, Fun
 }
 
 export function registerLanguageFeatures(context: vscode.ExtensionContext): void {
+    const liveDiagnostics = vscode.languages.createDiagnosticCollection("jasssharp-live-types");
+    context.subscriptions.push(liveDiagnostics);
+    const refreshLiveDiagnostics = (document: vscode.TextDocument): void => {
+        if (document.languageId !== "jasssharp" || document.uri.scheme !== "file") return;
+        liveDiagnostics.set(document.uri, collectLiveAssignmentDiagnostics(document));
+    };
+    context.subscriptions.push(
+        vscode.workspace.onDidOpenTextDocument(refreshLiveDiagnostics),
+        vscode.workspace.onDidChangeTextDocument(event => refreshLiveDiagnostics(event.document)),
+        vscode.workspace.onDidCloseTextDocument(document => liveDiagnostics.delete(document.uri)),
+        vscode.workspace.onDidSaveTextDocument(refreshLiveDiagnostics)
+    );
+    for (const document of vscode.workspace.textDocuments) refreshLiveDiagnostics(document);
+
     const completionProvider: vscode.CompletionItemProvider = {
         async provideCompletionItems(document, position, _token, _context) {
             const fullText = document.getText();
@@ -477,7 +1011,12 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
 
                 const classInfo = readClasses(fullText).find(c => c.name === receiverType);
                 const custom = classInfo ? readClassMembers(fullText, classInfo) : [];
-                for (const member of MEMBERS.filter(m => m.type === receiverType)) {
+                const standard = STANDARD_LIBRARY_MEMBERS[receiverType] ?? [];
+                if (hasWarcraft3Using(fullText) && HANDLE_TYPES.has(receiverType.toLowerCase())) {
+                    addCompletion(items, seen, "HandleId", vscode.CompletionItemKind.Property,
+                        `${receiverType}.HandleId : int (GetHandleId)`, range, "00");
+                }
+                for (const member of [...(hasWarcraft3Using(fullText) ? MEMBERS : []).filter(m => m.type === receiverType), ...standard]) {
                     const isMethod = member.kind === "Method";
                     addCompletion(items, seen, member.name,
                         isMethod ? vscode.CompletionItemKind.Method : vscode.CompletionItemKind.Property,
@@ -496,7 +1035,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
 
             const classes = readClasses(fullText);
             const functions = readFunctions(fullText, classes);
-            const variables = readVariables(fullText.slice(0, offset), readClasses(fullText.slice(0, offset)));
+            const variables = visibleVariables(fullText, offset);
             for (const fn of functions) {
                 const info = `${fn.signature} : ${fn.returnType}`;
                 addCompletion(items, seen, fn.name,
@@ -511,6 +1050,8 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
                     if (!ns) continue;
                     for (const name of ns.classes)
                         addCompletion(items, seen, name, vscode.CompletionItemKind.Class, `${namespace} class`, range, "02");
+                    for (const name of ns.interfaces)
+                        addCompletion(items, seen, name, vscode.CompletionItemKind.Interface, `${namespace} interface`, range, "02");
                     for (const name of ns.functions)
                         addCompletion(items, seen, name, vscode.CompletionItemKind.Function, `${namespace} function`, range, "02", new vscode.SnippetString(`${name}($0)`));
                     for (const name of ns.consts)
@@ -528,13 +1069,18 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             for (const cls of classes)
                 addCompletion(items, seen, cls.name, vscode.CompletionItemKind.Class, "JASS# class", range, "01");
 
-            for (const native of NATIVES)
-                addCompletion(items, seen, native.name, vscode.CompletionItemKind.Function,
-                    native.sig, range, "04", new vscode.SnippetString(`${native.name}($0)`), native.doc);
-            for (const constant of CONSTANTS)
-                addCompletion(items, seen, constant, vscode.CompletionItemKind.Constant, "Warcraft III constant", range, "05");
-            for (const type of BUILTIN_TYPES)
-                addCompletion(items, seen, type, vscode.CompletionItemKind.Class, "Warcraft III handle / enum type", range, "06");
+            if (hasWarcraft3Using(fullText)) {
+                for (const native of NATIVES)
+                    addCompletion(items, seen, native.name, vscode.CompletionItemKind.Function,
+                        native.sig, range, "04", new vscode.SnippetString(`${native.name}($0)`), native.doc);
+                for (const constant of CONSTANTS)
+                    addCompletion(items, seen, constant, vscode.CompletionItemKind.Constant, "Warcraft III constant", range, "05");
+                for (const type of BUILTIN_TYPES)
+                    addCompletion(items, seen, type, vscode.CompletionItemKind.Class, "Warcraft III handle / enum type", range, "06");
+            }
+            for (const operator of BITWISE_OPERATORS)
+                addCompletion(items, seen, operator.token, vscode.CompletionItemKind.Operator,
+                    operator.detail, range, "08", new vscode.SnippetString(`${operator.token} $0`), operator.documentation);
             for (const keyword of KEYWORDS)
                 addCompletion(items, seen, keyword, vscode.CompletionItemKind.Keyword, "JASS# keyword", range, "09");
 
@@ -554,8 +1100,12 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
 
             const functions = buildFunctionSignatures(document);
             const functionInfo = functions.get(call.name);
-            const native = nativeByName.get(call.name);
-            const member = MEMBERS.find(m => m.name === call.name && m.kind === "Method");
+            const hasWarcraft3 = hasWarcraft3Using(text);
+            const native = hasWarcraft3 ? nativeByName.get(call.name) : undefined;
+            const member = hasWarcraft3 ? MEMBERS.find(m => m.name === call.name && m.kind === "Method") : undefined;
+            const standardMember = call.owner
+                ? STANDARD_LIBRARY_MEMBERS[call.owner]?.find(m => m.name === call.name && m.kind === "Method")
+                : undefined;
             let label: string;
             let parameters: string[];
             let documentation = "";
@@ -570,6 +1120,10 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             } else if (member) {
                 label = `${member.name}(...) : ${member.ret}`;
                 parameters = [];
+            } else if (standardMember && call.owner) {
+                label = `${call.owner}.${standardMember.name}(${standardMember.parameters.join(", ")}) : ${standardMember.ret}`;
+                parameters = standardMember.parameters;
+                documentation = "JASS# standard-library method";
             } else {
                 return undefined;
             }
@@ -590,13 +1144,15 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             const range = document.getWordRangeAtPosition(position);
             if (!range) return undefined;
             const word = document.getText(range);
-            const native = nativeByName.get(word);
-            const functionInfo = buildFunctionSignatures(document).get(word);
-            const constant = constantNames.has(word);
-            const member = MEMBERS.find(m => m.name === word);
             const documentText = document.getText();
+            const hasWarcraft3 = hasWarcraft3Using(documentText);
+            const native = hasWarcraft3 ? nativeByName.get(word) : undefined;
+            const functionInfo = buildFunctionSignatures(document).get(word);
+            const constant = hasWarcraft3 && constantNames.has(word);
+            const member = hasWarcraft3 ? MEMBERS.find(m => m.name === word) : undefined;
+            const standardMember = Object.values(STANDARD_LIBRARY_MEMBERS).flat().find(m => m.name === word);
             const cls = readClasses(documentText).find(c => c.name === word);
-            const variables = readVariables(documentText.slice(0, document.offsetAt(position)));
+            const variables = visibleVariables(documentText, document.offsetAt(position));
             const variable = variables.filter(v => v.name === word).slice(-1)[0];
 
             let code: string | undefined;
@@ -604,6 +1160,7 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             if (native) { code = native.sig; description = native.doc; }
             else if (functionInfo) { code = functionInfo.signature; description = `Возвращаемый тип: ${functionInfo.returnType}`; }
             else if (member) { code = `${member.type}.${member.name} : ${member.ret}`; description = member.kind === "Method" ? "Нативный метод JASS#" : "Нативное свойство JASS#"; }
+            else if (standardMember) { code = `${standardMember.name}(${standardMember.parameters.join(", ")}) : ${standardMember.ret}`; description = "Метод стандартной библиотеки JASS#"; }
             else if (cls) { code = `class ${cls.name}`; description = "Класс текущего исходного файла"; }
             else if (constant) { code = word; description = "Константа Warcraft III"; }
             else if (variable) { code = `${variable.type} ${variable.name}`; description = variable.isParameter ? "Параметр" : "Локальная переменная / поле"; }
@@ -628,13 +1185,18 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
             const classes = readClasses(text);
             const functions = readFunctions(text, classes);
             const variables = readVariables(text, classes, functions);
+            const variablesByName = new Map<string, VariableInfo[]>();
+            for (const variable of variables) {
+                const sameName = variablesByName.get(variable.name) ?? [];
+                sameName.push(variable);
+                variablesByName.set(variable.name, sameName);
+            }
             const classNames = new Set(classes.map(c => c.name));
             const functionNames = new Set(functions.map(f => f.name));
-            const parameterNamesSet = new Set(variables.filter(v => v.isParameter).map(v => v.name));
-            const variableNames = new Set(variables.map(v => v.name));
             const customMembers = classes.flatMap(cls => readClassMembers(text, cls));
-            const memberMethods = new Set([...MEMBERS.filter(m => m.kind === "Method").map(m => m.name), ...customMembers.filter(m => m.kind === "Method").map(m => m.name)]);
-            const memberProperties = new Set([...MEMBERS.filter(m => m.kind !== "Method").map(m => m.name), ...customMembers.filter(m => m.kind === "Property").map(m => m.name)]);
+            const hasWarcraft3 = hasWarcraft3Using(text);
+            const memberMethods = new Set([...(hasWarcraft3 ? MEMBERS.filter(m => m.kind === "Method").map(m => m.name) : []), ...customMembers.filter(m => m.kind === "Method").map(m => m.name)]);
+            const memberProperties = new Set([...(hasWarcraft3 ? MEMBERS.filter(m => m.kind !== "Method").map(m => m.name) : []), ...customMembers.filter(m => m.kind === "Property").map(m => m.name)]);
             const declarationOffsets = new Map<number, { type: string; modifiers: string[] }>();
 
             for (const cls of classes) declarationOffsets.set(text.indexOf(cls.name, cls.start), { type: "class", modifiers: ["declaration"] });
@@ -658,34 +1220,52 @@ export function registerLanguageFeatures(context: vscode.ExtensionContext): void
                     modifiers = declaration.modifiers;
                 } else if (classNames.has(token.text)) {
                     type = "class";
-                } else if (PRIMITIVE_TYPES.has(token.text.toLowerCase()) || BUILTIN_TYPES.has(token.text.toLowerCase())) {
+                } else if (PRIMITIVE_TYPES.has(token.text.toLowerCase()) ||
+                    (hasWarcraft3 && BUILTIN_TYPES.has(token.text.toLowerCase()))) {
                     type = "type";
                     modifiers = ["defaultLibrary"];
                 } else if (KEYWORDS.has(token.text)) {
                     type = "keyword";
-                } else if (nativeNames.has(token.text)) {
+                } else if (hasWarcraft3 && nativeNames.has(token.text)) {
                     type = "function";
                     modifiers = ["defaultLibrary"];
-                } else if (constantNames.has(token.text)) {
+                } else if (hasWarcraft3 && constantNames.has(token.text)) {
                     type = "enumMember";
                     modifiers = ["readonly", "defaultLibrary"];
                 } else if (functionNames.has(token.text)) {
                     type = functions.find(f => f.name === token.text)?.isMethod ? "method" : "function";
-                } else if (parameterNamesSet.has(token.text)) {
-                    type = "parameter";
-                } else if (variableNames.has(token.text)) {
-                    type = "variable";
                 } else {
-                    const previous = text.slice(0, token.start).trimEnd();
-                    if (previous.endsWith(".")) {
-                        if (memberMethods.has(token.text)) type = "method";
-                        else if (memberProperties.has(token.text)) type = "property";
+                    const currentFunction = functions
+                        .filter(fn => fn.bodyStart !== undefined && fn.bodyEnd !== undefined &&
+                            fn.bodyStart <= token.start && token.start <= fn.bodyEnd)
+                        .sort((a, b) => b.offset - a.offset)[0];
+                    const currentClass = classes
+                        .filter(cls => cls.bodyStart <= token.start && token.start <= cls.bodyEnd)
+                        .sort((a, b) => b.start - a.start)[0];
+                    const visibleVariable = (variablesByName.get(token.text) ?? [])
+                        .filter(variable => isVariableVisibleAt(variable, token.start, currentFunction, currentClass))
+                        .sort((a, b) => b.offset - a.offset)[0];
+
+                    if (visibleVariable) {
+                        type = visibleVariable.isParameter ? "parameter" : "variable";
+                    } else {
+                        const previous = text.slice(0, token.start).trimEnd();
+                        if (previous.endsWith(".")) {
+                            if (memberMethods.has(token.text)) type = "method";
+                            else if (memberProperties.has(token.text)) type = "property";
+                        }
                     }
                 }
 
                 if (type) {
                     const start = document.positionAt(token.start);
-                    builder.push(start.line, start.character, token.end - token.start, type, modifiers);
+                    const tokenTypeIndex = semanticLegend.tokenTypes.indexOf(type);
+                    if (tokenTypeIndex < 0) continue;
+                    const tokenModifierMask = modifiers.reduce((mask, modifier) => {
+                        const modifierIndex = semanticLegend.tokenModifiers.indexOf(modifier);
+                        return modifierIndex < 0 ? mask : mask | (1 << modifierIndex);
+                    }, 0);
+                    builder.push(start.line, start.character, token.end - token.start, tokenTypeIndex, tokenModifierMask);
                 }
             }
             return builder.build();

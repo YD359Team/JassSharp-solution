@@ -1,0 +1,11 @@
+namespace VjassDirectiveRejectedSmoke
+{
+    void Run()
+    {
+        #if LUA
+        {
+            Print("Lua");
+        }
+        #endif
+    }
+}

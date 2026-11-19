@@ -1,0 +1,26 @@
+namespace BitwiseSmoke
+{
+    public void OnInit()
+    {
+        int abc = 0xABC;
+        int flags = 0x0000000F;
+        int mask = 0x00000003;
+        int combined = flags | mask;
+        int intersection = flags & mask;
+        int toggled = flags ^ mask;
+        int shiftedLeft = 1 << 5;
+        int shiftedRight = 32 >> 2;
+
+        flags |= 0x00000010;
+        flags &= 0x000000FF;
+        flags ^= 0x00000001;
+        flags <<= 1;
+        flags >>= 1;
+
+        int precedence = 1 | 2 ^ 3 & 4 << 1;
+        int allBits = 0xFFFFFFFF;
+        int deadBeef = 0xDEADBEEF;
+        int signBit = 0x80000000;
+        int minValue = -2147483648;
+    }
+}

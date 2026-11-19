@@ -8,14 +8,16 @@ public sealed record NsUnit(
     List<ClassDecl> Classes,
     List<FnDecl> Functions,
     List<FieldDecl> Fields,
-    List<EnumDecl> Enums) : Node;
+    List<EnumDecl> Enums,
+    List<InterfaceDecl>? Interfaces = null) : Node;
 public sealed record ConstDecl(string Type, string Name, Expr Value);
 public sealed record FieldDecl(string Type, string Name, bool IsArray = false);
 public sealed record ParamDecl(string Type, string Name);
-public sealed record ClassDecl(string Name, List<FieldDecl> Fields, FnDecl? Ctor, List<FnDecl> Methods);
+public sealed record ClassDecl(string Name, List<FieldDecl> Fields, FnDecl? Ctor, List<FnDecl> Methods, List<string>? BaseTypes = null);
+public sealed record InterfaceDecl(string Name, List<string> BaseInterfaces, List<FnDecl> Methods);
 public sealed record EnumMember(string Name, Expr? Value);
 public sealed record EnumDecl(string Name, List<EnumMember> Members);
-public sealed record FnDecl(string ReturnType, string Name, List<ParamDecl> Params, List<Stmt> Body, HashSet<string> Attributes = null!);
+public sealed record FnDecl(string ReturnType, string Name, List<ParamDecl> Params, List<Stmt> Body, HashSet<string> Attributes = null!, bool IsStatic = false, string? Operator = null, bool IsHook = false);
 public sealed record LambdaExpr(List<ParamDecl> Params, List<Stmt> Body, int Line = 1, int Col = 1) : Expr(Line, Col);
 
 public abstract record Stmt;
@@ -23,16 +25,26 @@ public sealed record VarStmt(string Type, string Name, Expr? Init, int Line = 1,
 public sealed record AssignStmt(Expr Target, Expr Value) : Stmt;
 public sealed record ExprStmt(Expr Expr) : Stmt;
 public sealed record ReturnStmt(Expr? Expr) : Stmt;
+public sealed record BreakStmt(int Line = 1, int Col = 1) : Stmt;
+public sealed record ContinueStmt(int Line = 1, int Col = 1) : Stmt;
 public sealed record IfStmt(Expr Cond, List<Stmt> Then, List<Stmt>? Else) : Stmt;
 public sealed record WhileStmt(Expr Cond, List<Stmt> Body) : Stmt;
+public sealed record DoWhileStmt(List<Stmt> Body, Expr Cond, int Line = 1, int Col = 1) : Stmt;
+public sealed record RawLuaStmt(string Code, int Line = 1, int Col = 1) : Stmt;
 public sealed record ForStmt(Stmt? Init, Expr? Cond, Stmt? Step, List<Stmt> Body) : Stmt;
-public sealed record CondStmt(string Target, List<Stmt> Then, List<Stmt>? Else) : Stmt; // #if LUA / VJASS
+public sealed record ForeachStmt(string Type, string Name, Expr Collection, List<Stmt> Body, int Line = 1, int Col = 1) : Stmt;
 
 public abstract record Expr(int Line = 1, int Col = 1);
 public sealed record NameExpr(string Name, int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record ThisExpr(int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record NumExpr(string Text, int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record StrExpr(string Text, int Line = 1, int Col = 1) : Expr(Line, Col);
+public sealed record InterpolatedExpr(List<InterpolatedPart> Parts, int Line = 1, int Col = 1) : Expr(Line, Col);
+public sealed record InterpolatedPart(string? Text, Expr? Expression)
+{
+    public static InterpolatedPart Literal(string text) => new(text, null);
+    public static InterpolatedPart Value(Expr expression) => new(null, expression);
+}
 public sealed record RawExpr(string Id, int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record BoolExpr(bool Value, int Line = 1, int Col = 1) : Expr(Line, Col);
 public sealed record NullExpr(int Line = 1, int Col = 1) : Expr(Line, Col);

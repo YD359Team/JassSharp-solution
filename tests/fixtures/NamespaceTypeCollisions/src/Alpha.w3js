@@ -1,0 +1,30 @@
+namespace Alpha
+{
+    interface IIdentity
+    {
+        int GetId();
+    }
+
+    class BaseEntity
+    {
+        public int BaseValue;
+
+        BaseEntity()
+        {
+            BaseValue = 100;
+        }
+    }
+
+    class Player : BaseEntity, IIdentity
+    {
+        static int GetStaticId()
+        {
+            return 10;
+        }
+
+        int GetId()
+        {
+            return BaseValue + 1;
+        }
+    }
+}

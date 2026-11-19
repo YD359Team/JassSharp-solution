@@ -1,4 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
+  <Import Project="../../Version.props" />
+  <ItemGroup>
+    <EmbeddedResource Include="../../standard-library/*.w3js" />
+  </ItemGroup>
   <PropertyGroup>
     <OutputType>Exe</OutputType>
     <TargetFramework>net11.0</TargetFramework>

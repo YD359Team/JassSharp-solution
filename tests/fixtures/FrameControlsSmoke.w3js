@@ -1,0 +1,72 @@
+namespace FrameControlsSmoke
+{
+    using Frames;
+    using Warcraft3;
+
+    public void OnInit()
+    {
+        Frame root = Frame.FromOrigin(ORIGIN_FRAME_GAME_UI, 0);
+
+        CheckBoxFrame checkBox = CheckBoxFrame.Create(
+            "SmokeCheckBox",
+            root.Handle(),
+            "ScriptDialogCheckBox",
+            0);
+        checkBox.SetText("Enabled");
+        checkBox.SetEnabled(true);
+        checkBox.SetVisible(true);
+        FrameEventSubscription checkedSubscription = checkBox.SubscribeChecked(() =>
+        {
+            framehandle source = FrameEvents.CurrentFrame();
+        });
+        FrameEventSubscription uncheckedSubscription = checkBox.SubscribeUnchecked(() =>
+        {
+            framehandle source = FrameEvents.CurrentFrame();
+        });
+
+        PopupFrame popup = PopupFrame.Create(
+            "SmokePopup",
+            root.Handle(),
+            "ScriptDialogDropDownMenu",
+            0);
+        popup.SetEnabled(true);
+        popup.SetVisible(true);
+        FrameEventSubscription selectionSubscription = popup.SubscribeSelectionChanged(() =>
+        {
+            float selectedIndex = FrameEvents.CurrentValue();
+        });
+
+        MenuFrame menu = MenuFrame.Create(
+            "SmokeMenu",
+            root.Handle(),
+            "Menu",
+            0);
+        menu.SetEnabled(true);
+        menu.SetVisible(true);
+        FrameEventSubscription menuMouseSubscription = menu.Subscribe(
+            FRAMEEVENT_MOUSE_ENTER,
+            () =>
+            {
+                framehandle source = FrameEvents.CurrentFrame();
+            });
+
+        TextFrame text = TextFrame.Create("SmokeText", root.Handle(), "EscMenuTextTemplate", 0);
+        FrameEventSubscription textMouseSubscription = text.Subscribe(
+            FRAMEEVENT_MOUSE_ENTER,
+            () =>
+            {
+                framehandle source = FrameEvents.CurrentFrame();
+            });
+
+        textMouseSubscription.Dispose();
+        text.Dispose();
+        menuMouseSubscription.Dispose();
+        menu.Dispose();
+        selectionSubscription.Dispose();
+        popup.Dispose();
+        uncheckedSubscription.Dispose();
+        checkedSubscription.Dispose();
+        checkBox.Dispose();
+        root.Dispose();
+    }
+}

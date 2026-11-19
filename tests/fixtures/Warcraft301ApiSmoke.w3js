@@ -1,0 +1,26 @@
+namespace Warcraft301ApiSmoke
+{
+    using Warcraft3;
+
+    public void OnInit()
+    {
+        unit target = GetTriggerUnit();
+        item carried = null;
+        effect temporary = AddSpecialEffect("Abilities\\Spells\\Human\\HolyBolt\\HolyBoltSpecialArt.mdl", 0.0, 0.0);
+
+        BlzResetUnitTalents(target);
+        int randomItem = ChooseRandomItemExWithFilterAndIncludes(null, 0, null, null, true, false);
+        float healed = BlzUnitHeal(target, target, 25.0, false, true);
+        BlzRemoveEffect(temporary);
+
+        bool targetLock = BlzGetCameraAllowsHotkeyTargetLock();
+        BlzSetCameraAllowsHotkeyTargetLock(targetLock);
+        SetThematicMusicAbsoluteVolume(100);
+
+        bool equipped = BlzIsItemEquipped(carried);
+        bool inBag = BlzIsItemInBag(carried);
+        bool canEquip = BlzUnitCanEquipItemOfEquipmentType(target, null);
+        bool hasEquipped = BlzUnitHasAnyItemEquiped(target);
+        bool equippedItem = BlzUnitEquipItem(target, carried);
+    }
+}

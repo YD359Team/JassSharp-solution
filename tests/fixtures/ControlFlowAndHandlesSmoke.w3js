@@ -1,0 +1,70 @@
+namespace ControlFlowAndHandlesSmoke
+{
+    using Warcraft3;
+
+    public void VerifyHandleTypes(unit source, widget widgetValue, group members)
+    {
+        widget asWidget = source;
+        agent asAgent = source;
+        handle asHandle = source;
+        player owner = GetTriggerPlayer();
+        agent ownerAgent = owner;
+        eventid eventReference = ConvertGameEvent(0);
+        effect temporaryEffect = AddSpecialEffect("Abilities\\\\Spells\\\\Human\\\\HolyBolt\\\\HolyBoltSpecialArt.mdl", 0.0, 0.0);
+        agent effectAgent = temporaryEffect;
+        gamestate gameState = ConvertIGameState(0);
+
+        int unitId = source.HandleId;
+        int widgetId = widgetValue.HandleId;
+        int directId = GetHandleId(source);
+
+        while (true)
+        {
+            if (unitId > 0)
+            {
+                continue;
+            }
+            break;
+        }
+
+        for (int index = 0; index < 3; index++)
+        {
+            if (index == 1)
+            {
+                continue;
+            }
+            if (index == 2)
+            {
+                break;
+            }
+        }
+
+        do
+        {
+            continue;
+        }
+        while (false);
+
+        int[] values = new int[];
+        values[0] = 1;
+        foreach (int value in values)
+        {
+            if (value > 0)
+            {
+                continue;
+            }
+            break;
+        }
+
+        foreach (unit member in members)
+        {
+            if (member.HandleId > 0)
+            {
+                continue;
+            }
+            break;
+        }
+
+        return;
+    }
+}

@@ -1,0 +1,175 @@
+name: CI and Release
+
+on:
+  push:
+    branches: ["**"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: jasssharp-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-package:
+    name: Validate and package JASS#
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 11.0.x
+
+      - name: Run compiler smoke tests
+        shell: pwsh
+        run: ./tests/run-smoke.ps1
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: src/jasssharp-vscode/package-lock.json
+
+      - name: Verify changelog extraction
+        shell: pwsh
+        run: node --test .github/scripts/extract-release-notes.test.cjs
+
+      - name: Synchronize extension version from Version.props
+        working-directory: src/jasssharp-vscode
+        shell: pwsh
+        run: |
+          npm.cmd run sync-version
+          if ($LASTEXITCODE -ne 0) {
+              throw "Could not synchronize VS Code extension version."
+          }
+
+      - name: Install extension dependencies
+        working-directory: src/jasssharp-vscode
+        shell: pwsh
+        run: npm.cmd ci
+
+      - name: Verify release tag and synchronize extension version
+        if: startsWith(github.ref, 'refs/tags/v')
+        working-directory: src/jasssharp-vscode
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          [xml]$versionDocument = Get-Content -LiteralPath "$env:GITHUB_WORKSPACE/Version.props" -Raw
+          $version = $versionDocument.Project.PropertyGroup.Version
+          $releaseVersion = $env:RELEASE_TAG -replace '^v', ''
+          if ($releaseVersion -ne $version) {
+              throw "Release tag '$($env:RELEASE_TAG)' does not match Version.props ($version)."
+          }
+
+      - name: Test VS Code extension and brace formatter
+        working-directory: src/jasssharp-vscode
+        shell: pwsh
+        run: |
+          npm.cmd test
+          if ($LASTEXITCODE -ne 0) {
+              throw "VS Code extension tests failed."
+          }
+
+      - name: Compile and package VSIX
+        working-directory: src/jasssharp-vscode
+        shell: pwsh
+        run: |
+          npm.cmd run package
+          if ($LASTEXITCODE -ne 0) {
+              throw "VS Code extension packaging failed."
+          }
+
+      - name: Publish compiler
+        shell: pwsh
+        run: |
+          dotnet publish src/JassSharp.Compiler/JassSharp.Compiler.csproj --configuration Release --runtime win-x64 --self-contained false --output artifacts/compiler
+          if ($LASTEXITCODE -ne 0) {
+              throw "Compiler publish failed."
+          }
+          Compress-Archive -Path artifacts/compiler/* -DestinationPath artifacts/jasssharp-compiler-win-x64.zip -Force
+
+      - name: Stage release assets
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force artifacts/release | Out-Null
+          Copy-Item src/jasssharp-vscode/*.vsix artifacts/release/
+          Copy-Item artifacts/jasssharp-compiler-win-x64.zip artifacts/release/
+
+      - name: Upload release assets
+        uses: actions/upload-artifact@v4
+        with:
+          name: jasssharp-release-assets
+          path: artifacts/release/*
+          if-no-files-found: error
+          retention-days: 30
+
+  lua-runtime-integration:
+    name: Execute generated Lua hook chains
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 11.0.x
+
+      - name: Install Lua 5.3
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes lua5.3
+
+      - name: Run Lua runtime integration tests
+        run: bash ./tests/run-lua-runtime-smoke.sh
+
+  publish-release:
+    name: Attach binaries and publish changelog notes
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [build-and-package, lua-runtime-integration]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Extract release notes from CHANGELOG.md
+        shell: bash
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          node .github/scripts/extract-release-notes.cjs "$VERSION" CHANGELOG.md "$RUNNER_TEMP/release-notes.md"
+
+      - name: Download release assets
+        uses: actions/download-artifact@v4
+        with:
+          name: jasssharp-release-assets
+          path: dist
+
+      - name: Attach binaries and update GitHub Release notes
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: JASS# ${{ github.ref_name }}
+          body_path: ${{ runner.temp }}/release-notes.md
+          files: dist/*
+          fail_on_unmatched_files: true

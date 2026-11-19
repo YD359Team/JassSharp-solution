@@ -1,0 +1,139 @@
+namespace MathGeometryApiSmoke
+{
+    using Math;
+    using Geometry;
+    using Frames;
+    using Abilities;
+    using Inventory;
+    using RpgStats;
+
+    public class MathGeometryApiSmoke
+    {
+        public static float Round(float value)
+        {
+            return Math.Round(value);
+        }
+
+        public static float Repeat(float value, float length)
+        {
+            return Math.Repeat(value, length);
+        }
+
+        public static float InverseLerp(float a, float b, float value)
+        {
+            return Math.InverseLerp(a, b, value);
+        }
+
+        public static float MoveTowards(float current, float target, float maxDelta)
+        {
+            return Math.MoveTowards(current, target, maxDelta);
+        }
+
+        public static float VectorLength(float x, float y)
+        {
+            return new Vector2(x, y).Length();
+        }
+
+        public static float Vector3CrossZ(float ax, float ay, float bx, float by)
+        {
+            return new Vector3(ax, ay, 0.0).Cross(new Vector3(bx, by, 0.0)).Z;
+        }
+
+        public static float RectArea(float x, float y, float width, float height)
+        {
+            return new Rect2(x, y, width, height).Area();
+        }
+
+        public static bool RectContains(float x, float y, float width, float height, float px, float py)
+        {
+            return new Rect2(x, y, width, height).Contains(new Vector2(px, py));
+        }
+
+        public static bool CircleIntersectsRect(float cx, float cy, float radius, float x, float y, float width, float height)
+        {
+            return new Rect2(x, y, width, height).IntersectsCircle(new Circle(new Vector2(cx, cy), radius));
+        }
+
+        public static float SegmentDistance(float ax, float ay, float bx, float by, float px, float py)
+        {
+            return new LineSegment2(new Vector2(ax, ay), new Vector2(bx, by))
+                .DistanceToPoint(new Vector2(px, py));
+        }
+
+
+        public static bool VerifyNullGameplayWrappers()
+        {
+            UnitAbility ability = new UnitAbility(null, 'A000');
+            UnitInventory inventory = new UnitInventory(null);
+            UnitCombatStats stats = new UnitCombatStats(null);
+
+            ability.SetEnabled(true, false);
+            ability.StartCooldown(1.0);
+            ability.EndCooldown();
+            stats.SetStrength(10, true);
+            stats.SetAgility(10, true);
+            stats.SetIntelligence(10, true);
+            stats.SetArmor(5.0);
+            stats.SetBaseDamage(10, 0);
+            stats.SetDamageDiceNumber(1, 0);
+            stats.SetDamageDiceSides(6, 0);
+            stats.SetAttackCooldown(1.5, 0);
+            stats.SetMoveSpeed(300.0);
+            stats.SetMaxLife(100);
+            stats.SetMaxMana(50);
+            stats.SetLife(100.0);
+            stats.SetMana(50.0);
+            stats.SetAbilityCooldownRemaining('A000', 1.0);
+            stats.SetAbilityCooldownPercent('A000', 50.0);
+            stats.AdjustAbilityCooldownPercent('A000', 10.0);
+            stats.AdjustAbilityCooldownRemaining('A000', 1.0);
+            stats.EndAbilityCooldown('A000');
+            stats.StartAbilityCooldown('A000', 1.0);
+
+            return !ability.IsPresent()
+                && !ability.Add()
+                && !ability.Remove()
+                && ability.Level() == 0
+                && ability.SetLevel(1) == 0
+                && ability.IncreaseLevel() == 0
+                && ability.DecreaseLevel() == 0
+                && !ability.SetPermanent(true)
+                && ability.Handle() == null
+                && inventory.Owner() == null
+                && inventory.BagSize() == 0
+                && inventory.BagItem(0) == null
+                && inventory.IsInBag(null) == false
+                && inventory.IsEquipped(null) == false
+                && !inventory.HasAnyEquippedItem()
+                && !inventory.Equip(null)
+                && stats.Owner() == null
+                && stats.Strength(false) == 0
+                && stats.Armor() == 0.0
+                && stats.BaseDamage(0) == 0
+                && stats.MaxLife() == 0
+                && stats.Life() == 0.0
+                && stats.AbilityCooldown('A000', 0) == 0.0;
+        }
+
+        public static bool VerifyNullFrameWrappers()
+        {
+            Frame frame = new Frame(null, true);
+            ButtonFrame button = new ButtonFrame(null, true);
+            TextFrame text = new TextFrame(null, true);
+            SliderFrame slider = new SliderFrame(null, true);
+            EditBoxFrame editBox = new EditBoxFrame(null, true);
+            CheckBoxFrame checkBox = new CheckBoxFrame(null, true);
+            PopupFrame popup = new PopupFrame(null, true);
+            MenuFrame menu = new MenuFrame(null, true);
+
+            return frame.IsDisposed() && frame.Handle() == null
+                && button.IsDisposed() && button.Handle() == null
+                && text.IsDisposed() && text.Handle() == null
+                && slider.IsDisposed() && slider.Handle() == null
+                && editBox.IsDisposed() && editBox.Handle() == null
+                && checkBox.IsDisposed() && checkBox.Handle() == null
+                && popup.IsDisposed() && popup.Handle() == null
+                && menu.IsDisposed() && menu.Handle() == null;
+        }
+    }
+}

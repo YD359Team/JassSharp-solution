@@ -4,13 +4,19 @@
   "scopeName": "source.jasssharp",
   "patterns": [
     {
-      "include": "#preprocessor"
-    },
-    {
       "include": "#comment"
     },
     {
       "include": "#rawcode"
+    },
+    {
+      "include": "#interpolated-raw-string"
+    },
+    {
+      "include": "#interpolated-string"
+    },
+    {
+      "include": "#raw-string"
     },
     {
       "include": "#string"
@@ -44,19 +50,6 @@
     }
   ],
   "repository": {
-    "preprocessor": {
-      "patterns": [
-        {
-          "name": "meta.preprocessor.jasssharp",
-          "match": "^\\s*#(if|else|elseif|endif|define|region|endregion)\\b.*$",
-          "captures": {
-            "1": {
-              "name": "keyword.control.directive.jasssharp"
-            }
-          }
-        }
-      ]
-    },
     "comment": {
       "patterns": [
         {
@@ -92,6 +85,20 @@
     "declaration": {
       "patterns": [
         {
+          "name": "meta.interface.jasssharp",
+          "begin": "\\b(interface)\\s+([A-Za-z_]\\w*)",
+          "beginCaptures": {
+            "1": {
+              "name": "storage.type.interface.jasssharp"
+            },
+            "2": {
+              "name": "entity.name.type.interface.jasssharp"
+            }
+          },
+          "end": "(?=\\{)",
+          "patterns": []
+        },
+        {
           "name": "meta.class.jasssharp",
           "begin": "\\b(class)\\s+([A-Za-z_]\\w*)",
           "beginCaptures": {
@@ -121,35 +128,22 @@
     },
     "keyword": {
       "name": "keyword.control.jasssharp",
-      "match": "\\b(namespace|using|class|enum|const|public|private|static|if|else|while|for|return|break|continue|new|this|in|is|as|get|set)\\b"
+      "match": "\\b(namespace|using|class|interface|enum|const|public|private|static|if|else|do|while|for|foreach|return|break|continue|new|this|in|is|as|get|set)\\b"
     },
     "type": {
       "name": "storage.type.jasssharp",
-      "match": "\\b(void|int|integer|float|real|bool|boolean|string|code|ability|agent|buff|button|camerafield|camerasetup|destructable|dialog|effect|event|force|group|handle|hashtable|image|item|leaderboard|lightning|location|multiboard|player|quest|race|rect|region|sound|texttag|timer|trigger|unit|widget|framehandle|fogmodifier|ubersplat|weathereffect)\\b"
+      "match": "\\b(void|int|float|bool|string|List|Queue|Stack|Dictionary|KeyValuePair)\\b"
     },
     "constant": {
       "patterns": [
         {
           "name": "constant.language.jasssharp",
           "match": "\\b(true|false|null)\\b"
-        },
-        {
-          "name": "constant.other.jasssharp",
-          "match": "\\b[A-Z][A-Z0-9_]{2,}\\b"
         }
       ]
     },
     "function": {
-      "patterns": [
-        {
-          "name": "support.function.library.jasssharp",
-          "match": "\\b(Get|Set|Blz|Create|Trigger|Add|Remove|Kill|Issue|Display|BJ)[A-Z]\\w*\\b"
-        },
-        {
-          "name": "support.function.jasssharp",
-          "match": "\\b[A-Za-z_]\\w*(?=\\s*\\()"
-        }
-      ]
+      "patterns": []
     },
     "number": {
       "name": "constant.numeric.jasssharp",
@@ -157,11 +151,62 @@
     },
     "operator": {
       "name": "keyword.operator.jasssharp",
-      "match": "\\+\\+|--|==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|%=|=>|[+\\-*/%=<>!&|?:]"
+      "match": "<<=|>>=|<<|>>|\\^=|\\^|\\|=|&=|\\+\\+|--|==|!=|<=|>=|&&|\\|\\||\\+=|-=|\\*=|/=|%=|=>|[+\\-*/%=<>!&|?:]"
     },
     "punctuation": {
       "name": "punctuation.separator.jasssharp",
       "match": "[{}()\\[\\].,;]"
+    },
+    "string-escape": {
+      "name": "constant.character.escape.jasssharp",
+      "match": "\\\\(?:[abfnrtv\\\\\"']|x[0-9A-Fa-f]{2}|u[0-9A-Fa-f]{4})"
+    },
+    "interpolation": {
+      "name": "meta.interpolation.jasssharp",
+      "begin": "\\{",
+      "end": "\\}",
+      "patterns": [
+        {
+          "include": "#keyword"
+        },
+        {
+          "include": "#type"
+        },
+        {
+          "include": "#number"
+        },
+        {
+          "include": "#operator"
+        }
+      ]
+    },
+    "interpolated-string": {
+      "name": "string.quoted.interpolated.jasssharp",
+      "begin": "\\$\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "include": "#interpolation"
+        },
+        {
+          "include": "#string-escape"
+        }
+      ]
+    },
+    "raw-string": {
+      "name": "string.quoted.raw.jasssharp",
+      "begin": "\"\"\"",
+      "end": "\"\"\""
+    },
+    "interpolated-raw-string": {
+      "name": "string.quoted.interpolated.raw.jasssharp",
+      "begin": "\\$\"\"\"",
+      "end": "\"\"\"",
+      "patterns": [
+        {
+          "include": "#interpolation"
+        }
+      ]
     }
   }
 }

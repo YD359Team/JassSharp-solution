@@ -1,0 +1,5 @@
+{
+  "mode": "headless",
+  "entry": "src/QualifiedRoot.w3js",
+  "output": "bin/NamespaceQualifiedFunctions.lua"
+}

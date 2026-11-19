@@ -1,0 +1,141 @@
+namespace Strings
+{
+    public class Strings
+    {
+        // All indexes are zero-based Unicode code-point indexes.
+        // Case conversion and trimming use Lua's ASCII string library semantics.
+
+        public static int Length(string value)
+        {
+            return utf8.len(value);
+        }
+
+        public static string Substring(string value, int startIndex, int length)
+        {
+            if (startIndex < 0 || length < 0) { error("Substring indexes must be non-negative"); }
+            int total = utf8.len(value);
+            if (startIndex >= total || length == 0) { return ""; }
+            int remaining = total - startIndex;
+            int endIndex = total;
+            if (length <= remaining) { endIndex = startIndex + length; }
+            int firstByte = utf8.offset(value, startIndex + 1);
+            int afterLastByte = utf8.offset(value, endIndex + 1);
+            return string.sub(value, firstByte, afterLastByte - 1);
+        }
+
+        public static string Replace(string value, string oldValue, string newValue)
+        {
+            if (oldValue == "") { return value; }
+            string result = "";
+            int cursor = 1;
+            while (true)
+            {
+                int found = string.find(value, oldValue, cursor, true);
+                if (found == null) { break; }
+                result = result + string.sub(value, cursor, found - 1) + newValue;
+                cursor = found + string.len(oldValue);
+            }
+            return result + string.sub(value, cursor);
+        }
+
+        public static int IndexOf(string value, string searchValue)
+        {
+            return Strings.IndexOfFrom(value, searchValue, 0);
+        }
+
+        private static int IndexOfFrom(string value, string searchValue, int startIndex)
+        {
+            int total = utf8.len(value);
+            if (startIndex < 0) { startIndex = 0; }
+            if (startIndex > total) { return -1; }
+            if (searchValue == "") { return startIndex; }
+            int byteStart = utf8.offset(value, startIndex + 1);
+            int found = string.find(value, searchValue, byteStart, true);
+            if (found == null) { return -1; }
+            return utf8.len(string.sub(value, 1, found - 1));
+        }
+
+        public static int LastIndexOf(string value, string searchValue)
+        {
+            int total = utf8.len(value);
+            if (searchValue == "") { return total; }
+
+            int cursor = 1;
+            int last = -1;
+            while (true)
+            {
+                int found = string.find(value, searchValue, cursor, true);
+                if (found == null) { break; }
+
+                // found is a byte offset. Convert only the valid UTF-8 prefix
+                // before the match, then advance one byte to preserve overlapping
+                // matches. A UTF-8 search string cannot begin at a continuation byte.
+                last = utf8.len(string.sub(value, 1, found - 1));
+                cursor = found + 1;
+            }
+            return last;
+        }
+
+        public static bool Contains(string value, string searchValue)
+        {
+            return Strings.IndexOf(value, searchValue) >= 0;
+        }
+
+        public static string Trim(string value)
+        {
+            string result = string.gsub(value, "^%s*(.-)%s*$", "%1");
+            return result;
+        }
+
+        public static string TrimStart(string value)
+        {
+            string result = string.gsub(value, "^%s+", "");
+            return result;
+        }
+
+        public static string TrimEnd(string value)
+        {
+            string result = string.gsub(value, "%s+$", "");
+            return result;
+        }
+
+        public static string ToLower(string value)
+        {
+            return string.lower(value);
+        }
+
+        public static string ToUpper(string value)
+        {
+            return string.upper(value);
+        }
+
+        public static string[] Split(string value, string separator)
+        {
+            if (separator == "") { error("Split separator cannot be empty"); }
+            string[] parts = new string[];
+            int cursor = 1;
+            int count = 0;
+            while (true)
+            {
+                int found = string.find(value, separator, cursor, true);
+                if (found == null) { break; }
+                parts[count] = string.sub(value, cursor, found - 1);
+                count = count + 1;
+                cursor = found + string.len(separator);
+            }
+            parts[count] = string.sub(value, cursor);
+            return parts;
+        }
+
+        public static string Join(string separator, string[] values)
+        {
+            string result = "";
+            for (int i = 0; i < values.Length; i = i + 1)
+            {
+                if (i > 0) { result = result + separator; }
+                result = result + values[i];
+            }
+            return result;
+        }
+    }
+}

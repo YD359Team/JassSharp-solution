@@ -1,0 +1,20 @@
+namespace DuplicateTypeDeclarationRoot
+{
+    class Collision
+    {
+    }
+
+    class Collision
+    {
+    }
+
+    interface Collision
+    {
+    }
+
+    enum Collision
+    {
+        First,
+        Second
+    }
+}

@@ -1,0 +1,140 @@
+namespace VisualRpgSmoke
+{
+    using Colors;
+    using FloatingText;
+    using Lightning;
+    using Inventory;
+    using RpgStats;
+    using Effects;
+    using CameraControl;
+    using Audio;
+    using Math;
+    using Warcraft3;
+
+    void Run(
+        unit hero,
+        unit target,
+        destructable scenery,
+        player owner,
+        playercolor teamColor,
+        item equipment,
+        effect specialEffect,
+        framehandle frame,
+        lightning nativeBolt,
+        texttag nativeTag,
+        loadoutslot equipmentSlot,
+        equipmentType equipmentCategory)
+    {
+        Color accent = Color.FromBytes(255, 160, 40, 220);
+        Color percent = Color.FromPercent(20.0, 60.0, 100.0, 100.0);
+        string coloredText = accent.WrapText("Critical hit");
+        int packedColor = accent.ToArgb();
+
+        accent.ApplyToUnitVertexColor(hero);
+        accent.ApplyToEffect(specialEffect);
+        accent.ApplyToLightning(nativeBolt);
+        accent.ApplyToTextTag(nativeTag);
+        accent.ApplyToFrameText(frame);
+        accent.ApplyToFrameVertex(frame);
+        Color.ApplyPlayerColorToUnit(hero, teamColor);
+        Color.ApplyPlayerColorToItem(equipment, teamColor);
+        Color.ApplyPlayerColorToDestructable(scenery, teamColor);
+        Color.ApplyPlayerColorToEffect(specialEffect, owner);
+
+        FloatingTextTag popup = new FloatingTextTag(
+            "+250", GetUnitX(target), GetUnitY(target), 40.0,
+            0.023, 2.0, 1.5);
+        popup.SetColor(accent);
+        popup.SetVelocity(0.0, 0.035);
+        popup.AttachToUnit(target, 50.0);
+        popup.SetVisible(true);
+        popup.SetSuspended(false);
+        popup.SetAge(0.0);
+        popup.SetLifespan(2.0, 1.5);
+        popup.Dispose();
+        popup.Dispose();
+
+        LightningEffect bolt = new LightningEffect(
+            "CLPB", true,
+            new Vector3(GetUnitX(hero), GetUnitY(hero), 40.0),
+            new Vector3(GetUnitX(target), GetUnitY(target), 40.0));
+        bolt.SetColor(percent);
+        bolt.Move(
+            new Vector3(GetUnitX(hero), GetUnitY(hero), 40.0),
+            new Vector3(GetUnitX(target), GetUnitY(target), 40.0),
+            true);
+        bolt.Dispose();
+        bolt.Dispose();
+
+        UnitInventory inventory = new UnitInventory(hero);
+        int bagSize = inventory.BagSize();
+        item bagItem = inventory.BagItem(0);
+        item equippedItem = inventory.EquipmentItem(equipmentSlot);
+        bool inBag = inventory.IsInBag(equipment);
+        bool equipped = inventory.IsEquipped(equipment);
+        bool anyEquipped = inventory.HasAnyEquippedItem();
+        bool hasCategory = inventory.HasEquipmentType(equipmentCategory);
+        equipmentType itemType = inventory.ItemEquipmentType(equipment);
+        itemTag itemTagValue = inventory.ItemTag(equipment);
+        int randomEquipmentRawcode = ItemSelection.ChooseRandomRawcode(
+            ITEM_TYPE_PERMANENT, 5, equipmentCategory, itemTagValue, false, false);
+        bool canEquip = inventory.CanEquip(equipmentCategory);
+        bool emptySlot = inventory.HasEmptySlot(equipmentSlot);
+        bool equipResult = inventory.Equip(equipment);
+        inventory.Unequip(equipment);
+        item removed = inventory.UnequipSlot(equipmentSlot);
+
+        Talents.Reset(hero);
+        int talentRawcode = AbilityId("A0T1");
+        bool talentAdded = Talents.GrantAbility(hero, talentRawcode);
+        int talentRank = Talents.AbilityRank(hero, talentRawcode);
+        bool talentRankSet = Talents.SetAbilityRank(hero, talentRawcode, 2);
+        bool talentPermanent = Talents.SetAbilityPermanent(hero, talentRawcode, true);
+        bool talentRemoved = Talents.RemoveAbility(hero, talentRawcode);
+        float healed = RpgCombat.Heal(target, hero, 125.0, false, true);
+        float drained = RpgCombat.Heal(target, hero, -25.0, false, true);
+        UnitCombatStats stats = new UnitCombatStats(hero);
+        int strength = stats.Strength(true);
+        int agility = stats.Agility(true);
+        int intelligence = stats.Intelligence(true);
+        stats.SetStrength(strength, false);
+        stats.SetAgility(agility, false);
+        stats.SetIntelligence(intelligence, false);
+        float armor = stats.Armor();
+        stats.SetArmor(armor);
+        int baseDamage = stats.BaseDamage(0);
+        stats.SetBaseDamage(baseDamage, 0);
+        int diceNumber = stats.DamageDiceNumber(0);
+        stats.SetDamageDiceNumber(diceNumber, 0);
+        int diceSides = stats.DamageDiceSides(0);
+        stats.SetDamageDiceSides(diceSides, 0);
+        float attackCooldown = stats.AttackCooldown(0);
+        stats.SetAttackCooldown(attackCooldown, 0);
+        float moveSpeed = stats.MoveSpeed();
+        stats.SetMoveSpeed(moveSpeed);
+        int maxLife = stats.MaxLife();
+        stats.SetMaxLife(maxLife);
+        int maxMana = stats.MaxMana();
+        stats.SetMaxMana(maxMana);
+        float life = stats.Life();
+        stats.SetLife(life);
+        float mana = stats.Mana();
+        stats.SetMana(mana);
+        float abilityCooldown = stats.AbilityCooldown(talentRawcode, 0);
+        float remainingCooldown = stats.AbilityCooldownRemaining(talentRawcode);
+        stats.SetAbilityCooldownRemaining(talentRawcode, remainingCooldown);
+        float cooldownPercent = stats.AbilityCooldownPercent(talentRawcode);
+        stats.SetAbilityCooldownPercent(talentRawcode, cooldownPercent);
+        stats.AdjustAbilityCooldownPercent(talentRawcode, 0.0);
+        stats.AdjustAbilityCooldownRemaining(talentRawcode, 0.0);
+        stats.EndAbilityCooldown(talentRawcode);
+        stats.StartAbilityCooldown(talentRawcode, abilityCooldown);
+        item eventEquipped = InventoryEvents.EquippedItem();
+        item eventUnequipped = InventoryEvents.UnequippedItem();
+
+        SpecialEffects.Remove(specialEffect);
+        CameraSettings.SetHotkeyTargetLockAllowed(false);
+        bool cameraHotkeyLock = CameraSettings.IsHotkeyTargetLockAllowed();
+        AudioSettings.SetThematicMusicVolume(96);
+    }
+}

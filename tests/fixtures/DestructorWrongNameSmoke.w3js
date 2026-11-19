@@ -1,0 +1,9 @@
+namespace DestructorWrongNameSmoke
+{
+    public class Resource
+    {
+        ~OtherResource()
+        {
+        }
+    }
+}

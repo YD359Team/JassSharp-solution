@@ -1,0 +1,12 @@
+namespace Gamma
+{
+    void ShadowedName()
+    {
+    }
+
+    enum Color
+    {
+        Red,
+        Blue
+    }
+}

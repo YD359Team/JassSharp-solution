@@ -1,0 +1,16 @@
+namespace NamespaceTypeCollisions
+{
+    using Alpha;
+    using Beta;
+
+    int VerifyDistinctTypes()
+    {
+        Alpha.Player first = new Alpha.Player();
+        Beta.Player second = new Beta.Player();
+        Alpha.IIdentity firstIdentity = first;
+        Beta.IIdentity secondIdentity = second;
+        return firstIdentity.GetId() + secondIdentity.GetId()
+            + Alpha.Player.GetStaticId()
+            + Beta.Player.GetStaticId();
+    }
+}

@@ -1,0 +1,5 @@
+{
+  "mode": "headless",
+  "entry": "src/HeadlessWarcraftUsing.w3js",
+  "output": "bin/HeadlessWarcraftUsing.lua"
+}
